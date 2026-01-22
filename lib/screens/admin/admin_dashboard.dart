@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../utils/constants/colors.dart';
-import '../../utils/constants/sizes.dart';
 import '../../controllers/admin/admin_controller.dart';
-import '../../controllers/navigation_controller.dart';
 import '../../routes/route_names.dart';
 
 class AdminDashboard extends StatelessWidget {
@@ -11,272 +9,239 @@ class AdminDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<AdminController>();
-    final navController = Get.find<NavigationController>();
+    // Initialize controller
+    final controller = Get.put(AdminController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Modern color palette
+    final backgroundColor = isDark
+        ? const Color(0xFF121212)
+        : const Color(0xFFF5F5F5);
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return Scaffold(
-      backgroundColor: isDark ? TColors.dark : TColors.light,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text("Admin Command Center"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => navController.selectedIndex.value = 0,
+        backgroundColor: isDark ? TColors.dark : Colors.white,
+        elevation: 0,
+        titleSpacing: 20,
+        automaticallyImplyLeading: false, // Clean header (No back button)
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "COMMAND CENTER",
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey : Colors.grey[600],
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              "Yoobbel Admin",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            onPressed: () => controller.refreshStats(),
-            icon: const Icon(Icons.refresh),
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: () => controller.refreshStats(),
+              icon: const Icon(Icons.refresh, size: 20),
+              color: isDark ? Colors.white : Colors.black,
+            ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(TSizes.md),
+        padding: const EdgeInsets.all(20),
         child: Obx(
           () => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Pending Approvals Card
+              // 1. Alert Banner (Only if needed)
               if (controller.pendingApprovalsCount.value > 0)
-                _buildApprovalNotificationCard(controller, isDark),
+                _buildAlertBanner(controller),
 
-              const SizedBox(height: TSizes.md),
-              Text(
-                "Factory Overview",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: TSizes.md),
-
-              // 2. Statistics Grid (Now fully dynamic)
+              // 2. Key Metrics Grid
+              const SizedBox(height: 10),
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 1.4,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                // FIX: Aspect Ratio 1.3 makes cards taller to prevent overflow
+                childAspectRatio: 1.3,
                 children: [
-                  _buildStatCard(
+                  _buildModernStatCard(
                     "Production",
                     "₹${controller.totalDailyProduction.value}",
                     TColors.primary,
                     Icons.currency_rupee,
+                    isDark,
                   ),
-                  _buildStatCard(
+                  _buildModernStatCard(
                     "Efficiency",
                     "${controller.averageEfficiency.value.toStringAsFixed(1)}%",
                     controller.averageEfficiency.value > 80
                         ? Colors.green
                         : Colors.orange,
                     Icons.trending_up,
+                    isDark,
                   ),
-                  _buildStatCard(
-                    "Workers",
+                  _buildModernStatCard(
+                    "Active Workers",
                     "${controller.activeWorkers.value}",
                     Colors.blue,
-                    Icons.people,
+                    Icons.groups,
+                    isDark,
                   ),
-                  _buildStatCard(
-                    "Damages",
+                  _buildModernStatCard(
+                    "Reported Damages",
                     "${controller.totalDamages.value}",
                     Colors.red,
-                    Icons.warning,
+                    Icons.warning_amber_rounded,
+                    isDark,
                   ),
                 ],
               ),
 
-              const SizedBox(height: TSizes.xl),
+              const SizedBox(height: 25),
 
-              // 3. NEW: Stitching Section Entries
-              _buildSectionHeader(
-                context,
-                "Floor Status: Stitching",
-                Icons.precision_manufacturing_outlined,
+              // 3. Quick Actions
+              const Text(
+                "QUICK ACCESS",
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                  letterSpacing: 1.2,
+                ),
               ),
-              const SizedBox(height: TSizes.md),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      "Sales Agents",
+                      "Team & Orders",
+                      Icons.person_pin_circle_outlined,
+                      TColors.marketing,
+                      () => Get.toNamed(AppRouteNames.agentList),
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      "Inventory",
+                      "Stock Summary",
+                      Icons.inventory_2_outlined,
+                      TColors.packing,
+                      () => Get.toNamed(AppRouteNames.factoryStock),
+                    ),
+                  ),
+                ],
+              ),
 
+              const SizedBox(height: 30),
+
+              // 4. Live Floor Activity Feeds
+              _buildModernSectionHeader("Live Floor Activity"),
+              const SizedBox(height: 15),
+
+              // --- Stitching Feed ---
+              _buildDepartmentHeader("Stitching Line", TColors.stitching),
               if (controller.recentStitchingEntries.isEmpty)
-                const Center(child: Text("No stitching records today."))
+                _buildEmptyState("No stitching data yet")
               else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: controller.recentStitchingEntries.length,
-                  itemBuilder: (context, index) {
-                    final entry = controller.recentStitchingEntries[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: TColors.stitching,
-                          child: Icon(
-                            Icons.person_outline,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                        title: Text(
-                          "${entry['workerName']}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          "Style: ${entry['styleNo']} • Op: ${entry['operationType']}",
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "${entry['completedQty']}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: TColors.stitching,
-                              ),
-                            ),
-                            const Text("Done", style: TextStyle(fontSize: 10)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                ...controller.recentStitchingEntries.map(
+                  (entry) => _buildLogTile(
+                    title: "${entry['workerName']}",
+                    subtitle:
+                        "Style: ${entry['styleNo']} • Op: ${entry['operationType']}",
+                    value: "${entry['completedQty']}",
+                    unit: "Pcs",
+                    color: TColors.stitching,
+                    icon: Icons.precision_manufacturing_outlined,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                  ),
                 ),
 
-              const SizedBox(height: TSizes.xl),
+              const SizedBox(height: 20),
 
-              // 4. Printing Section Entries
-              _buildSectionHeader(
-                context,
-                "Floor Status: Printing",
-                Icons.colorize,
-              ),
-              const SizedBox(height: TSizes.md),
-
+              // --- Printing Feed ---
+              _buildDepartmentHeader("Printing Unit", TColors.printing),
               if (controller.recentPrintingEntries.isEmpty)
-                const Center(child: Text("No printing entries recorded today."))
+                _buildEmptyState("No printing data yet")
               else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: controller.recentPrintingEntries.length,
-                  itemBuilder: (context, index) {
-                    final entry = controller.recentPrintingEntries[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.purple,
-                          child: Icon(
-                            Icons.print_outlined,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                        title: Text(
-                          "Style: ${entry['styleNo']}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          "Good Pieces: ${entry['netGoodPieces']}",
-                        ),
-                        trailing: Text(
-                          "${entry['totalDamaged']} Bad",
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                ...controller.recentPrintingEntries.map(
+                  (entry) => _buildLogTile(
+                    title: "Style: ${entry['styleNo']}",
+                    subtitle: "${entry['totalDamaged']} Damaged",
+                    value: "${entry['netGoodPieces']}",
+                    unit: "Good",
+                    color: TColors.printing,
+                    icon: Icons.print,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                  ),
                 ),
 
-              const SizedBox(height: TSizes.xl),
+              const SizedBox(height: 20),
 
-              // 5. Cutting Section Entries
-              _buildSectionHeader(
-                context,
-                "Floor Status: Cutting",
-                Icons.content_cut,
-              ),
-              const SizedBox(height: TSizes.md),
-
+              // --- Cutting Feed ---
+              _buildDepartmentHeader("Cutting Table", TColors.cutting),
               if (controller.recentCuttingEntries.isEmpty)
-                const Center(child: Text("No cutting entries recorded today."))
+                _buildEmptyState("No cutting data yet")
               else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: controller.recentCuttingEntries.length,
-                  itemBuilder: (context, index) {
-                    final entry = controller.recentCuttingEntries[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.redAccent,
-                          child: Icon(Icons.cut, color: Colors.white, size: 18),
-                        ),
-                        title: Text(
-                          "Style: ${entry['styleNo']}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          "Lot: ${entry['lotNo']} • Fabric: ${entry['fabricType']}",
-                        ),
-                        trailing: Text(
-                          "${entry['totalQuantity']} Pcs",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    );
-                  },
+                ...controller.recentCuttingEntries.map(
+                  (entry) => _buildLogTile(
+                    title: "Style: ${entry['styleNo']}",
+                    subtitle: "Lot: ${entry['lotNo']}",
+                    value: "${entry['totalQuantity']}",
+                    unit: "Layers",
+                    color: TColors.cutting,
+                    icon: Icons.content_cut,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                  ),
                 ),
 
-              const SizedBox(height: TSizes.xl),
+              const SizedBox(height: 20),
 
-              // 6. Marketing Orders Section
-              _buildSectionHeader(
-                context,
-                "Recent Marketing Orders",
-                Icons.shopping_bag_outlined,
-              ),
-              const SizedBox(height: TSizes.md),
-
+              // --- Marketing Feed ---
+              _buildDepartmentHeader("Recent Orders", TColors.marketing),
               if (controller.recentOrders.isEmpty)
-                const Center(child: Text("No orders recorded yet."))
+                _buildEmptyState("No new orders")
               else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: controller.recentOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = controller.recentOrders[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.storefront_outlined),
-                        ),
-                        title: Text(
-                          order.clientName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          "${order.productName} • Qty: ${order.quantity}",
-                        ),
-                        trailing: Text(
-                          "₹${order.totalAmount}",
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                ...controller.recentOrders.map(
+                  (order) => _buildLogTile(
+                    title: order.clientName,
+                    subtitle: "${order.productName} (x${order.quantity})",
+                    value: "₹${order.totalAmount}",
+                    unit: "",
+                    color: TColors.marketing,
+                    icon: Icons.shopping_bag,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                  ),
                 ),
+
+              const SizedBox(height: 50),
             ],
           ),
         ),
@@ -284,48 +249,187 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  // --- UI Helpers ---
-  Widget _buildSectionHeader(
-    BuildContext context,
-    String title,
-    IconData icon,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: TColors.primary),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+  // ==================== MODERN WIDGETS ====================
+
+  Widget _buildAlertBanner(AdminController controller) {
+    return GestureDetector(
+      onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ],
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.notifications_active,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Action Required",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    "${controller.pendingApprovalsCount.value} New users waiting for approval",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward, color: Colors.white),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildStatCard(
+  Widget _buildModernStatCard(
     String title,
     String value,
     Color color,
     IconData icon,
+    bool isDark,
   ) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Background Watermark Icon
+          Positioned(
+            right: -5,
+            top: -5,
+            child: Icon(icon, size: 70, color: color.withOpacity(0.08)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(
+              12,
+            ), // Reduced padding to prevent overflow
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 18, color: color),
+                ),
+                const Spacer(),
+                // FIX: FittedBox ensures text scales down if number is huge
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(isDark ? 0.15 : 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
             ),
           ],
         ),
@@ -333,42 +437,148 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildApprovalNotificationCard(
-    AdminController controller,
-    bool isDark,
-  ) {
-    return GestureDetector(
-      onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: TSizes.md),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+  Widget _buildModernSectionHeader(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 20,
+          decoration: BoxDecoration(
+            color: TColors.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.group_add, color: Colors.orange, size: 30),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Pending Approvals",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "${controller.pendingApprovalsCount.value} requests waiting",
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDepartmentHeader(String title, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 8, color: color),
+          const SizedBox(width: 8),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+              letterSpacing: 1.0,
             ),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.orange),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      ),
+      child: Center(
+        child: Text(
+          text,
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLogTile({
+    required String title,
+    required String subtitle,
+    required String value,
+    required String unit,
+    required Color color,
+    required IconData icon,
+    required bool isDark,
+    required Color cardColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              if (unit.isNotEmpty)
+                Text(
+                  unit,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

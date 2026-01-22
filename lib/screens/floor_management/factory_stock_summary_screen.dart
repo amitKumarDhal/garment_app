@@ -9,6 +9,7 @@ class FactoryStockSummaryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // We use Get.find because the controller is already alive from the previous screen
     final controller = Get.find<PackingController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -19,9 +20,10 @@ class FactoryStockSummaryScreen extends StatelessWidget {
         centerTitle: true,
         backgroundColor: TColors.packing,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(TSizes.md),
+        padding: const EdgeInsets.all(TSizes.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -45,7 +47,7 @@ class FactoryStockSummaryScreen extends StatelessWidget {
                 crossAxisCount: 2,
                 mainAxisSpacing: TSizes.md,
                 crossAxisSpacing: TSizes.md,
-                childAspectRatio: 1.4, // Adjusted for better fit
+                childAspectRatio: 1.5, // Slightly wider for better fit
                 children: [
                   _buildSizeBox(
                     "Small (S)",
@@ -76,7 +78,7 @@ class FactoryStockSummaryScreen extends StatelessWidget {
                     controller.countXXL,
                     Colors.purple,
                     isDark,
-                  ), // Added XXL
+                  ),
                 ],
               ),
             ),
@@ -91,7 +93,16 @@ class FactoryStockSummaryScreen extends StatelessWidget {
                   "Recent Packing Logs",
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                TextButton(onPressed: () {}, child: const Text("View All")),
+                // Optional: Export Feature
+                IconButton(
+                  icon: const Icon(
+                    Icons.download,
+                    size: 20,
+                    color: Colors.grey,
+                  ),
+                  onPressed: () =>
+                      Get.snackbar("Info", "Export to CSV coming soon"),
+                ),
               ],
             ),
 
@@ -99,10 +110,16 @@ class FactoryStockSummaryScreen extends StatelessWidget {
               if (controller.inventoryList.isEmpty) {
                 return const Center(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      "No cartons recorded yet.",
-                      style: TextStyle(color: Colors.grey),
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Column(
+                      children: [
+                        Icon(Icons.inbox, size: 40, color: Colors.grey),
+                        SizedBox(height: 10),
+                        Text(
+                          "No cartons recorded yet.",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -111,12 +128,14 @@ class FactoryStockSummaryScreen extends StatelessWidget {
               return ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: controller.inventoryList.length > 5
-                    ? 5
+                // FIX: Limit to 10 items, but keep ORIGINAL order (Newest First)
+                itemCount: controller.inventoryList.length > 10
+                    ? 10
                     : controller.inventoryList.length,
                 itemBuilder: (context, index) {
-                  final item = controller.inventoryList.reversed
-                      .toList()[index];
+                  // FIX: Removed .reversed so we see the newest item at the top
+                  final item = controller.inventoryList[index];
+
                   return Card(
                     elevation: 0,
                     color: isDark ? TColors.dark : Colors.white,
@@ -139,20 +158,42 @@ class FactoryStockSummaryScreen extends StatelessWidget {
                           color: TColors.packing,
                         ),
                       ),
-                      title: Text("Carton #${item['cartonNo']}"),
-                      subtitle: Text(
-                        "Size: ${item['category']} | Qty: ${item['totalPieces']}",
+                      title: Text(
+                        "Carton #${item['cartonNo']}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      trailing: const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 20,
+                      subtitle: Text(
+                        "Size: ${item['category']}  |  Qty: ${item['totalPieces']} Pcs",
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        ),
+                      ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 16,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "Packed",
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 },
               );
             }),
+            const SizedBox(height: 50), // Bottom padding for scrolling
           ],
         ),
       ),
@@ -166,8 +207,19 @@ class FactoryStockSummaryScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(TSizes.lg),
       decoration: BoxDecoration(
-        color: TColors.packing,
+        gradient: LinearGradient(
+          colors: [TColors.packing, TColors.packing.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+        boxShadow: [
+          BoxShadow(
+            color: TColors.packing.withOpacity(0.4),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -176,6 +228,7 @@ class FactoryStockSummaryScreen extends StatelessWidget {
             style: TextStyle(
               color: Colors.white70,
               fontWeight: FontWeight.bold,
+              letterSpacing: 1,
             ),
           ),
           const SizedBox(height: TSizes.sm),
@@ -184,10 +237,15 @@ class FactoryStockSummaryScreen extends StatelessWidget {
               "${controller.totalPiecesInFactory}",
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
+                fontSize: 42,
+                fontWeight: FontWeight.w900,
               ),
             ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            "Ready for Dispatch",
+            style: TextStyle(color: Colors.white60, fontSize: 12),
           ),
         ],
       ),
@@ -197,9 +255,16 @@ class FactoryStockSummaryScreen extends StatelessWidget {
   Widget _buildSizeBox(String label, int count, Color color, bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? TColors.dark : Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -212,15 +277,16 @@ class FactoryStockSummaryScreen extends StatelessWidget {
               fontSize: 12,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             "$count",
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
+          const SizedBox(height: 4),
           const Text(
             "Cartons",
             style: TextStyle(fontSize: 10, color: Colors.grey),

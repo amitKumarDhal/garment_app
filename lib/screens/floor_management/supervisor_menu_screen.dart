@@ -10,6 +10,7 @@ class SupervisorMenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure controller is initialized
     final controller = Get.put(SupervisorController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -18,13 +19,14 @@ class SupervisorMenuScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Yoobbel Production"),
         centerTitle: true,
+        automaticallyImplyLeading: false, // Hides back button
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(TSizes.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Section
+            // --- Welcome Section ---
             Obx(
               () => Container(
                 padding: const EdgeInsets.all(16),
@@ -64,36 +66,31 @@ class SupervisorMenuScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: TSizes.xl),
+
+            // --- Marketing Section ---
             const Text(
               "Department Sections",
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 12),
 
-            // Marketing
             _buildMenuCard(
               "New Order Entry",
               "Upload and record client orders",
               Icons.add_shopping_cart,
               TColors.marketing,
-              () => Get.toNamed(AppRouteNames.marketingUpload),
-            ),
-            _buildMenuCard(
-              "Marketing Agent List",
-              "Track and manage client orders",
-              Icons.campaign,
-              TColors.marketing,
-              () => Get.toNamed(AppRouteNames.agentList),
+              () => _safeNavigate(AppRouteNames.marketingUpload),
             ),
 
             const Divider(height: 32),
+
+            // --- Production Floor ---
             const Text(
               "Production Floor",
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 12),
 
-            // Production Floor
             _buildMenuCard(
               "Cutting Section",
               "Manage fabric layers",
@@ -116,25 +113,30 @@ class SupervisorMenuScreen extends StatelessWidget {
               () => controller.goToSection(AppRouteNames.stitchingEntry),
             ),
 
-            // --- MODIFIED: Packing Section with Analytics Icon ---
+            // --- UPDATED PACKING CARD ---
+            // Renamed to "Packing Section" and removed the inventory button
             _buildMenuCard(
-              "Packing & Inventory",
-              "Seal cartons & Check Stock",
+              "Packing Section",
+              "Seal cartons & record shipment",
               Icons.inventory_2,
               TColors.packing,
               () => controller.goToSection(AppRouteNames.packingEntry),
-              trailing: IconButton(
-                icon: const Icon(
-                  Icons.analytics_outlined,
-                  color: TColors.packing,
-                ),
-                onPressed: () => Get.toNamed(AppRouteNames.factoryStock),
-              ),
+              // No trailing button here anymore. It defaults to the arrow >
             ),
           ],
         ),
       ),
     );
+  }
+
+  // --- Helpers ---
+
+  void _safeNavigate(String route) {
+    try {
+      Get.toNamed(route);
+    } catch (e) {
+      Get.snackbar("Error", "Page not found: $route");
+    }
   }
 
   Widget _buildMenuCard(

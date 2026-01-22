@@ -6,13 +6,16 @@ import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 import '../../utils/widgets/custom_text_field.dart';
 import '../../controllers/floor_management/packing_controller.dart';
+// import '../../routes/route_names.dart'; // No longer needed if we aren't navigating
 
 class PackingEntryScreen extends StatelessWidget {
   const PackingEntryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final PackingController controller = Get.put(PackingController());
+    // FIX: Use Get.find() to retrieve the persistent controller instance
+    final controller = Get.find<PackingController>();
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = screenWidth > 600 ? 3 : 2;
@@ -23,15 +26,9 @@ class PackingEntryScreen extends StatelessWidget {
         title: const Text("Factory Packing Entry"),
         centerTitle: true,
         backgroundColor: TColors.packing,
-        foregroundColor: TColors.textWhite,
+        foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          // Link to the Summary Screen
-          IconButton(
-            onPressed: () => Get.toNamed('/factory-stock-summary'),
-            icon: const Icon(Icons.analytics_outlined),
-          ),
-        ],
+        // REMOVED: The 'actions' list with the analytics button is gone.
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(TSizes.md),
@@ -60,6 +57,17 @@ class PackingEntryScreen extends StatelessWidget {
                       validator: (value) =>
                           value == null || value.isEmpty ? "Required" : null,
                     ),
+                    const SizedBox(height: TSizes.md),
+
+                    // Style Number Field
+                    TCustomTextField(
+                      label: "Style Number",
+                      controller: controller.styleNo,
+                      prefixIcon: Icons.style,
+                      validator: (value) =>
+                          value == null || value.isEmpty ? "Required" : null,
+                    ),
+
                     const SizedBox(height: TSizes.md),
                     const Text(
                       "Select Primary Size Category:",
@@ -95,9 +103,13 @@ class PackingEntryScreen extends StatelessWidget {
                                 ),
                                 selected: isSelected,
                                 selectedColor: TColors.packing,
+                                backgroundColor: isDark
+                                    ? Colors.grey[800]
+                                    : Colors.grey[200],
                                 onSelected: (selected) {
-                                  if (selected)
+                                  if (selected) {
                                     controller.selectedCartonSize.value = size;
+                                  }
                                 },
                               ),
                             );
@@ -235,7 +247,7 @@ class PackingEntryScreen extends StatelessWidget {
     );
   }
 
-  // --- Helper Widgets (Same as your provided code) ---
+  // --- UI Helpers ---
   Widget _buildSectionHeader(
     BuildContext context,
     String title,

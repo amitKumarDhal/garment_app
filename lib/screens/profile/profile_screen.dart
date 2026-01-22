@@ -1,126 +1,123 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:yoobbel/controllers/auth/profile_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
-import '../../routes/route_names.dart';
-import '../../controllers/auth/profile_controller.dart';
-import '../../controllers/navigation_controller.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // FIX: Use Get.find if initialized in MainWrapper/Binding to persist state
+    // Initialize the Production Controller
     final controller = Get.put(ProfileController());
-    final navController = Get.find<NavigationController>();
-    // final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        // Global Behavior: Back button always returns to Home Tab
-        if (navController.selectedIndex.value != 0) {
-          navController.selectedIndex.value = 0;
-        }
-      },
-      child: Scaffold(
-        // FIX: Ensuring background matches global theme perfectly
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text("My Profile"),
-          centerTitle: true,
-          backgroundColor: TColors.primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-            onPressed: () => navController.selectedIndex.value = 0,
+    // Note: We removed PopScope because MainWrapper already handles
+    // the "Back to Home" logic for the Bottom Navigation Bar.
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text("My Profile"),
+        centerTitle: true,
+        backgroundColor: TColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        // Optional: Add refresh button to reload data manually
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => controller.fetchUserProfile(),
           ),
-        ),
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              // --- Header Section ---
-              _buildHeader(context, controller),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // --- Header Section ---
+            _buildHeader(context, controller),
 
-              const SizedBox(height: TSizes.xl),
+            const SizedBox(height: TSizes.xl),
 
-              // --- Settings Section ---
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: TSizes.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionLabel(context, "Account Settings"),
-                    _buildProfileMenuItem(
-                      context,
-                      icon: Icons.edit_outlined,
-                      title: "Edit Profile",
-                      onTap: () {},
-                    ),
-                    _buildProfileMenuItem(
-                      context,
-                      icon: Icons.notifications_none,
-                      title: "Notifications",
-                      onTap: () {},
-                    ),
-                    _buildProfileMenuItem(
-                      context,
-                      icon: Icons.security_outlined,
-                      title: "Security",
-                      onTap: () {},
-                    ),
+            // --- Settings Section ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: TSizes.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionLabel(context, "Account Settings"),
+                  _buildProfileMenuItem(
+                    context,
+                    icon: Icons.edit_outlined,
+                    title: "Edit Profile",
+                    onTap: () {
+                      // TODO: Add Edit Profile Logic
+                      Get.snackbar(
+                        "Coming Soon",
+                        "Edit Profile feature is in progress",
+                      );
+                    },
+                  ),
+                  _buildProfileMenuItem(
+                    context,
+                    icon: Icons.notifications_none,
+                    title: "Notifications",
+                    onTap: () {},
+                  ),
+                  _buildProfileMenuItem(
+                    context,
+                    icon: Icons.security_outlined,
+                    title: "Security",
+                    onTap: () {},
+                  ),
 
-                    const SizedBox(height: TSizes.lg),
-                    _buildSectionLabel(context, "App System"),
-                    _buildThemeToggleItem(context),
+                  const SizedBox(height: TSizes.lg),
+                  _buildSectionLabel(context, "App System"),
+                  _buildThemeToggleItem(context),
 
-                    _buildProfileMenuItem(
-                      context,
-                      icon: Icons.language_outlined,
-                      title: "Language",
-                      onTap: () {},
-                    ),
-                    _buildProfileMenuItem(
-                      context,
-                      icon: Icons.help_outline,
-                      title: "Help Center",
-                      onTap: () {},
-                    ),
+                  _buildProfileMenuItem(
+                    context,
+                    icon: Icons.language_outlined,
+                    title: "Language",
+                    onTap: () {},
+                  ),
+                  _buildProfileMenuItem(
+                    context,
+                    icon: Icons.help_outline,
+                    title: "Help Center",
+                    onTap: () {},
+                  ),
 
-                    const SizedBox(height: TSizes.xl),
+                  const SizedBox(height: TSizes.xl),
 
-                    // --- Logout Button ---
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => _showLogoutDialog(controller),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: TSizes.md,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(TSizes.sm),
-                          ),
+                  // --- Logout Button ---
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => _showLogoutDialog(controller),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
                         ),
-                        child: const Text(
-                          "LOGOUT",
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(TSizes.sm),
+                        ),
+                      ),
+                      child: const Text(
+                        "LOGOUT",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    const SizedBox(height: TSizes.xl),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: TSizes.xl),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -146,16 +143,30 @@ class ProfileScreen extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white24, width: 4),
             ),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 50,
               backgroundColor: Colors.white10,
-              child: Icon(Icons.person, size: 60, color: Colors.white),
+              // Show first letter of name if available
+              child: Obx(
+                () => Text(
+                  controller.name.value.isNotEmpty
+                      ? controller.name.value[0].toUpperCase()
+                      : "U",
+                  style: const TextStyle(
+                    fontSize: 40,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: TSizes.md),
+
+          // FIX: Variable names now match the Real ProfileController
           Obx(
             () => Text(
-              controller.userName.value,
+              controller.name.value, // Was userName
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -164,14 +175,14 @@ class ProfileScreen extends StatelessWidget {
           ),
           Obx(
             () => Text(
-              controller.userEmail.value,
+              controller.email.value, // Was userEmail
               style: const TextStyle(color: Colors.white70),
             ),
           ),
           const SizedBox(height: 4),
           Obx(
             () => Text(
-              "ID: ${controller.supervisorId.value}",
+              "ID: ${controller.employeeId.value}", // Was supervisorId
               style: const TextStyle(color: Colors.white60, fontSize: 12),
             ),
           ),
@@ -271,7 +282,7 @@ class ProfileScreen extends StatelessWidget {
       buttonColor: Colors.red,
       onConfirm: () {
         controller.logout();
-        Get.offAllNamed(AppRouteNames.login);
+        // Note: The controller handles the navigation to login
       },
     );
   }

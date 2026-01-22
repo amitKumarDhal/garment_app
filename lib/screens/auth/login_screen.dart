@@ -11,10 +11,12 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // If you use Bindings, use Get.find(). Otherwise Get.put() is fine here.
     final controller = Get.put(LoginController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? TColors.dark : TColors.light,
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(TSizes.lg),
@@ -22,27 +24,39 @@ class LoginScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 80),
+
+              // --- Header ---
               Text(
                 "Factory Manager",
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: TColors.primary,
                 ),
               ),
-              const Text("Select your role to access your dashboard"),
+              const SizedBox(height: TSizes.xs),
+              Text(
+                "Select your role to access your dashboard",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+
               const SizedBox(height: TSizes.xl),
 
+              // --- Role Selection Grid ---
               const Text(
                 "Login as:",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: TSizes.sm),
-
               _buildRoleGrid(controller, isDark),
 
               const SizedBox(height: TSizes.xl),
+
+              // --- Login Form ---
               _buildLoginForm(controller),
 
               const SizedBox(height: TSizes.xl),
+
+              // --- Footer ---
               _buildSignUpFooter(),
             ],
           ),
@@ -68,7 +82,8 @@ class LoginScreen extends StatelessWidget {
           final isSelected = controller.selectedRole.value == role;
           return GestureDetector(
             onTap: () => controller.selectedRole.value = role,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               decoration: BoxDecoration(
                 color: isSelected
                     ? TColors.primary
@@ -77,9 +92,18 @@ class LoginScreen extends StatelessWidget {
                 border: Border.all(
                   color: isSelected
                       ? TColors.primary
-                      : Colors.grey.withOpacity(0.2),
+                      : Colors.grey.withOpacity(0.3),
                   width: 2,
                 ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: TColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : [],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -88,10 +112,14 @@ class LoginScreen extends StatelessWidget {
                     controller.roleIcons[role],
                     color: isSelected ? Colors.white : TColors.primary,
                   ),
+                  const SizedBox(height: 5),
                   Text(
                     role,
                     style: TextStyle(
                       fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       color: isSelected
                           ? Colors.white
                           : (isDark ? Colors.white70 : Colors.black87),
@@ -136,14 +164,32 @@ class LoginScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: TSizes.lg),
-          Obx(
-            () => ElevatedButton(
-              onPressed: controller.isLoading.value
-                  ? null
-                  : () => controller.login(),
-              child: controller.isLoading.value
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("LOGIN"),
+
+          // --- Full Width Login Button ---
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: Obx(
+              () => ElevatedButton(
+                onPressed: controller.isLoading.value
+                    ? null
+                    : () => controller.login(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(TSizes.sm),
+                  ),
+                ),
+                child: controller.isLoading.value
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        "LOGIN",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
             ),
           ),
         ],
