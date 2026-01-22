@@ -36,6 +36,7 @@ class AdminDashboard extends StatelessWidget {
           () => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. Pending Approvals Card
               if (controller.pendingApprovalsCount.value > 0)
                 _buildApprovalNotificationCard(controller, isDark),
 
@@ -48,6 +49,7 @@ class AdminDashboard extends StatelessWidget {
               ),
               const SizedBox(height: TSizes.md),
 
+              // 2. Statistics Grid (Now fully dynamic)
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -58,14 +60,16 @@ class AdminDashboard extends StatelessWidget {
                 children: [
                   _buildStatCard(
                     "Production",
-                    "${controller.totalDailyProduction.value}",
+                    "₹${controller.totalDailyProduction.value}",
                     TColors.primary,
-                    Icons.precision_manufacturing,
+                    Icons.currency_rupee,
                   ),
                   _buildStatCard(
                     "Efficiency",
-                    "${controller.averageEfficiency.value}%",
-                    Colors.green,
+                    "${controller.averageEfficiency.value.toStringAsFixed(1)}%",
+                    controller.averageEfficiency.value > 80
+                        ? Colors.green
+                        : Colors.orange,
                     Icons.trending_up,
                   ),
                   _buildStatCard(
@@ -82,10 +86,221 @@ class AdminDashboard extends StatelessWidget {
                   ),
                 ],
               ),
+
+              const SizedBox(height: TSizes.xl),
+
+              // 3. NEW: Stitching Section Entries
+              _buildSectionHeader(
+                context,
+                "Floor Status: Stitching",
+                Icons.precision_manufacturing_outlined,
+              ),
+              const SizedBox(height: TSizes.md),
+
+              if (controller.recentStitchingEntries.isEmpty)
+                const Center(child: Text("No stitching records today."))
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: controller.recentStitchingEntries.length,
+                  itemBuilder: (context, index) {
+                    final entry = controller.recentStitchingEntries[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: TColors.stitching,
+                          child: Icon(
+                            Icons.person_outline,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          "${entry['workerName']}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "Style: ${entry['styleNo']} • Op: ${entry['operationType']}",
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "${entry['completedQty']}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: TColors.stitching,
+                              ),
+                            ),
+                            const Text("Done", style: TextStyle(fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: TSizes.xl),
+
+              // 4. Printing Section Entries
+              _buildSectionHeader(
+                context,
+                "Floor Status: Printing",
+                Icons.colorize,
+              ),
+              const SizedBox(height: TSizes.md),
+
+              if (controller.recentPrintingEntries.isEmpty)
+                const Center(child: Text("No printing entries recorded today."))
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: controller.recentPrintingEntries.length,
+                  itemBuilder: (context, index) {
+                    final entry = controller.recentPrintingEntries[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.purple,
+                          child: Icon(
+                            Icons.print_outlined,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          "Style: ${entry['styleNo']}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "Good Pieces: ${entry['netGoodPieces']}",
+                        ),
+                        trailing: Text(
+                          "${entry['totalDamaged']} Bad",
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: TSizes.xl),
+
+              // 5. Cutting Section Entries
+              _buildSectionHeader(
+                context,
+                "Floor Status: Cutting",
+                Icons.content_cut,
+              ),
+              const SizedBox(height: TSizes.md),
+
+              if (controller.recentCuttingEntries.isEmpty)
+                const Center(child: Text("No cutting entries recorded today."))
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: controller.recentCuttingEntries.length,
+                  itemBuilder: (context, index) {
+                    final entry = controller.recentCuttingEntries[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.redAccent,
+                          child: Icon(Icons.cut, color: Colors.white, size: 18),
+                        ),
+                        title: Text(
+                          "Style: ${entry['styleNo']}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "Lot: ${entry['lotNo']} • Fabric: ${entry['fabricType']}",
+                        ),
+                        trailing: Text(
+                          "${entry['totalQuantity']} Pcs",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: TSizes.xl),
+
+              // 6. Marketing Orders Section
+              _buildSectionHeader(
+                context,
+                "Recent Marketing Orders",
+                Icons.shopping_bag_outlined,
+              ),
+              const SizedBox(height: TSizes.md),
+
+              if (controller.recentOrders.isEmpty)
+                const Center(child: Text("No orders recorded yet."))
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: controller.recentOrders.length,
+                  itemBuilder: (context, index) {
+                    final order = controller.recentOrders[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.storefront_outlined),
+                        ),
+                        title: Text(
+                          order.clientName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "${order.productName} • Qty: ${order.quantity}",
+                        ),
+                        trailing: Text(
+                          "₹${order.totalAmount}",
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  // --- UI Helpers ---
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: TColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 
@@ -106,7 +321,7 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               value,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
               title,
@@ -125,6 +340,7 @@ class AdminDashboard extends StatelessWidget {
     return GestureDetector(
       onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
       child: Container(
+        margin: const EdgeInsets.only(bottom: TSizes.md),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.orange.withOpacity(0.1),

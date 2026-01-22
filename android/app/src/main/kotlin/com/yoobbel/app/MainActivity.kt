@@ -1,4 +1,4 @@
-package com.example.yoobbel
+package com.yoobbel.app
 
 import io.flutter.embedding.android.FlutterActivity
 

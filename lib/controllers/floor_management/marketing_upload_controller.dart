@@ -1,6 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart'; // REQUIRED
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'marketing_controller.dart'; // Import to update the global list
+import 'package:yoobbel/data/models/order_model.dart';
 
 class MarketingUploadController extends GetxController {
   final uploadFormKey = GlobalKey<FormState>();
@@ -17,18 +18,19 @@ class MarketingUploadController extends GetxController {
   final deadline = TextEditingController();
 
   final isLoading = false.obs;
+  DateTime? _selectedDeadline; // Store raw DateTime for Firestore
 
   // --- Date Picker Logic ---
   Future<void> chooseDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime.now(), // Agents can't pick past dates
+      firstDate: DateTime.now(),
       lastDate: DateTime(2030),
     );
 
     if (pickedDate != null) {
-      // Format: DD MMM YYYY (e.g., 17 Jan 2026)
+      _selectedDeadline = pickedDate; // Keep track of the actual date object
       deadline.text =
           "${pickedDate.day} ${_getMonthName(pickedDate.month)} ${pickedDate.year}";
     }
@@ -52,50 +54,47 @@ class MarketingUploadController extends GetxController {
     return months[month - 1];
   }
 
-  // --- Submit Logic ---
+  // --- Submit Logic (NOW WITH FIRESTORE) ---
   void submitOrder() async {
     if (!uploadFormKey.currentState!.validate()) return;
+    if (_selectedDeadline == null) {
+      Get.snackbar("Error", "Please select a deadline date");
+      return;
+    }
 
     try {
       isLoading.value = true;
-      await Future.delayed(
-        const Duration(seconds: 1),
-      ); // Simulate network delay
 
-      // --- Connect to MarketingController (In-Memory Update) ---
-      // This ensures the new order shows up in the Agent's list immediately
-      final marketingCtrl = Get.find<MarketingController>();
+      // 1. Create the OrderModel using your form data
+      final newOrder = OrderModel(
+        clientName: clientName.text.trim(),
+        productName: productDetails.text.trim(), // From productDetails field
+        quantity: int.tryParse(quantity.text.trim()) ?? 0,
+        priority: "Medium", // You can add a priority picker later
+        orderDate: DateTime.now(),
+        deliveryDate: _selectedDeadline!,
+        marketingPersonName:
+            "Amit शर्मा", // Ideally get this from current user profile
+        totalAmount: double.tryParse(orderValue.text.trim()) ?? 0.0,
+      );
 
-      final newOrder = {
-        "name": clientName.text.trim(),
-        "org": organization.text.trim(),
-        "phone": phone.text.trim(),
-        "qty": int.tryParse(quantity.text) ?? 0,
-        "value": "₹${orderValue.text.trim()}",
-        "gst": "${gstInfo.text.trim()}%",
-        "date": "Today",
-        "targetDate": deadline.text.trim(),
-        "status": "Processing",
-      };
-
-      // Add to the first agent (Amit Sharma) for now as a dummy test
-      if (marketingCtrl.allAgents.isNotEmpty) {
-        marketingCtrl.allAgents[0]['clients'].add(newOrder);
-        marketingCtrl.allAgents.refresh(); // Tell GetX to update the UI
-      }
+      // 2. Save to Cloud Firestore 'orders' collection
+      await FirebaseFirestore.instance
+          .collection('orders')
+          .add(newOrder.toJson());
 
       Get.snackbar(
         "Success",
-        "Order ${orderNo.text} recorded for ${clientName.text}",
+        "Order ${orderNo.text} for ${clientName.text} saved to Cloud",
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green.withOpacity(0.1),
         colorText: Colors.green,
       );
 
       _clearForm();
-      Get.back(); // Go back to the list screen after upload
+      Get.back();
     } catch (e) {
-      Get.snackbar("Error", "Failed to upload order");
+      Get.snackbar("Error", "Failed to upload to database: $e");
     } finally {
       isLoading.value = false;
     }
@@ -113,10 +112,12 @@ class MarketingUploadController extends GetxController {
       gstInfo,
       deadline,
     ].forEach((c) => c.clear());
+    _selectedDeadline = null;
   }
 
   @override
   void onClose() {
+    // Crucial for 8GB RAM: Dispose all controllers properly
     [
       orderNo,
       clientName,

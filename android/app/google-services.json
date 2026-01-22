@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1081594365878",
+    "project_id": "yoobbel-bbsr01",
+    "storage_bucket": "yoobbel-bbsr01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1081594365878:android:23510363559189d81ea317",
+        "android_client_info": {
+          "package_name": "com.yoobbel.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrKSjEDerQjyxjDRSCQC9bvzU8KEA4QbU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

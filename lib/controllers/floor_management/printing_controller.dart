@@ -1,19 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class PrintingController extends GetxController {
   final printingFormKey = GlobalKey<FormState>();
+  final isLoading = false.obs;
 
-  // 1. References from Cutting (To be fetched from DB later)
   final styleNo = TextEditingController();
-  final receivedFromCutting = TextEditingController(); // e.g., 100 pieces
+  final receivedFromCutting = TextEditingController();
 
-  // 2. Printing Specific Inputs
-  final printingMachineNo = TextEditingController();
-  final inkType = TextEditingController();
-
-  // 3. Size-Wise "Damaged" Logic
-  // We track damages per size to identify where the printing press is failing
+  // Size-wise damage controllers
   var damagedQuantities = <String, TextEditingController>{
     'S': TextEditingController(),
     'M': TextEditingController(),
@@ -21,43 +17,70 @@ class PrintingController extends GetxController {
     'XL': TextEditingController(),
   }.obs;
 
-  // 4. Calculations
   RxInt totalDamaged = 0.obs;
   RxInt netGoodPieces = 0.obs;
 
   void calculatePrintingTotals() {
     int damageSum = 0;
     damagedQuantities.forEach((size, controller) {
-      if (controller.text.isNotEmpty) {
-        damageSum += int.tryParse(controller.text) ?? 0;
-      }
+      damageSum += int.tryParse(controller.text) ?? 0;
     });
     totalDamaged.value = damageSum;
 
-    // Net Pieces = Received - Damaged
     int received = int.tryParse(receivedFromCutting.text) ?? 0;
     netGoodPieces.value = received - totalDamaged.value;
   }
 
-  void submitPrintingData() {
-    if (printingFormKey.currentState!.validate()) {
+  Future<void> submitPrintingData() async {
+    if (!printingFormKey.currentState!.validate()) return;
+
+    try {
+      isLoading.value = true;
+
+      // Prepare map for database
+      Map<String, int> damageData = {};
+      damagedQuantities.forEach((size, controller) {
+        damageData[size] = int.tryParse(controller.text) ?? 0;
+      });
+
+      // Save to Firestore
+      await FirebaseFirestore.instance.collection('printing_entries').add({
+        "styleNo": styleNo.text.trim(),
+        "receivedFromCutting": int.tryParse(receivedFromCutting.text) ?? 0,
+        "damagedQuantities": damageData,
+        "totalDamaged": totalDamaged.value,
+        "netGoodPieces": netGoodPieces.value,
+        "timestamp": FieldValue.serverTimestamp(),
+        "status": "Printing Completed",
+      });
+
       Get.snackbar(
-        "Printing Updated",
-        "Total Good Pieces: ${netGoodPieces.value}. Sending to Stitching...",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.purple.withOpacity(0.1),
-        colorText: Colors.purple,
+        "Success",
+        "Sent ${netGoodPieces.value} pieces to Stitching",
+        backgroundColor: Colors.green.withOpacity(0.1),
+        colorText: Colors.green,
       );
-      // Future: Firebase Update call here
+
+      _clearFields();
+      Get.back();
+    } catch (e) {
+      Get.snackbar("Error", e.toString());
+    } finally {
+      isLoading.value = false;
     }
+  }
+
+  void _clearFields() {
+    [styleNo, receivedFromCutting].forEach((c) => c.clear());
+    damagedQuantities.forEach((_, c) => c.clear());
+    totalDamaged.value = 0;
+    netGoodPieces.value = 0;
   }
 
   @override
   void onClose() {
-    styleNo.dispose();
-    receivedFromCutting.dispose();
-    printingMachineNo.dispose();
-    inkType.dispose();
+    // Memory disposal for 8GB RAM performance
+    [styleNo, receivedFromCutting].forEach((c) => c.dispose());
     damagedQuantities.forEach((_, c) => c.dispose());
     super.onClose();
   }

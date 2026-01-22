@@ -15,13 +15,12 @@ class CuttingEntryScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      // Background adapts to theme
       backgroundColor: isDark ? TColors.dark : TColors.light,
       appBar: AppBar(
         title: const Text(TTexts.cuttingTitle),
         centerTitle: true,
         backgroundColor: TColors.cutting,
-        foregroundColor: TColors.textWhite,
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -31,7 +30,7 @@ class CuttingEntryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Section 1: Job Details Card ---
+              // Section 1: Job Details
               _buildSectionHeader(
                 context,
                 "Job Details",
@@ -55,6 +54,7 @@ class CuttingEntryScreen extends StatelessWidget {
                           child: TCustomTextField(
                             label: "Lot No",
                             controller: controller.lotNo,
+                            prefixIcon: Icons.numbers,
                           ),
                         ),
                         const SizedBox(width: TSizes.md),
@@ -62,6 +62,7 @@ class CuttingEntryScreen extends StatelessWidget {
                           child: TCustomTextField(
                             label: "Fabric",
                             controller: controller.fabricType,
+                            prefixIcon: Icons.layers_outlined,
                           ),
                         ),
                       ],
@@ -72,7 +73,7 @@ class CuttingEntryScreen extends StatelessWidget {
 
               const SizedBox(height: TSizes.xl),
 
-              // --- Section 2: Size-Wise Quantity Card ---
+              // Section 2: Size Breakdown
               _buildSectionHeader(
                 context,
                 "Size-Wise Quantity",
@@ -95,7 +96,6 @@ class CuttingEntryScreen extends StatelessWidget {
                     String sizeKey = controller.sizeQuantities.keys.elementAt(
                       index,
                     );
-
                     return TCustomTextField(
                       label: "Qty",
                       controller: controller.sizeQuantities[sizeKey],
@@ -109,36 +109,24 @@ class CuttingEntryScreen extends StatelessWidget {
 
               const SizedBox(height: TSizes.xl),
 
-              // --- Section 3: Summary & Action ---
+              // Section 3: Summary and Submission
               Container(
                 padding: const EdgeInsets.all(TSizes.lg),
-                decoration: BoxDecoration(
-                  color: isDark ? TColors.dark : Colors.white,
-                  borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+                decoration: _buildBoxDecoration(context).copyWith(
                   border: const Border(
                     bottom: BorderSide(color: TColors.cutting, width: 4),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.2 : 0.05,
-                      ),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           "Total Pieces:",
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white : TColors.textPrimary,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         Obx(
@@ -154,24 +142,30 @@ class CuttingEntryScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: TSizes.md),
+
+                    // Reactive Submit Button
                     SizedBox(
                       width: double.infinity,
                       height: 55,
-                      child: ElevatedButton(
-                        onPressed: () => controller.submitCuttingData(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: TColors.cutting,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(TSizes.sm),
+                      child: Obx(
+                        () => ElevatedButton(
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : () => controller.submitCuttingData(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: TColors.cutting,
                           ),
-                        ),
-                        child: Text(
-                          TTexts.submit.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          child: controller.isLoading.value
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                              : Text(
+                                  TTexts.submit.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -185,30 +179,21 @@ class CuttingEntryScreen extends StatelessWidget {
     );
   }
 
-  // --- UI Helpers ---
+  // Helper methods for UI consistency
   Widget _buildSectionHeader(
     BuildContext context,
     String title,
     IconData icon,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(bottom: TSizes.sm, left: TSizes.xs),
+      padding: const EdgeInsets.only(bottom: TSizes.sm),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: isDark ? Colors.grey[400] : TColors.textSecondary,
-          ),
+          Icon(icon, size: 20, color: TColors.cutting),
           const SizedBox(width: TSizes.sm),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : TColors.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -220,10 +205,9 @@ class CuttingEntryScreen extends StatelessWidget {
     return BoxDecoration(
       color: isDark ? TColors.dark : Colors.white,
       borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-      border: isDark ? Border.all(color: Colors.white10) : null,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+          color: Colors.black.withOpacity(0.05),
           blurRadius: 10,
           offset: const Offset(0, 4),
         ),

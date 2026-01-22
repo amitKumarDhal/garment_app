@@ -13,12 +13,13 @@ class AppRouteNames {
   static const String printingEntry = '/printing-entry';
   static const String stitchingEntry = '/stitching-entry';
   static const String packingEntry = '/packing-entry';
+  static const String factoryStock = '/factory-stock'; // ADDED
 
   // --- Marketing ---
   static const String agentList = '/agent-list';
   static const String agentDetail = '/agent-detail';
   static const String clientDetail = '/client-detail';
-  static const String marketingUpload = '/marketing-upload'; // ADDED THIS
+  static const String marketingUpload = '/marketing-upload';
 
   // --- Admin ---
   static const String adminDashboard = '/admin-dashboard';

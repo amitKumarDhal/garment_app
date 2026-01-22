@@ -1,20 +1,22 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class StitchingController extends GetxController {
+  static StitchingController get instance => Get.find();
   final stitchingFormKey = GlobalKey<FormState>();
+  final isLoading = false.obs;
 
-  // 1. Assignment Details
+  // --- Input Controllers ---
   final workerName = TextEditingController();
   final styleNo = TextEditingController();
-  final operationType = TextEditingController(); // e.g., Side Seam, Neck, etc.
+  final operationType = TextEditingController();
 
-  // 2. Production Tracking
   final assignedQty = TextEditingController();
   final completedQty = TextEditingController();
   final rejectedQty = TextEditingController();
 
-  // 3. Worker List (Dummy data until we use Firebase)
+  // --- FIX: Re-adding the missing list for the Dropdown ---
   var availableWorkers = <String>[
     "Worker 001 - Rahul",
     "Worker 002 - Priya",
@@ -22,7 +24,7 @@ class StitchingController extends GetxController {
     "Worker 004 - Suman",
   ].obs;
 
-  // 4. Summary Calculations
+  // --- Summary Calculations ---
   RxInt balanceQty = 0.obs;
   RxDouble efficiency = 0.0.obs;
 
@@ -31,36 +33,73 @@ class StitchingController extends GetxController {
     int completed = int.tryParse(completedQty.text) ?? 0;
     int rejected = int.tryParse(rejectedQty.text) ?? 0;
 
-    // Remaining = Total - (Completed + Rejected)
     balanceQty.value = assigned - (completed + rejected);
 
-    // Efficiency = (Completed / Assigned) * 100
     if (assigned > 0) {
       efficiency.value = (completed / assigned) * 100;
     }
   }
 
-  void submitStitchingEntry() {
-    if (stitchingFormKey.currentState!.validate()) {
+  /// --- Submit Logic with Firestore Integration ---
+  Future<void> submitStitchingEntry() async {
+    if (!stitchingFormKey.currentState!.validate()) return;
+
+    try {
+      isLoading.value = true;
+
+      // Save to 'stitching_entries' collection
+      await FirebaseFirestore.instance.collection('stitching_entries').add({
+        "workerName": workerName.text.trim(),
+        "styleNo": styleNo.text.trim(),
+        "operationType": operationType.text.trim(),
+        "assignedQty": int.tryParse(assignedQty.text) ?? 0,
+        "completedQty": int.tryParse(completedQty.text) ?? 0,
+        "rejectedQty": int.tryParse(rejectedQty.text) ?? 0,
+        "efficiency": efficiency.value,
+        "timestamp": FieldValue.serverTimestamp(),
+        "status": "Stitching Record Added",
+      });
+
       Get.snackbar(
         "Production Saved",
-        "Record for ${workerName.text} added to Daily Log.",
-        snackPosition: SnackPosition.BOTTOM,
+        "Record for ${workerName.text} synced to Cloud.",
         backgroundColor: Colors.green.withOpacity(0.1),
         colorText: Colors.green,
       );
-      // Logic to push to a 'Daily Production List' will go here
+
+      _clearFields();
+      Get.back();
+    } catch (e) {
+      Get.snackbar("Error", "Cloud Update Failed: $e");
+    } finally {
+      isLoading.value = false;
     }
+  }
+
+  void _clearFields() {
+    [
+      workerName,
+      styleNo,
+      operationType,
+      assignedQty,
+      completedQty,
+      rejectedQty,
+    ].forEach((c) => c.clear());
+    balanceQty.value = 0;
+    efficiency.value = 0.0;
   }
 
   @override
   void onClose() {
-    workerName.dispose();
-    styleNo.dispose();
-    operationType.dispose();
-    assignedQty.dispose();
-    completedQty.dispose();
-    rejectedQty.dispose();
+    // Memory disposal for 8GB RAM performance
+    [
+      workerName,
+      styleNo,
+      operationType,
+      assignedQty,
+      completedQty,
+      rejectedQty,
+    ].forEach((c) => c.dispose());
     super.onClose();
   }
 }

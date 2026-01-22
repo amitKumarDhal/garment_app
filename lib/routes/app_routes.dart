@@ -10,19 +10,20 @@ import '../screens/admin/pending_approvals_screen.dart';
 import '../screens/main_wrapper.dart';
 import '../screens/floor_management/supervisor_menu_screen.dart';
 import '../screens/floor_management/agent_list_screen.dart';
-import '../screens/floor_management/marketing_upload_screen.dart'; // NEW
+import '../screens/floor_management/marketing_upload_screen.dart';
 import '../screens/floor_management/cutting_entry_screen.dart';
 import '../screens/floor_management/printing_entry_screen.dart';
 import '../screens/floor_management/stitching_entry_screen.dart';
 import '../screens/floor_management/packing_entry_screen.dart';
+import '../screens/floor_management/factory_stock_summary_screen.dart'; // ADDED
 
 // Controllers
 import '../controllers/auth/splash_controller.dart';
 import '../controllers/auth/signup_controller.dart';
 import '../controllers/admin/admin_controller.dart';
 import '../controllers/navigation_controller.dart';
-import '../controllers/floor_management/marketing_controller.dart'; // NEW
-import '../controllers/floor_management/marketing_upload_controller.dart'; // NEW
+import '../controllers/floor_management/marketing_controller.dart';
+import '../controllers/floor_management/marketing_upload_controller.dart';
 import '../controllers/floor_management/cutting_controller.dart';
 import '../controllers/floor_management/printing_controller.dart';
 import '../controllers/floor_management/stitching_controller.dart';
@@ -30,14 +31,12 @@ import '../controllers/floor_management/packing_controller.dart';
 
 class AppRoutes {
   static final pages = [
-    // Splash
+    // Splash & Auth
     GetPage(
       name: AppRouteNames.splash,
       page: () => const SplashScreen(),
       binding: BindingsBuilder(() => Get.put(SplashController())),
     ),
-
-    // Auth
     GetPage(
       name: AppRouteNames.login,
       page: () => const LoginScreen(),
@@ -49,7 +48,7 @@ class AppRoutes {
       binding: BindingsBuilder(() => Get.lazyPut(() => SignupController())),
     ),
 
-    // Main Shell
+    // Shell & Admin
     GetPage(
       name: AppRouteNames.mainWrapper,
       page: () => const MainWrapper(),
@@ -58,8 +57,6 @@ class AppRoutes {
         Get.put(AdminController());
       }),
     ),
-
-    // Admin
     GetPage(
       name: AppRouteNames.adminDashboard,
       page: () => const AdminDashboard(),
@@ -75,7 +72,7 @@ class AppRoutes {
       page: () => const SupervisorMenuScreen(),
     ),
 
-    // Floor Management Sections
+    // Production Sections
     GetPage(
       name: AppRouteNames.cuttingEntry,
       page: () => const CuttingEntryScreen(),
@@ -91,21 +88,31 @@ class AppRoutes {
       page: () => const StitchingEntryScreen(),
       binding: BindingsBuilder(() => Get.lazyPut(() => StitchingController())),
     ),
+
+    // Packing Entry Page
     GetPage(
       name: AppRouteNames.packingEntry,
       page: () => const PackingEntryScreen(),
       binding: BindingsBuilder(() => Get.lazyPut(() => PackingController())),
     ),
 
-    // Marketing Section
+    // --- UPDATED: Added Binding here too ---
+    GetPage(
+      name: AppRouteNames.factoryStock,
+      page: () => const FactoryStockSummaryScreen(),
+      binding: BindingsBuilder(
+        () => Get.lazyPut(() => PackingController()),
+      ), // Add this!
+    ),
+
+    // Marketing
     GetPage(
       name: AppRouteNames.agentList,
       page: () => const AgentListScreen(),
       binding: BindingsBuilder(() => Get.lazyPut(() => MarketingController())),
     ),
     GetPage(
-      name: AppRouteNames
-          .marketingUpload, // Ensure this exists in your route_names.dart
+      name: AppRouteNames.marketingUpload,
       page: () => const MarketingUploadScreen(),
       binding: BindingsBuilder(
         () => Get.lazyPut(() => MarketingUploadController()),

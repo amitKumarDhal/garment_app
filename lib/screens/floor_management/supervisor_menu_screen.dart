@@ -24,7 +24,7 @@ class SupervisorMenuScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Welcome Section
+            // Welcome Section
             Obx(
               () => Container(
                 padding: const EdgeInsets.all(16),
@@ -70,7 +70,7 @@ class SupervisorMenuScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // --- Marketing & Sales (Pink Section) ---
+            // Marketing
             _buildMenuCard(
               "New Order Entry",
               "Upload and record client orders",
@@ -78,7 +78,6 @@ class SupervisorMenuScreen extends StatelessWidget {
               TColors.marketing,
               () => Get.toNamed(AppRouteNames.marketingUpload),
             ),
-
             _buildMenuCard(
               "Marketing Agent List",
               "Track and manage client orders",
@@ -94,10 +93,10 @@ class SupervisorMenuScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // --- Production Sections ---
+            // Production Floor
             _buildMenuCard(
               "Cutting Section",
-              "Manage fabric layers & bundles",
+              "Manage fabric layers",
               Icons.content_cut,
               TColors.cutting,
               () => controller.goToSection(AppRouteNames.cuttingEntry),
@@ -116,12 +115,21 @@ class SupervisorMenuScreen extends StatelessWidget {
               TColors.stitching,
               () => controller.goToSection(AppRouteNames.stitchingEntry),
             ),
+
+            // --- MODIFIED: Packing Section with Analytics Icon ---
             _buildMenuCard(
-              "Packing Section",
-              "Final QC & Export details",
+              "Packing & Inventory",
+              "Seal cartons & Check Stock",
               Icons.inventory_2,
               TColors.packing,
               () => controller.goToSection(AppRouteNames.packingEntry),
+              trailing: IconButton(
+                icon: const Icon(
+                  Icons.analytics_outlined,
+                  color: TColors.packing,
+                ),
+                onPressed: () => Get.toNamed(AppRouteNames.factoryStock),
+              ),
             ),
           ],
         ),
@@ -134,8 +142,9 @@ class SupervisorMenuScreen extends StatelessWidget {
     String sub,
     IconData icon,
     Color color,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    Widget? trailing,
+  }) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -162,11 +171,9 @@ class SupervisorMenuScreen extends StatelessWidget {
           sub,
           style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 14,
-          color: Colors.grey,
-        ),
+        trailing:
+            trailing ??
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
       ),
     );
   }

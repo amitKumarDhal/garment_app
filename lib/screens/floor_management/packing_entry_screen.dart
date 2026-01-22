@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+
 import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 import '../../utils/widgets/custom_text_field.dart';
@@ -10,17 +12,26 @@ class PackingEntryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<PackingController>();
+    final PackingController controller = Get.put(PackingController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 600 ? 3 : 2;
 
     return Scaffold(
       backgroundColor: isDark ? TColors.dark : TColors.light,
       appBar: AppBar(
-        title: const Text("Packing & Export Entry"),
+        title: const Text("Factory Packing Entry"),
         centerTitle: true,
         backgroundColor: TColors.packing,
         foregroundColor: TColors.textWhite,
         elevation: 0,
+        actions: [
+          // Link to the Summary Screen
+          IconButton(
+            onPressed: () => Get.toNamed('/factory-stock-summary'),
+            icon: const Icon(Icons.analytics_outlined),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(TSizes.md),
@@ -29,47 +40,81 @@ class PackingEntryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // --- SECTION 1: CARTON CATEGORIZATION ---
               _buildSectionHeader(
                 context,
-                "Carton Logistics",
-                Icons.local_shipping_outlined,
+                "Carton Type",
+                Icons.category_outlined,
               ),
               Container(
                 padding: const EdgeInsets.all(TSizes.md),
                 decoration: _buildBoxDecoration(context),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TCustomTextField(
-                            label: "Carton #",
-                            controller: controller.cartonNo,
-                            prefixIcon: Icons.inventory_2_outlined,
-                          ),
-                        ),
-                        const SizedBox(width: TSizes.md),
-                        Expanded(
-                          child: TCustomTextField(
-                            label: "Style No",
-                            controller: controller.styleNo,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: TSizes.inputFieldSpacing),
                     TCustomTextField(
-                      label: "Destination / Buyer",
-                      controller: controller.destination,
-                      prefixIcon: Icons.location_on_outlined,
+                      label: "Carton Serial #",
+                      controller: controller.cartonNo,
+                      prefixIcon: Icons.qr_code_scanner,
+                      keyboardType: TextInputType.number,
+                      validator: (value) =>
+                          value == null || value.isEmpty ? "Required" : null,
+                    ),
+                    const SizedBox(height: TSizes.md),
+                    const Text(
+                      "Select Primary Size Category:",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Horizontal Size Toggle Selector
+                    Obx(
+                      () => SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: controller.sizeOptions.map((size) {
+                            bool isSelected =
+                                controller.selectedCartonSize.value == size;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(
+                                  size,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark
+                                              ? Colors.white70
+                                              : Colors.black),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                selected: isSelected,
+                                selectedColor: TColors.packing,
+                                onSelected: (selected) {
+                                  if (selected)
+                                    controller.selectedCartonSize.value = size;
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
+
               const SizedBox(height: TSizes.xl),
+
+              // --- SECTION 2: PIECE COUNT ---
               _buildSectionHeader(
                 context,
-                "Packing List (Size Wise)",
+                "Pieces Inside Carton",
                 Icons.list_alt_outlined,
               ),
               Container(
@@ -78,28 +123,32 @@ class PackingEntryScreen extends StatelessWidget {
                 child: GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
                     childAspectRatio: 2.8,
                     crossAxisSpacing: TSizes.md,
                     mainAxisSpacing: TSizes.md,
                   ),
                   itemCount: controller.boxContents.length,
                   itemBuilder: (context, index) {
-                    String sizeKey = controller.boxContents.keys.elementAt(
+                    final sizeKey = controller.boxContents.keys.elementAt(
                       index,
                     );
                     return TCustomTextField(
                       label: "Qty",
                       controller: controller.boxContents[sizeKey],
                       keyboardType: TextInputType.number,
-                      prefixText: "$sizeKey: ",
-                      onChanged: (value) => controller.calculateBoxTotal(),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      prefixText: "$sizeKey : ",
+                      onChanged: (_) => controller.calculateBoxTotal(),
                     );
                   },
                 ),
               ),
+
               const SizedBox(height: TSizes.xl),
+
+              // --- SECTION 3: TOTAL & SUBMIT ---
               Container(
                 padding: const EdgeInsets.all(TSizes.lg),
                 decoration: BoxDecoration(
@@ -110,9 +159,7 @@ class PackingEntryScreen extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.2 : 0.05,
-                      ),
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -123,12 +170,11 @@ class PackingEntryScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           "Total Pieces in Box:",
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white : TColors.textPrimary,
                           ),
                         ),
                         Obx(
@@ -144,24 +190,38 @@ class PackingEntryScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: TSizes.md),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed: () => controller.submitCarton(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: TColors.packing,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(TSizes.sm),
+                    Obx(
+                      () => SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          onPressed:
+                              controller.totalInBox.value == 0 ||
+                                  controller.isSubmitting.value
+                              ? null
+                              : () => controller.submitCarton(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: TColors.packing,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(TSizes.sm),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          "SEAL & FINISH",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          child: controller.isSubmitting.value
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  "SEAL & ADD TO STOCK",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -175,6 +235,7 @@ class PackingEntryScreen extends StatelessWidget {
     );
   }
 
+  // --- Helper Widgets (Same as your provided code) ---
   Widget _buildSectionHeader(
     BuildContext context,
     String title,
@@ -209,10 +270,9 @@ class PackingEntryScreen extends StatelessWidget {
     return BoxDecoration(
       color: isDark ? TColors.dark : Colors.white,
       borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-      border: isDark ? Border.all(color: Colors.white10) : null,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+          color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
           blurRadius: 10,
           offset: const Offset(0, 4),
         ),

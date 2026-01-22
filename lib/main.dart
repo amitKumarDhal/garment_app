@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -5,11 +6,18 @@ import 'package:yoobbel/utils/theme/theme.dart';
 import 'bindings/general_bindings.dart';
 import 'routes/route_names.dart';
 import 'routes/app_routes.dart';
+import 'firebase_options.dart'; // Ensure you have run 'flutterfire configure'
 
-void main() {
+void main() async {
+  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set System UI Overlay (Status Bar & Navigation Bar colors)
+  // Initialize Firebase with Platform Options
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Set System UI Overlay
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -17,10 +25,8 @@ void main() {
     ),
   );
 
-  // Lock Orientation to Portrait for industrial consistency
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
-    _,
-  ) {
+  // Lock Orientation to Portrait
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     runApp(const App());
   });
 }
@@ -33,7 +39,7 @@ class App extends StatelessWidget {
     return GetMaterialApp(
       title: 'Yoobbel',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system, // Switches based on phone settings
+      themeMode: ThemeMode.system,
       theme: TAppTheme.lightTheme,
       darkTheme: TAppTheme.darkTheme,
 
@@ -44,7 +50,6 @@ class App extends StatelessWidget {
       initialRoute: AppRouteNames.splash,
       getPages: AppRoutes.pages,
 
-      // Default transition for a premium feel
       defaultTransition: Transition.cupertino,
     );
   }

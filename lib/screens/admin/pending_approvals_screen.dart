@@ -8,14 +8,16 @@ class PendingApprovalsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Accessing the AdminController which now uses real-time Firestore streams
     final controller = Get.find<AdminController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(title: const Text("ID Approval Queue")),
       body: Obx(() {
+        // Obx listens to the reactive pendingRequests list from Firestore
         if (controller.pendingRequests.isEmpty) {
-          return const Center(child: Text("No pending requests"));
+          return const Center(child: Text("No pending requests found"));
         }
 
         return ListView.builder(
@@ -23,7 +25,8 @@ class PendingApprovalsScreen extends StatelessWidget {
           itemCount: controller.pendingRequests.length,
           itemBuilder: (context, index) {
             final user = controller.pendingRequests[index];
-            return _buildRequestCard(controller, user, index, isDark);
+            // Pass the user map directly to the card builder
+            return _buildRequestCard(controller, user, isDark);
           },
         );
       }),
@@ -33,9 +36,11 @@ class PendingApprovalsScreen extends StatelessWidget {
   Widget _buildRequestCard(
     AdminController controller,
     Map<String, dynamic> user,
-    int index,
     bool isDark,
   ) {
+    // FIX: Extract the String docId to resolve the 'int' vs 'String' type error
+    final String docId = user['id'] ?? '';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -44,38 +49,49 @@ class PendingApprovalsScreen extends StatelessWidget {
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(child: Text(user['name'][0])),
+              leading: CircleAvatar(
+                backgroundColor: Colors.blue.withOpacity(0.1),
+                child: Text(user['name']?[0] ?? 'U'),
+              ),
               title: Text(
-                user['name'],
+                user['name'] ?? 'Unknown User',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Text("${user['role']} • ${user['employeeId']}"),
             ),
             const Divider(),
             const SizedBox(height: 8),
+
+            // Approval Path Visualizer using boolean flags from Firestore
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatusCircle("Unit", user['unitApproved']),
-                _buildLine(user['unitApproved']),
-                _buildStatusCircle("Shift", user['shiftApproved']),
-                _buildLine(user['shiftApproved']),
-                _buildStatusCircle("Admin", user['adminApproved']),
+                _buildStatusCircle("Unit", user['unitApproved'] ?? false),
+                _buildLine(user['unitApproved'] ?? false),
+                _buildStatusCircle("Shift", user['shiftApproved'] ?? false),
+                _buildLine(user['shiftApproved'] ?? false),
+                _buildStatusCircle("Admin", user['adminApproved'] ?? false),
               ],
             ),
+
             const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => controller.rejectRequest(index),
+                    // FIX: Passing String docId to match the updated AdminController
+                    onPressed: () => controller.rejectRequest(docId),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
                     child: const Text("Reject"),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => controller.approveNextStage(index),
+                    // FIX: Passing both String docId and the user Map to approveNextStage
+                    onPressed: () => controller.approveNextStage(docId, user),
                     child: const Text("Approve Stage"),
                   ),
                 ),

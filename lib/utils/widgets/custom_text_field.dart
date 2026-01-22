@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../constants/colors.dart';
 import '../constants/sizes.dart';
 
 class TCustomTextField extends StatelessWidget {
   final String label;
-  final String?
-  hintText; // ADDED: This must exist for the other screens to stop complaining
+  final String? hintText;
   final TextEditingController? controller;
   final IconData? prefixIcon;
   final String? prefixText;
@@ -15,10 +16,13 @@ class TCustomTextField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
 
+  // ✅ ADD THIS
+  final List<TextInputFormatter>? inputFormatters;
+
   const TCustomTextField({
     super.key,
     required this.label,
-    this.hintText, // ADDED: It is not 'required', so old screens won't crash
+    this.hintText,
     this.controller,
     this.prefixIcon,
     this.prefixText,
@@ -27,6 +31,7 @@ class TCustomTextField extends StatelessWidget {
     this.onChanged,
     this.obscureText = false,
     this.suffixIcon,
+    this.inputFormatters, // ✅ ADD THIS
   });
 
   @override
@@ -39,14 +44,17 @@ class TCustomTextField extends StatelessWidget {
       obscureText: obscureText,
       validator: validator,
       onChanged: onChanged,
+
+      // ✅ PASS HERE
+      inputFormatters: inputFormatters,
+
       style: TextStyle(
         color: isDark ? Colors.white : TColors.textPrimary,
         fontSize: 14,
       ),
       decoration: InputDecoration(
         labelText: label,
-        hintText:
-            hintText, // ADDED: This connects the variable to the actual UI
+        hintText: hintText,
         hintStyle: TextStyle(
           color: isDark ? Colors.grey[600] : Colors.grey[400],
           fontSize: 12,
