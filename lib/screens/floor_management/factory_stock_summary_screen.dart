@@ -150,7 +150,7 @@ class FactoryStockSummaryScreen extends StatelessWidget {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: TColors.packing.withOpacity(0.1),
+                          color: TColors.packing.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -208,14 +208,14 @@ class FactoryStockSummaryScreen extends StatelessWidget {
       padding: const EdgeInsets.all(TSizes.lg),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [TColors.packing, TColors.packing.withOpacity(0.8)],
+          colors: [TColors.packing, TColors.packing.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
         boxShadow: [
           BoxShadow(
-            color: TColors.packing.withOpacity(0.4),
+            color: TColors.packing.withValues(alpha: 0.4),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -257,10 +257,10 @@ class FactoryStockSummaryScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),

@@ -57,7 +57,7 @@ class PrintingController extends GetxController {
       Get.snackbar(
         "Success",
         "Sent ${netGoodPieces.value} pieces to Stitching",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 
@@ -71,7 +71,9 @@ class PrintingController extends GetxController {
   }
 
   void _clearFields() {
-    [styleNo, receivedFromCutting].forEach((c) => c.clear());
+    for (var c in [styleNo, receivedFromCutting]) {
+      c.clear();
+    }
     damagedQuantities.forEach((_, c) => c.clear());
     totalDamaged.value = 0;
     netGoodPieces.value = 0;
@@ -80,7 +82,9 @@ class PrintingController extends GetxController {
   @override
   void onClose() {
     // Memory disposal for 8GB RAM performance
-    [styleNo, receivedFromCutting].forEach((c) => c.dispose());
+    for (var c in [styleNo, receivedFromCutting]) {
+      c.dispose();
+    }
     damagedQuantities.forEach((_, c) => c.dispose());
     super.onClose();
   }

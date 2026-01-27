@@ -2,31 +2,36 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart'; // CRITICAL FOR SPEED
 import 'package:yoobbel/utils/theme/theme.dart';
 import 'bindings/general_bindings.dart';
 import 'routes/route_names.dart';
 import 'routes/app_routes.dart';
-import 'firebase_options.dart'; // Ensure you have run 'flutterfire configure'
+import 'firebase_options.dart';
 
 void main() async {
-  // Ensure Flutter is initialized
+  // 1. Ensure Flutter Engine is ready (MUST BE FIRST)
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase with Platform Options
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // 2. Initialize Local Storage (Critical for Instant Speed)
+  await GetStorage.init();
 
-  // Set System UI Overlay
+  // 3. Initialize Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // 4. UI Styling (Transparent Status Bar)
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
     ),
   );
 
-  // Lock Orientation to Portrait
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
+  // 5. Lock Orientation
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
+    _,
+  ) {
     runApp(const App());
   });
 }
@@ -37,20 +42,24 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Yoobbel',
+      title: 'Yoobbel Production',
       debugShowCheckedModeBanner: false,
+
+      // Theme Settings
       themeMode: ThemeMode.system,
       theme: TAppTheme.lightTheme,
       darkTheme: TAppTheme.darkTheme,
 
-      // Global Dependency Injection
+      // Global Bindings (Auth Repository, etc.)
       initialBinding: GeneralBindings(),
 
-      // Navigation Logic
+      // Navigation Setup
       initialRoute: AppRouteNames.splash,
       getPages: AppRoutes.pages,
 
-      defaultTransition: Transition.cupertino,
+      // Smoother Transitions
+      defaultTransition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
     );
   }
 }

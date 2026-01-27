@@ -63,7 +63,7 @@ class StitchingController extends GetxController {
       Get.snackbar(
         "Production Saved",
         "Record for ${workerName.text} synced to Cloud.",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 
@@ -77,14 +77,16 @@ class StitchingController extends GetxController {
   }
 
   void _clearFields() {
-    [
+    for (var c in [
       workerName,
       styleNo,
       operationType,
       assignedQty,
       completedQty,
       rejectedQty,
-    ].forEach((c) => c.clear());
+    ]) {
+      c.clear();
+    }
     balanceQty.value = 0;
     efficiency.value = 0.0;
   }
@@ -92,14 +94,16 @@ class StitchingController extends GetxController {
   @override
   void onClose() {
     // Memory disposal for 8GB RAM performance
-    [
+    for (var c in [
       workerName,
       styleNo,
       operationType,
       assignedQty,
       completedQty,
       rejectedQty,
-    ].forEach((c) => c.dispose());
+    ]) {
+      c.dispose();
+    }
     super.onClose();
   }
 }

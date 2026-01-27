@@ -19,7 +19,7 @@ class DailyWorkLogScreen extends StatelessWidget {
           // Summary Header
           Container(
             padding: const EdgeInsets.all(20),
-            color: Colors.teal.withOpacity(0.1),
+            color: Colors.teal.withValues(alpha: 0.1),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

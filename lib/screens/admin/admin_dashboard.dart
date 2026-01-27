@@ -9,11 +9,10 @@ class AdminDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize controller
     final controller = Get.put(AdminController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Modern color palette
+    // Modern background colors
     final backgroundColor = isDark
         ? const Color(0xFF121212)
         : const Color(0xFFF5F5F5);
@@ -25,7 +24,7 @@ class AdminDashboard extends StatelessWidget {
         backgroundColor: isDark ? TColors.dark : Colors.white,
         elevation: 0,
         titleSpacing: 20,
-        automaticallyImplyLeading: false, // Clean header (No back button)
+        automaticallyImplyLeading: false, // Clean header
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -34,8 +33,8 @@ class AdminDashboard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.grey : Colors.grey[600],
-                letterSpacing: 1.5,
                 fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
               ),
             ),
             Text(
@@ -63,257 +62,204 @@ class AdminDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Obx(
-          () => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Alert Banner (Only if needed)
-              if (controller.pendingApprovalsCount.value > 0)
-                _buildAlertBanner(controller),
 
-              // 2. Key Metrics Grid
-              const SizedBox(height: 10),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                // FIX: Aspect Ratio 1.3 makes cards taller to prevent overflow
-                childAspectRatio: 1.3,
-                children: [
-                  _buildModernStatCard(
-                    "Production",
-                    "₹${controller.totalDailyProduction.value}",
-                    TColors.primary,
-                    Icons.currency_rupee,
-                    isDark,
-                  ),
-                  _buildModernStatCard(
-                    "Efficiency",
-                    "${controller.averageEfficiency.value.toStringAsFixed(1)}%",
-                    controller.averageEfficiency.value > 80
-                        ? Colors.green
-                        : Colors.orange,
-                    Icons.trending_up,
-                    isDark,
-                  ),
-                  _buildModernStatCard(
-                    "Active Workers",
-                    "${controller.activeWorkers.value}",
-                    Colors.blue,
-                    Icons.groups,
-                    isDark,
-                  ),
-                  _buildModernStatCard(
-                    "Reported Damages",
-                    "${controller.totalDamages.value}",
-                    Colors.red,
-                    Icons.warning_amber_rounded,
-                    isDark,
-                  ),
-                ],
-              ),
+      // --- FIX: WRAP BODY IN REFRESH INDICATOR ---
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await controller.refreshStats(); // Trigger the refresh
+        },
+        color: TColors.primary,
+        backgroundColor: isDark ? TColors.dark : Colors.white,
+        child: SingleChildScrollView(
+          // Important: Ensures scrolling works even if content is short
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Obx(
+            () => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Alert Banner
+                if (controller.pendingApprovalsCount.value > 0)
+                  _buildAlertBanner(controller),
 
-              const SizedBox(height: 25),
+                const SizedBox(height: 10),
 
-              // 3. Quick Actions
-              const Text(
-                "QUICK ACCESS",
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                  letterSpacing: 1.2,
+                // 2. Statistics Grid
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.3,
+                  children: [
+                    _buildModernStatCard(
+                      "Production",
+                      "₹${controller.totalDailyProduction.value}",
+                      TColors.primary,
+                      Icons.currency_rupee,
+                      isDark,
+                    ),
+                    _buildModernStatCard(
+                      "Efficiency",
+                      "${controller.averageEfficiency.value.toStringAsFixed(1)}%",
+                      Colors.green,
+                      Icons.trending_up,
+                      isDark,
+                    ),
+                    _buildModernStatCard(
+                      "Workers",
+                      "${controller.activeWorkers.value}",
+                      Colors.blue,
+                      Icons.groups,
+                      isDark,
+                    ),
+                    _buildModernStatCard(
+                      "Damages",
+                      "${controller.totalDamages.value}",
+                      Colors.red,
+                      Icons.warning_amber_rounded,
+                      isDark,
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
-                      "Sales Agents",
-                      "Team & Orders",
-                      Icons.person_pin_circle_outlined,
-                      TColors.marketing,
-                      () => Get.toNamed(AppRouteNames.agentList),
+
+                const SizedBox(height: 25),
+
+                // 3. Quick Actions
+                const Text(
+                  "QUICK ACCESS",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        "Sales Agents",
+                        "Team & Orders",
+                        Icons.person_pin_circle_outlined,
+                        TColors.marketing,
+                        () => Get.toNamed(AppRouteNames.agentList),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        "Inventory",
+                        "Stock Summary",
+                        Icons.inventory_2_outlined,
+                        TColors.packing,
+                        () => Get.toNamed(AppRouteNames.factoryStock),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 30),
+
+                // 4. Live Activity Feeds
+                _buildModernSectionHeader("Live Floor Activity"),
+                const SizedBox(height: 15),
+
+                // --- Stitching Feed ---
+                _buildDepartmentHeader("Stitching Line", TColors.stitching),
+                if (controller.recentStitchingEntries.isEmpty)
+                  _buildEmptyState("No stitching data yet")
+                else
+                  ...controller.recentStitchingEntries.map(
+                    (entry) => _buildLogTile(
+                      title: "${entry['workerName']}",
+                      subtitle:
+                          "Style: ${entry['styleNo']} • Op: ${entry['operationType']}",
+                      value: "${entry['completedQty']}",
+                      unit: "Pcs",
+                      color: TColors.stitching,
+                      icon: Icons.precision_manufacturing_outlined,
+                      isDark: isDark,
+                      cardColor: cardColor,
                     ),
                   ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
-                      "Inventory",
-                      "Stock Summary",
-                      Icons.inventory_2_outlined,
-                      TColors.packing,
-                      () => Get.toNamed(AppRouteNames.factoryStock),
+
+                const SizedBox(height: 20),
+
+                // --- Printing Feed ---
+                _buildDepartmentHeader("Printing Unit", TColors.printing),
+                if (controller.recentPrintingEntries.isEmpty)
+                  _buildEmptyState("No printing data yet")
+                else
+                  ...controller.recentPrintingEntries.map(
+                    (entry) => _buildLogTile(
+                      title: "Style: ${entry['styleNo']}",
+                      subtitle: "${entry['totalDamaged']} Damaged",
+                      value: "${entry['netGoodPieces']}",
+                      unit: "Good",
+                      color: TColors.printing,
+                      icon: Icons.print,
+                      isDark: isDark,
+                      cardColor: cardColor,
                     ),
                   ),
-                ],
-              ),
 
-              const SizedBox(height: 30),
+                const SizedBox(height: 20),
 
-              // 4. Live Floor Activity Feeds
-              _buildModernSectionHeader("Live Floor Activity"),
-              const SizedBox(height: 15),
-
-              // --- Stitching Feed ---
-              _buildDepartmentHeader("Stitching Line", TColors.stitching),
-              if (controller.recentStitchingEntries.isEmpty)
-                _buildEmptyState("No stitching data yet")
-              else
-                ...controller.recentStitchingEntries.map(
-                  (entry) => _buildLogTile(
-                    title: "${entry['workerName']}",
-                    subtitle:
-                        "Style: ${entry['styleNo']} • Op: ${entry['operationType']}",
-                    value: "${entry['completedQty']}",
-                    unit: "Pcs",
-                    color: TColors.stitching,
-                    icon: Icons.precision_manufacturing_outlined,
-                    isDark: isDark,
-                    cardColor: cardColor,
+                // --- Cutting Feed ---
+                _buildDepartmentHeader("Cutting Table", TColors.cutting),
+                if (controller.recentCuttingEntries.isEmpty)
+                  _buildEmptyState("No cutting data yet")
+                else
+                  ...controller.recentCuttingEntries.map(
+                    (entry) => _buildLogTile(
+                      title: "Style: ${entry['styleNo']}",
+                      subtitle: "Lot: ${entry['lotNo']}",
+                      value: "${entry['totalQuantity']}",
+                      unit: "Layers",
+                      color: TColors.cutting,
+                      icon: Icons.content_cut,
+                      isDark: isDark,
+                      cardColor: cardColor,
+                    ),
                   ),
-                ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // --- Printing Feed ---
-              _buildDepartmentHeader("Printing Unit", TColors.printing),
-              if (controller.recentPrintingEntries.isEmpty)
-                _buildEmptyState("No printing data yet")
-              else
-                ...controller.recentPrintingEntries.map(
-                  (entry) => _buildLogTile(
-                    title: "Style: ${entry['styleNo']}",
-                    subtitle: "${entry['totalDamaged']} Damaged",
-                    value: "${entry['netGoodPieces']}",
-                    unit: "Good",
-                    color: TColors.printing,
-                    icon: Icons.print,
-                    isDark: isDark,
-                    cardColor: cardColor,
+                // --- Marketing Feed ---
+                _buildDepartmentHeader("Recent Orders", TColors.marketing),
+                if (controller.recentOrders.isEmpty)
+                  _buildEmptyState("No new orders")
+                else
+                  ...controller.recentOrders.map(
+                    (order) => _buildLogTile(
+                      title: order.clientName,
+                      subtitle: "${order.productName} (x${order.quantity})",
+                      value: "₹${order.totalAmount}",
+                      unit: "",
+                      color: TColors.marketing,
+                      icon: Icons.shopping_bag,
+                      isDark: isDark,
+                      cardColor: cardColor,
+                    ),
                   ),
-                ),
 
-              const SizedBox(height: 20),
-
-              // --- Cutting Feed ---
-              _buildDepartmentHeader("Cutting Table", TColors.cutting),
-              if (controller.recentCuttingEntries.isEmpty)
-                _buildEmptyState("No cutting data yet")
-              else
-                ...controller.recentCuttingEntries.map(
-                  (entry) => _buildLogTile(
-                    title: "Style: ${entry['styleNo']}",
-                    subtitle: "Lot: ${entry['lotNo']}",
-                    value: "${entry['totalQuantity']}",
-                    unit: "Layers",
-                    color: TColors.cutting,
-                    icon: Icons.content_cut,
-                    isDark: isDark,
-                    cardColor: cardColor,
-                  ),
-                ),
-
-              const SizedBox(height: 20),
-
-              // --- Marketing Feed ---
-              _buildDepartmentHeader("Recent Orders", TColors.marketing),
-              if (controller.recentOrders.isEmpty)
-                _buildEmptyState("No new orders")
-              else
-                ...controller.recentOrders.map(
-                  (order) => _buildLogTile(
-                    title: order.clientName,
-                    subtitle: "${order.productName} (x${order.quantity})",
-                    value: "₹${order.totalAmount}",
-                    unit: "",
-                    color: TColors.marketing,
-                    icon: Icons.shopping_bag,
-                    isDark: isDark,
-                    cardColor: cardColor,
-                  ),
-                ),
-
-              const SizedBox(height: 50),
-            ],
+                const SizedBox(height: 50),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ==================== MODERN WIDGETS ====================
-
-  Widget _buildAlertBanner(AdminController controller) {
-    return GestureDetector(
-      onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.orange.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.notifications_active,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Action Required",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Text(
-                    "${controller.pendingApprovalsCount.value} New users waiting for approval",
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward, color: Colors.white),
-          ],
-        ),
-      ),
-    );
-  }
+  // ... (Paste all your Helper Widgets here: _buildModernStatCard, _buildActionCard, etc.) ...
+  // Keeping the helpers the same as your code to save space.
 
   Widget _buildModernStatCard(
     String title,
@@ -327,11 +273,11 @@ class AdminDashboard extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.1),
+          color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -339,16 +285,13 @@ class AdminDashboard extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Background Watermark Icon
           Positioned(
             right: -5,
             top: -5,
-            child: Icon(icon, size: 70, color: color.withOpacity(0.08)),
+            child: Icon(icon, size: 70, color: color.withValues(alpha: 0.08)),
           ),
           Padding(
-            padding: const EdgeInsets.all(
-              12,
-            ), // Reduced padding to prevent overflow
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
@@ -356,13 +299,12 @@ class AdminDashboard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, size: 18, color: color),
                 ),
                 const Spacer(),
-                // FIX: FittedBox ensures text scales down if number is huge
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
@@ -374,7 +316,6 @@ class AdminDashboard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   title,
                   style: const TextStyle(
@@ -382,8 +323,6 @@ class AdminDashboard extends StatelessWidget {
                     color: Colors.grey,
                     fontWeight: FontWeight.w500,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -407,9 +346,9 @@ class AdminDashboard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(isDark ? 0.15 : 0.1),
+          color: color.withValues(alpha: isDark ? 0.15 : 0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,6 +370,57 @@ class AdminDashboard extends StatelessWidget {
                 color: isDark ? Colors.grey[400] : Colors.grey[600],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlertBanner(AdminController controller) {
+    return GestureDetector(
+      onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.notifications_active, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Action Required",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    "${controller.pendingApprovalsCount.value} New users waiting",
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward, color: Colors.white),
           ],
         ),
       ),
@@ -487,9 +477,9 @@ class AdminDashboard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.05),
+        color: Colors.grey.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Center(
         child: Text(
@@ -518,7 +508,7 @@ class AdminDashboard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -529,7 +519,7 @@ class AdminDashboard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 20),

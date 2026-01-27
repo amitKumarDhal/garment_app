@@ -31,7 +31,11 @@ class StitchingEntryScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // --- Section 1: Worker Assignment ---
-              _buildSectionHeader(context, "Worker Assignment", Icons.person_add_alt_1_outlined),
+              _buildSectionHeader(
+                context,
+                "Worker Assignment",
+                Icons.person_add_alt_1_outlined,
+              ),
               Container(
                 padding: const EdgeInsets.all(TSizes.md),
                 decoration: _buildBoxDecoration(context),
@@ -39,16 +43,27 @@ class StitchingEntryScreen extends StatelessWidget {
                   children: [
                     DropdownButtonFormField<String>(
                       dropdownColor: isDark ? TColors.dark : Colors.white,
-                      style: TextStyle(color: isDark ? Colors.white : TColors.textPrimary),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : TColors.textPrimary,
+                      ),
                       decoration: InputDecoration(
                         labelText: "Select Worker",
-                        prefixIcon: const Icon(Icons.badge_outlined, color: TColors.stitching),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(TSizes.sm)),
+                        prefixIcon: const Icon(
+                          Icons.badge_outlined,
+                          color: TColors.stitching,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(TSizes.sm),
+                        ),
                       ),
                       items: controller.availableWorkers.map((String worker) {
-                        return DropdownMenuItem(value: worker, child: Text(worker));
+                        return DropdownMenuItem(
+                          value: worker,
+                          child: Text(worker),
+                        );
                       }).toList(),
-                      onChanged: (value) => controller.workerName.text = value ?? "",
+                      onChanged: (value) =>
+                          controller.workerName.text = value ?? "",
                       validator: (value) => value == null ? "Required" : null,
                     ),
                     const SizedBox(height: TSizes.inputFieldSpacing),
@@ -59,7 +74,8 @@ class StitchingEntryScreen extends StatelessWidget {
                             label: "Style No",
                             controller: controller.styleNo,
                             prefixIcon: Icons.style_outlined,
-                            validator: (val) => val!.isEmpty ? "Required" : null,
+                            validator: (val) =>
+                                val!.isEmpty ? "Required" : null,
                           ),
                         ),
                         const SizedBox(width: TSizes.md),
@@ -79,7 +95,11 @@ class StitchingEntryScreen extends StatelessWidget {
               const SizedBox(height: TSizes.xl),
 
               // --- Section 2: Production Logs ---
-              _buildSectionHeader(context, "Production Logs", Icons.history_edu_outlined),
+              _buildSectionHeader(
+                context,
+                "Production Logs",
+                Icons.history_edu_outlined,
+              ),
               Container(
                 padding: const EdgeInsets.all(TSizes.md),
                 decoration: _buildBoxDecoration(context),
@@ -90,7 +110,8 @@ class StitchingEntryScreen extends StatelessWidget {
                       controller: controller.assignedQty,
                       keyboardType: TextInputType.number,
                       prefixIcon: Icons.assignment_outlined,
-                      onChanged: (value) => controller.calculateStitchingStats(),
+                      onChanged: (value) =>
+                          controller.calculateStitchingStats(),
                     ),
                     const SizedBox(height: TSizes.inputFieldSpacing),
                     Row(
@@ -100,7 +121,8 @@ class StitchingEntryScreen extends StatelessWidget {
                             label: "Completed",
                             controller: controller.completedQty,
                             keyboardType: TextInputType.number,
-                            onChanged: (value) => controller.calculateStitchingStats(),
+                            onChanged: (value) =>
+                                controller.calculateStitchingStats(),
                           ),
                         ),
                         const SizedBox(width: TSizes.md),
@@ -109,7 +131,8 @@ class StitchingEntryScreen extends StatelessWidget {
                             label: "Rejected",
                             controller: controller.rejectedQty,
                             keyboardType: TextInputType.number,
-                            onChanged: (value) => controller.calculateStitchingStats(),
+                            onChanged: (value) =>
+                                controller.calculateStitchingStats(),
                           ),
                         ),
                       ],
@@ -121,27 +144,44 @@ class StitchingEntryScreen extends StatelessWidget {
               const SizedBox(height: TSizes.xl),
 
               // --- Section 3: Live Efficiency Summary ---
-              Obx(() => Container(
-                padding: const EdgeInsets.all(TSizes.lg),
-                decoration: BoxDecoration(
-                  color: isDark ? TColors.dark : Colors.white,
-                  borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-                  border: const Border(left: BorderSide(color: TColors.stitching, width: 6)),
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                child: Column(
-                  children: [
-                    _statusRow(context, "Balance to Finish:", "${controller.balanceQty.value}", isDark ? Colors.white : TColors.textPrimary),
-                    const Divider(height: 30),
-                    _statusRow(
-                      context,
-                      "Worker Efficiency:",
-                      "${controller.efficiency.value.toStringAsFixed(1)}%",
-                      controller.efficiency.value > 80 ? TColors.stitching : Colors.orange,
+              Obx(
+                () => Container(
+                  padding: const EdgeInsets.all(TSizes.lg),
+                  decoration: BoxDecoration(
+                    color: isDark ? TColors.dark : Colors.white,
+                    borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+                    border: const Border(
+                      left: BorderSide(color: TColors.stitching, width: 6),
                     ),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _statusRow(
+                        context,
+                        "Balance to Finish:",
+                        "${controller.balanceQty.value}",
+                        isDark ? Colors.white : TColors.textPrimary,
+                      ),
+                      const Divider(height: 30),
+                      _statusRow(
+                        context,
+                        "Worker Efficiency:",
+                        "${controller.efficiency.value.toStringAsFixed(1)}%",
+                        controller.efficiency.value > 80
+                            ? TColors.stitching
+                            : Colors.orange,
+                      ),
+                    ],
+                  ),
                 ),
-              )),
+              ),
 
               const SizedBox(height: TSizes.xl),
 
@@ -149,16 +189,28 @@ class StitchingEntryScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 height: 55,
-                child: Obx(() => ElevatedButton(
-                  onPressed: controller.isLoading.value ? null : () => controller.submitStitchingEntry(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.stitching,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TSizes.sm)),
+                child: Obx(
+                  () => ElevatedButton(
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () => controller.submitStitchingEntry(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: TColors.stitching,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(TSizes.sm),
+                      ),
+                    ),
+                    child: controller.isLoading.value
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                            TTexts.save.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
-                  child: controller.isLoading.value
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(TTexts.save.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                )),
+                ),
               ),
             ],
           ),
@@ -168,7 +220,11 @@ class StitchingEntryScreen extends StatelessWidget {
   }
 
   // --- UI Helpers ---
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: TSizes.sm, left: TSizes.xs),
@@ -176,7 +232,14 @@ class StitchingEntryScreen extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: TColors.stitching),
           const SizedBox(width: TSizes.sm),
-          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : TColors.textPrimary)),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : TColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );
@@ -187,16 +250,37 @@ class StitchingEntryScreen extends StatelessWidget {
     return BoxDecoration(
       color: isDark ? TColors.dark : Colors.white,
       borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
     );
   }
 
-  Widget _statusRow(BuildContext context, String label, String value, Color valueColor) {
+  Widget _statusRow(
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: valueColor)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: valueColor,
+          ),
+        ),
       ],
     );
   }

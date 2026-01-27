@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../constants/colors.dart';
 import '../constants/sizes.dart';
 
@@ -15,9 +14,10 @@ class TCustomTextField extends StatelessWidget {
   final void Function(String)? onChanged;
   final bool obscureText;
   final Widget? suffixIcon;
-
-  // ✅ ADD THIS
   final List<TextInputFormatter>? inputFormatters;
+
+  // ✅ ADD THIS MISSING PARAMETER
+  final TextInputAction? textInputAction;
 
   const TCustomTextField({
     super.key,
@@ -31,7 +31,10 @@ class TCustomTextField extends StatelessWidget {
     this.onChanged,
     this.obscureText = false,
     this.suffixIcon,
-    this.inputFormatters, // ✅ ADD THIS
+    this.inputFormatters,
+
+    // ✅ ADD THIS TO CONSTRUCTOR
+    this.textInputAction,
   });
 
   @override
@@ -44,9 +47,10 @@ class TCustomTextField extends StatelessWidget {
       obscureText: obscureText,
       validator: validator,
       onChanged: onChanged,
-
-      // ✅ PASS HERE
       inputFormatters: inputFormatters,
+
+      // ✅ PASS IT TO THE WIDGET
+      textInputAction: textInputAction,
 
       style: TextStyle(
         color: isDark ? Colors.white : TColors.textPrimary,
@@ -90,6 +94,8 @@ class TCustomTextField extends StatelessWidget {
           borderRadius: BorderRadius.circular(TSizes.sm),
           borderSide: const BorderSide(color: TColors.primary, width: 2),
         ),
+        filled: true,
+        fillColor: isDark ? TColors.dark : Colors.grey[50],
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -51,7 +52,9 @@ class PackingController extends GetxController {
                 .toList();
           },
           onError: (e) {
-            print("Error fetching inventory: $e");
+            if (kDebugMode) {
+              print("Error fetching inventory: $e");
+            }
           },
         );
   }
@@ -66,7 +69,7 @@ class PackingController extends GetxController {
 
   int get totalPiecesInFactory => inventoryList.fold(
     0,
-    (sum, item) => sum + (item['totalPieces'] as int? ?? 0),
+    (totalsum, item) => totalsum + (item['totalPieces'] as int? ?? 0),
   );
 
   // --- 3. CALCULATION LOGIC ---
@@ -91,7 +94,7 @@ class PackingController extends GetxController {
       Get.snackbar(
         "Error",
         "Carton cannot be empty",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
         colorText: Colors.red,
       );
       return;
@@ -126,7 +129,7 @@ class PackingController extends GetxController {
       Get.snackbar(
         "Inventory Updated",
         "Carton ${cartonNo.text} synced to Cloud.",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 
@@ -135,7 +138,7 @@ class PackingController extends GetxController {
       Get.snackbar(
         "Error",
         "Cloud sync failed: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
     } finally {
       isSubmitting.value = false;

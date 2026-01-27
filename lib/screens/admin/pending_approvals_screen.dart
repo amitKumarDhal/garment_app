@@ -50,7 +50,7 @@ class PendingApprovalsScreen extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
-                backgroundColor: Colors.blue.withOpacity(0.1),
+                backgroundColor: Colors.blue.withValues(alpha: 0.1),
                 child: Text(user['name']?[0] ?? 'U'),
               ),
               title: Text(
@@ -120,7 +120,7 @@ class PendingApprovalsScreen extends StatelessWidget {
     return Expanded(
       child: Container(
         height: 2,
-        color: active ? Colors.green : Colors.grey.withOpacity(0.3),
+        color: active ? Colors.green : Colors.grey.withValues(alpha: 0.3),
       ),
     );
   }

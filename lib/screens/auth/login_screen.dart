@@ -11,54 +11,61 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // If you use Bindings, use Get.find(). Otherwise Get.put() is fine here.
+    // Inject the controller. Get.put() ensures it's created if not found.
     final controller = Get.put(LoginController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? TColors.dark : TColors.light,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(TSizes.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 80),
+    return GestureDetector(
+      // OPTIMIZATION: Dismiss keyboard when tapping background
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        backgroundColor: isDark ? TColors.dark : TColors.light,
+        body: SafeArea(
+          // OPTIMIZATION: Avoid system notches
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(TSizes.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 40),
 
-              // --- Header ---
-              Text(
-                "Factory Manager",
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: TColors.primary,
+                // --- Header ---
+                Text(
+                  "Factory Manager",
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: TColors.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: TSizes.xs),
-              Text(
-                "Select your role to access your dashboard",
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+                const SizedBox(height: TSizes.xs),
+                Text(
+                  "Select your role to access your dashboard",
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
 
-              const SizedBox(height: TSizes.xl),
+                const SizedBox(height: TSizes.xl),
 
-              // --- Role Selection Grid ---
-              const Text(
-                "Login as:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: TSizes.sm),
-              _buildRoleGrid(controller, isDark),
+                // --- Role Selection Grid ---
+                const Text(
+                  "Login as:",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: TSizes.sm),
+                _buildRoleGrid(controller, isDark),
 
-              const SizedBox(height: TSizes.xl),
+                const SizedBox(height: TSizes.xl),
 
-              // --- Login Form ---
-              _buildLoginForm(controller),
+                // --- Login Form ---
+                _buildLoginForm(controller),
 
-              const SizedBox(height: TSizes.xl),
+                const SizedBox(height: TSizes.xl),
 
-              // --- Footer ---
-              _buildSignUpFooter(),
-            ],
+                // --- Footer ---
+                _buildSignUpFooter(),
+
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -73,7 +80,7 @@ class LoginScreen extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        mainAxisExtent: 85,
+        mainAxisExtent: 85, // Fixed height for consistent look
       ),
       itemCount: controller.roles.length,
       itemBuilder: (context, index) {
@@ -92,13 +99,13 @@ class LoginScreen extends StatelessWidget {
                 border: Border.all(
                   color: isSelected
                       ? TColors.primary
-                      : Colors.grey.withOpacity(0.3),
+                      : Colors.grey.withValues(alpha: 0.3),
                   width: 2,
                 ),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: TColors.primary.withOpacity(0.3),
+                          color: TColors.primary.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -181,7 +188,14 @@ class LoginScreen extends StatelessWidget {
                   ),
                 ),
                 child: controller.isLoading.value
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Text(
                         "LOGIN",
                         style: TextStyle(

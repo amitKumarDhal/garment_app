@@ -87,7 +87,7 @@ class MarketingUploadController extends GetxController {
         "Success",
         "Order ${orderNo.text} for ${clientName.text} saved to Cloud",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 
@@ -101,7 +101,7 @@ class MarketingUploadController extends GetxController {
   }
 
   void _clearForm() {
-    [
+    for (var c in [
       orderNo,
       clientName,
       organization,
@@ -111,14 +111,16 @@ class MarketingUploadController extends GetxController {
       quantity,
       gstInfo,
       deadline,
-    ].forEach((c) => c.clear());
+    ]) {
+      c.clear();
+    }
     _selectedDeadline = null;
   }
 
   @override
   void onClose() {
     // Crucial for 8GB RAM: Dispose all controllers properly
-    [
+    for (var c in [
       orderNo,
       clientName,
       organization,
@@ -128,7 +130,9 @@ class MarketingUploadController extends GetxController {
       quantity,
       gstInfo,
       deadline,
-    ].forEach((c) => c.dispose());
+    ]) {
+      c.dispose();
+    }
     super.onClose();
   }
 }

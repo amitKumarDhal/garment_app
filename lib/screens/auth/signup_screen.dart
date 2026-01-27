@@ -100,13 +100,13 @@ class _SignupScreenState extends State<SignupScreen> {
                         border: Border.all(
                           color: isSelected
                               ? TColors.primary
-                              : Colors.grey.withOpacity(0.3),
+                              : Colors.grey.withValues(alpha: 0.3),
                           width: 2,
                         ),
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: TColors.primary.withOpacity(0.3),
+                                  color: TColors.primary.withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
@@ -241,10 +241,10 @@ class _SignupScreenState extends State<SignupScreen> {
       padding: const EdgeInsets.all(TSizes.md),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.blue.withOpacity(0.1)
-            : Colors.blue.withOpacity(0.05),
+            ? Colors.blue.withValues(alpha: 0.1)
+            : Colors.blue.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-        border: Border.all(color: TColors.primary.withOpacity(0.3)),
+        border: Border.all(color: TColors.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

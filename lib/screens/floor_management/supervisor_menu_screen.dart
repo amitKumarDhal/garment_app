@@ -40,7 +40,7 @@ class SupervisorMenuScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: TColors.primary.withOpacity(0.1),
+                      backgroundColor: TColors.primary.withValues(alpha: 0.1),
                       child: const Icon(Icons.person, color: TColors.primary),
                     ),
                     const SizedBox(width: 12),
@@ -160,7 +160,7 @@ class SupervisorMenuScreen extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 24),

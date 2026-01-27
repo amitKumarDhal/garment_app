@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 class SupervisorController extends GetxController {
@@ -34,7 +35,9 @@ class SupervisorController extends GetxController {
           supervisorRole.value = data['role'] ?? "Worker";
         }
       } catch (e) {
-        print("Error loading supervisor profile: $e");
+        if (kDebugMode) {
+          print("Error loading supervisor profile: $e");
+        }
         supervisorName.value = "Unknown User";
       }
     }

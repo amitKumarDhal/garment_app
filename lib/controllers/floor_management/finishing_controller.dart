@@ -43,7 +43,7 @@ class FinishingController extends GetxController {
       Get.snackbar(
         "Shipment Ready",
         "Style ${styleNo.text} - $packed Pcs Packed",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 

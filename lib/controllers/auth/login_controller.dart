@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../routes/route_names.dart';
+import '../navigation_controller.dart';
 
 class LoginController extends GetxController {
   static LoginController get instance => Get.find();
@@ -15,9 +17,9 @@ class LoginController extends GetxController {
   // --- Observables ---
   final isLoading = false.obs;
   final hidePassword = true.obs;
-  final selectedRole = 'Worker'.obs; // Default selection
+  final selectedRole = 'Worker'.obs;
 
-  // --- Role Config ---
+  // --- Role Config (THIS WAS MISSING) ---
   final List<String> roles = [
     'Worker',
     'Unit Supervisor',
@@ -25,6 +27,7 @@ class LoginController extends GetxController {
     'Admin',
   ];
 
+  // FIX: Added the missing map here
   final Map<String, IconData> roleIcons = {
     'Worker': Icons.engineering_outlined,
     'Unit Supervisor': Icons.manage_accounts_outlined,
@@ -39,14 +42,14 @@ class LoginController extends GetxController {
     try {
       isLoading.value = true;
 
-      // 1. Authenticate with Firebase Auth
+      // 1. Authenticate
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
             email: email.text.trim(),
             password: password.text.trim(),
           );
 
-      // 2. Fetch User Profile from Firestore
+      // 2. Fetch User Profile
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('id_requests')
           .doc(userCredential.user!.uid)
@@ -54,7 +57,7 @@ class LoginController extends GetxController {
 
       if (!userDoc.exists) {
         await FirebaseAuth.instance.signOut();
-        _showError("User record not found. Please sign up first.");
+        _showError("User record not found.");
         return;
       }
 
@@ -62,42 +65,48 @@ class LoginController extends GetxController {
       final dbStatus = userData['status'] ?? 'Pending';
       final dbRole = userData['role'] ?? 'Worker';
 
-      // 3. Security Check: Is Account Approved?
+      // 3. Security Checks
       if (dbStatus == 'Pending') {
         await FirebaseAuth.instance.signOut();
-        _showError("Account awaiting Admin approval.");
+        _showError("Account awaiting approval.");
         return;
       } else if (dbStatus == 'Rejected') {
         await FirebaseAuth.instance.signOut();
-        _showError("Account request was rejected.");
+        _showError("Account rejected.");
         return;
       }
 
-      // 4. Security Check: Does Role Match?
-      // Prevent a Worker from logging in as Admin by selecting it in the UI
       if (dbRole != selectedRole.value) {
         await FirebaseAuth.instance.signOut();
         _showError("You are not registered as a ${selectedRole.value}.");
         return;
       }
 
-      // 5. Success - Navigate to Dashboard
+      // 4. Success - Save Data & Navigate
+      GetStorage().write('user_role', dbRole);
+
+      // Prepare Navigation Controller
+      if (Get.isRegistered<NavigationController>()) {
+        Get.delete<NavigationController>();
+      }
+      final navController = Get.put(NavigationController());
+
+      if (dbRole == 'Admin') {
+        navController.selectedIndex.value = 0;
+      } else {
+        navController.selectedIndex.value = 1;
+      }
+
       Get.snackbar(
-        "Welcome Back",
+        "Welcome",
         "Logged in as ${userData['name']}",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 
       Get.offAllNamed(AppRouteNames.mainWrapper);
     } on FirebaseAuthException catch (e) {
-      // Handle standard Firebase errors
-      String message = "Login Failed";
-      if (e.code == 'user-not-found') message = "No user found for this email.";
-      if (e.code == 'wrong-password') message = "Incorrect password.";
-      if (e.code == 'invalid-credential')
-        message = "Invalid email or password.";
-      _showError(message);
+      _showError(e.message ?? "Login failed");
     } catch (e) {
       _showError("System Error: $e");
     } finally {
@@ -109,18 +118,8 @@ class LoginController extends GetxController {
     Get.snackbar(
       "Access Denied",
       message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red.withOpacity(0.1),
+      backgroundColor: Colors.red.withValues(alpha: 0.1),
       colorText: Colors.red,
-      duration: const Duration(seconds: 4),
     );
-  }
-
-  @override
-  void onClose() {
-    // Memory cleanup for 8GB RAM optimization
-    email.dispose();
-    password.dispose();
-    super.onClose();
   }
 }

@@ -60,7 +60,7 @@ class CuttingController extends GetxController {
       Get.snackbar(
         "Success",
         "Cutting for ${styleNo.text} recorded in Cloud!",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -71,7 +71,7 @@ class CuttingController extends GetxController {
       Get.snackbar(
         "Error",
         "Cloud sync failed: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
     } finally {
       isLoading.value = false;
@@ -79,7 +79,9 @@ class CuttingController extends GetxController {
   }
 
   void _clearFields() {
-    [styleNo, lotNo, fabricType].forEach((c) => c.clear());
+    for (var c in [styleNo, lotNo, fabricType]) {
+      c.clear();
+    }
     for (var c in sizeQuantities.values) {
       c.clear();
     }
@@ -89,7 +91,9 @@ class CuttingController extends GetxController {
   @override
   void onClose() {
     // Crucial memory cleanup for 8GB RAM
-    [styleNo, lotNo, fabricType].forEach((c) => c.dispose());
+    for (var c in [styleNo, lotNo, fabricType]) {
+      c.dispose();
+    }
     for (var c in sizeQuantities.values) {
       c.dispose();
     }

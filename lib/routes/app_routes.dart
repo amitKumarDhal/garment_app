@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:yoobbel/controllers/auth/login_controller.dart';
 import 'route_names.dart';
 
 // Screens
@@ -15,7 +16,7 @@ import '../screens/floor_management/cutting_entry_screen.dart';
 import '../screens/floor_management/printing_entry_screen.dart';
 import '../screens/floor_management/stitching_entry_screen.dart';
 import '../screens/floor_management/packing_entry_screen.dart';
-import '../screens/floor_management/factory_stock_summary_screen.dart'; // ADDED
+import '../screens/floor_management/factory_stock_summary_screen.dart';
 
 // Controllers
 import '../controllers/auth/splash_controller.dart';
@@ -35,23 +36,32 @@ class AppRoutes {
     GetPage(
       name: AppRouteNames.splash,
       page: () => const SplashScreen(),
-      binding: BindingsBuilder(() => Get.put(SplashController())),
+      binding: BindingsBuilder(() {
+        Get.put(SplashController());
+      }),
     ),
     GetPage(
       name: AppRouteNames.login,
       page: () => const LoginScreen(),
-      transition: Transition.fadeIn,
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => LoginController());
+      }),
     ),
     GetPage(
       name: AppRouteNames.signup,
       page: () => const SignupScreen(),
-      binding: BindingsBuilder(() => Get.lazyPut(() => SignupController())),
+      // FIX: Use { } for safety
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => SignupController());
+      }),
     ),
 
     // Shell & Admin
     GetPage(
       name: AppRouteNames.mainWrapper,
       page: () => const MainWrapper(),
+      // FIX: Add FadeIn for smooth "No Glitch" navigation
+      transition: Transition.fadeIn,
       binding: BindingsBuilder(() {
         Get.put(NavigationController());
         Get.put(AdminController());
@@ -76,47 +86,57 @@ class AppRoutes {
     GetPage(
       name: AppRouteNames.cuttingEntry,
       page: () => const CuttingEntryScreen(),
-      binding: BindingsBuilder(() => Get.lazyPut(() => CuttingController())),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => CuttingController());
+      }),
     ),
     GetPage(
       name: AppRouteNames.printingEntry,
       page: () => const PrintingEntryScreen(),
-      binding: BindingsBuilder(() => Get.lazyPut(() => PrintingController())),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => PrintingController());
+      }),
     ),
     GetPage(
       name: AppRouteNames.stitchingEntry,
       page: () => const StitchingEntryScreen(),
-      binding: BindingsBuilder(() => Get.lazyPut(() => StitchingController())),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => StitchingController());
+      }),
     ),
 
     // Packing Entry Page
     GetPage(
       name: AppRouteNames.packingEntry,
       page: () => const PackingEntryScreen(),
-      binding: BindingsBuilder(() => Get.lazyPut(() => PackingController())),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => PackingController());
+      }),
     ),
 
-    // --- UPDATED: Added Binding here too ---
+    // Factory Stock Summary
     GetPage(
       name: AppRouteNames.factoryStock,
       page: () => const FactoryStockSummaryScreen(),
-      binding: BindingsBuilder(
-        () => Get.lazyPut(() => PackingController()),
-      ), // Add this!
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => PackingController());
+      }),
     ),
 
     // Marketing
     GetPage(
       name: AppRouteNames.agentList,
       page: () => const AgentListScreen(),
-      binding: BindingsBuilder(() => Get.lazyPut(() => MarketingController())),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => MarketingController());
+      }),
     ),
     GetPage(
       name: AppRouteNames.marketingUpload,
       page: () => const MarketingUploadScreen(),
-      binding: BindingsBuilder(
-        () => Get.lazyPut(() => MarketingUploadController()),
-      ),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => MarketingUploadController());
+      }),
     ),
   ];
 }

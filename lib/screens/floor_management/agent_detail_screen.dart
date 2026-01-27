@@ -35,7 +35,7 @@ class AgentDetailScreen extends StatelessWidget {
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   ),
@@ -45,7 +45,7 @@ class AgentDetailScreen extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: TColors.marketing.withOpacity(0.1),
+                  backgroundColor: TColors.marketing.withValues(alpha: 0.1),
                   child: Text(
                     _getInitials(agent['name'] ?? "??"),
                     style: const TextStyle(
@@ -152,7 +152,7 @@ class AgentDetailScreen extends StatelessWidget {
                       Icon(
                         Icons.person_search,
                         size: 60,
-                        color: Colors.grey.withOpacity(0.5),
+                        color: Colors.grey.withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -216,7 +216,7 @@ class AgentDetailScreen extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: Colors.green.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(

@@ -143,18 +143,21 @@ class AdminController extends GetxController {
     // B. Total Damages (Printing + Stitching)
     int pDamages = recentPrintingEntries.fold(
       0,
-      (sum, item) => sum + (item['totalDamaged'] as int? ?? 0),
+      (totalsum, item) => totalsum + (item['totalDamaged'] as int? ?? 0),
     );
     int sDamages = recentStitchingEntries.fold(
       0,
-      (sum, item) => sum + (item['rejectedQty'] as int? ?? 0),
+      (totalsum, item) => totalsum + (item['rejectedQty'] as int? ?? 0),
     );
     totalDamages.value = pDamages + sDamages;
   }
 
   /// Sums up the totalAmount from orders
   void _calculateProductionTotal() {
-    double total = recentOrders.fold(0, (sum, item) => sum + item.totalAmount);
+    double total = recentOrders.fold(
+      0,
+      (totalsum, item) => totalsum + item.totalAmount,
+    );
     totalDailyProduction.value = total;
   }
 
