@@ -60,7 +60,7 @@ class ManagerController extends GetxController {
         "Order $status",
         "The record has been updated successfully.",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: snackColor.withOpacity(0.1),
+        backgroundColor: snackColor.withValues(alpha: 0.1),
         colorText: snackColor,
         duration: const Duration(seconds: 2),
       );

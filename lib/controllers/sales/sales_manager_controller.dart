@@ -252,7 +252,7 @@ class SalesManagerController extends GetxController {
         "Order $newStatus",
         "Successfully updated status.",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: color.withOpacity(0.1),
+        backgroundColor: color.withValues(alpha: 0.1),
         colorText: color,
       );
     } catch (e) {

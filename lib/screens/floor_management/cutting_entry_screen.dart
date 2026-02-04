@@ -94,7 +94,7 @@ class CuttingEntryScreen extends StatelessWidget {
                         // Scan Button
                         Container(
                           decoration: BoxDecoration(
-                            color: TColors.cutting.withOpacity(0.1),
+                            color: TColors.cutting.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: IconButton(
@@ -223,12 +223,15 @@ class CuttingEntryScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [TColors.cutting, TColors.cutting.withOpacity(0.8)],
+                    colors: [
+                      TColors.cutting,
+                      TColors.cutting.withValues(alpha: 0.8),
+                    ],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: TColors.cutting.withOpacity(0.4),
+                      color: TColors.cutting.withValues(alpha: 0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -363,7 +366,7 @@ class CuttingEntryScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? TColors.dark : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -397,7 +400,7 @@ class CuttingEntryScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.03),
+          color: Colors.black.withValues(alpha: 0.03),
           blurRadius: 10,
           offset: const Offset(0, 4),
         ),

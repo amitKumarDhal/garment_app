@@ -37,7 +37,7 @@ class AgentDetailScreen extends StatelessWidget {
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   ),
@@ -47,7 +47,7 @@ class AgentDetailScreen extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: TColors.marketing.withOpacity(0.1),
+                  backgroundColor: TColors.marketing.withValues(alpha: 0.1),
                   child: Text(
                     _getInitials(agent['name'] ?? "??"),
                     style: const TextStyle(
@@ -190,7 +190,7 @@ class AgentDetailScreen extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: Colors.green.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -240,7 +240,7 @@ class AgentDetailScreen extends StatelessWidget {
           "Error",
           "Could not open dialer for $phoneNumber",
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
           colorText: Colors.red,
         );
       }

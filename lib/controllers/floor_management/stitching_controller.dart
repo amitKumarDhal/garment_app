@@ -72,7 +72,7 @@ class StitchingController extends GetxController {
       Get.snackbar(
         "Production Saved",
         "Record for ${workerName.text} synced to Cloud.",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 

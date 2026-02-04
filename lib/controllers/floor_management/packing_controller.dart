@@ -107,7 +107,7 @@ class PackingController extends GetxController {
       Get.snackbar(
         "Error",
         "Carton cannot be empty",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
       return;
     }
@@ -149,7 +149,7 @@ class PackingController extends GetxController {
       Get.snackbar(
         "Success",
         "Carton ${cartonNo.text} Added to Factory Stock",
-        backgroundColor: Colors.green.withOpacity(0.8),
+        backgroundColor: Colors.green.withValues(alpha: 0.8),
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -159,7 +159,7 @@ class PackingController extends GetxController {
       Get.snackbar(
         "Error",
         "Save failed: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
     } finally {
       isSubmitting.value = false;

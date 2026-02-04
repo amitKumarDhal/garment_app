@@ -107,14 +107,14 @@ class SalesDashboard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [TColors.primary, TColors.primary.withOpacity(0.7)],
+            colors: [TColors.primary, TColors.primary.withValues(alpha: 0.7)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: TColors.primary.withOpacity(0.3),
+              color: TColors.primary.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -131,7 +131,7 @@ class SalesDashboard extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: percentage,
                     strokeWidth: 8,
-                    backgroundColor: Colors.white.withOpacity(0.2),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     valueColor: const AlwaysStoppedAnimation<Color>(
                       Colors.white,
                     ),
@@ -205,7 +205,7 @@ class SalesDashboard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
                 ),
                 child: Row(
                   children: [
@@ -327,7 +327,7 @@ class SalesDashboard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(

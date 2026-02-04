@@ -159,7 +159,7 @@ class ProductionReportsScreen extends StatelessWidget {
         },
         selectedColor: TColors.primary,
         labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
-        backgroundColor: Colors.grey.withOpacity(0.1),
+        backgroundColor: Colors.grey.withValues(alpha: 0.1),
       ),
     );
   }
@@ -173,14 +173,14 @@ class ProductionReportsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: item.color.withOpacity(0.1),
+              color: item.color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(item.icon, color: item.color, size: 20),

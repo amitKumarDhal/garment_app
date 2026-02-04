@@ -83,7 +83,9 @@ class AgentListScreen extends StatelessWidget {
                       // --- DYNAMIC AVATAR ---
                       leading: CircleAvatar(
                         radius: 25,
-                        backgroundColor: TColors.marketing.withOpacity(0.1),
+                        backgroundColor: TColors.marketing.withValues(
+                          alpha: 0.1,
+                        ),
                         child: Text(
                           agent['avatar'] ?? "??",
                           style: const TextStyle(

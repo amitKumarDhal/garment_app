@@ -15,7 +15,7 @@ class ClientFormController extends GetxController {
       Get.snackbar(
         "Success",
         "Client ${nameController.text} added to database",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
       _clearForm();

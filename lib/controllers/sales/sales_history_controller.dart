@@ -69,7 +69,7 @@ class SalesHistoryController extends GetxController {
       Get.snackbar(
         "Error",
         "Could not load history: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
         colorText: Colors.red,
       );
     } finally {
@@ -84,7 +84,7 @@ class SalesHistoryController extends GetxController {
         Get.snackbar(
           "Action Denied",
           "Approved orders are locked and cannot be deleted.",
-          backgroundColor: Colors.orange.withOpacity(0.1),
+          backgroundColor: Colors.orange.withValues(alpha: 0.1),
           colorText: Colors.orange,
         );
         return;
@@ -103,7 +103,7 @@ class SalesHistoryController extends GetxController {
         "Deleted",
         "Order has been removed successfully",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
         colorText: Colors.red,
       );
     } catch (e) {

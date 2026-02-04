@@ -232,9 +232,11 @@ class MarketingUploadScreen extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(TSizes.md),
         decoration: BoxDecoration(
-          color: isDark ? Colors.green.withOpacity(0.05) : Colors.green[50],
+          color: isDark
+              ? Colors.green.withValues(alpha: 0.05)
+              : Colors.green[50],
           borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-          border: Border.all(color: Colors.green.withOpacity(0.3)),
+          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -325,7 +327,7 @@ class MarketingUploadScreen extends StatelessWidget {
       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
       boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
       ],
     ),
     child: Column(children: children),

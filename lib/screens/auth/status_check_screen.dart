@@ -40,7 +40,7 @@ class StatusCheckScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -269,8 +269,8 @@ class StatusCheckScreen extends StatelessWidget {
                 width: 2,
                 height: 40,
                 color: isCompleted
-                    ? Colors.green.withOpacity(0.5)
-                    : Colors.grey.withOpacity(0.3),
+                    ? Colors.green.withValues(alpha: 0.5)
+                    : Colors.grey.withValues(alpha: 0.3),
               ),
           ],
         ),

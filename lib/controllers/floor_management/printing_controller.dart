@@ -68,7 +68,7 @@ class PrintingController extends GetxController {
       Get.snackbar(
         "Success",
         "Sent ${netGoodPieces.value} pieces to Stitching",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 

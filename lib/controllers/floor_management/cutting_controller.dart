@@ -46,7 +46,7 @@ class CuttingController extends GetxController {
       Get.snackbar(
         "Error",
         "Total quantity cannot be zero",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
       return;
     }
@@ -57,7 +57,7 @@ class CuttingController extends GetxController {
       Get.snackbar(
         "Error",
         "Please enter valid consumption (e.g., 1.5)",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
       return;
     }
@@ -130,7 +130,7 @@ class CuttingController extends GetxController {
       Get.snackbar(
         "Success",
         "Stock Deducted: ${totalFabricNeeded}m. Batch Recorded!",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -141,7 +141,7 @@ class CuttingController extends GetxController {
       Get.snackbar(
         "Error",
         e.toString(),
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
         duration: const Duration(seconds: 4), // Longer duration to read error
       );
     } finally {

@@ -79,7 +79,7 @@ class SalesManagerOrderDetails extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
               ),
               child: ListView.separated(
                 shrinkWrap: true,
@@ -101,7 +101,7 @@ class SalesManagerOrderDetails extends StatelessWidget {
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.1),
+                        color: Colors.purple.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -139,10 +139,10 @@ class SalesManagerOrderDetails extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: _getStatusColor(order.status).withOpacity(0.1),
+                color: _getStatusColor(order.status).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _getStatusColor(order.status).withOpacity(0.3),
+                  color: _getStatusColor(order.status).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -237,6 +237,6 @@ class SalesManagerOrderDetails extends StatelessWidget {
         return Colors.orange;
       default:
         return Colors.blue;
-    } 
+    }
   }
-} 
+}

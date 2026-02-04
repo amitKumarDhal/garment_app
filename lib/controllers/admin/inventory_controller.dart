@@ -87,7 +87,7 @@ class InventoryController extends GetxController {
             Get.snackbar(
               "Database Error",
               msg,
-              backgroundColor: Colors.red.withOpacity(0.1),
+              backgroundColor: Colors.red.withValues(alpha: 0.1),
               colorText: Colors.red,
               duration: const Duration(seconds: 5),
             );
@@ -106,7 +106,7 @@ class InventoryController extends GetxController {
       Get.snackbar(
         "Restricted",
         "Only Supervisors can add stock.",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
         colorText: Colors.red,
       );
       return;
@@ -149,7 +149,7 @@ class InventoryController extends GetxController {
       Get.snackbar(
         "Success",
         "Stock Added Successfully",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
     } catch (e) {

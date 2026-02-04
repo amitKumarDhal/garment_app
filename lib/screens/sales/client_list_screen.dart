@@ -58,7 +58,7 @@ class ClientListScreen extends StatelessWidget {
 
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Colors.blue.withOpacity(0.1),
+                      backgroundColor: Colors.blue.withValues(alpha: 0.1),
                       child: Text(
                         name[0].toUpperCase(),
                         style: const TextStyle(

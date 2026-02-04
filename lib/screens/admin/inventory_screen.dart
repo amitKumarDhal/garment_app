@@ -70,8 +70,8 @@ class InventoryScreen extends StatelessWidget {
                 ),
                 leading: CircleAvatar(
                   backgroundColor: isLowStock
-                      ? Colors.red.withOpacity(0.1)
-                      : Colors.green.withOpacity(0.1),
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : Colors.green.withValues(alpha: 0.1),
                   child: Icon(
                     Icons.texture,
                     color: isLowStock ? Colors.red : Colors.green,

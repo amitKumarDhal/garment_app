@@ -55,7 +55,7 @@ class SalesManagerApprovals extends StatelessWidget {
                   contentPadding: const EdgeInsets.all(12),
                   onTap: () => Get.to(() => OrderApprovalScreen(order: order)),
                   leading: CircleAvatar(
-                    backgroundColor: Colors.orange.withOpacity(0.1),
+                    backgroundColor: Colors.orange.withValues(alpha: 0.1),
                     child: const Icon(
                       Icons.pending_actions,
                       color: Colors.orange,
@@ -69,7 +69,7 @@ class SalesManagerApprovals extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text("Agent: ${order.marketingPersonName}"),
+                      Text("Associate: ${order.marketingPersonName}"),
                       Text(
                         "Amount: ₹${order.totalAmount}",
                         style: const TextStyle(

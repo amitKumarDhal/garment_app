@@ -94,7 +94,7 @@ class LoginController extends GetxController {
       Get.snackbar(
         "Welcome",
         "Logged in as ${userData['name']}",
-        backgroundColor: Colors.green.withOpacity(0.1),
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
         colorText: Colors.green,
       );
 
@@ -129,7 +129,7 @@ class LoginController extends GetxController {
     Get.snackbar(
       "Access Denied",
       message,
-      backgroundColor: Colors.red.withOpacity(0.1),
+      backgroundColor: Colors.red.withValues(alpha: 0.1),
       colorText: Colors.red,
     );
   }

@@ -42,7 +42,7 @@ class SalesManagerHistoryController extends GetxController {
       Get.snackbar(
         "Error",
         "Could not load history: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
         colorText: Colors.red,
       );
     } finally {

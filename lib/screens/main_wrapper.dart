@@ -13,6 +13,14 @@ class MainWrapper extends StatefulWidget {
 
 class _MainWrapperState extends State<MainWrapper> {
   DateTime? currentBackPressTime;
+  late final NavigationController controller; // Declare it here
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize it once when the screen loads
+    controller = Get.put(NavigationController());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +50,7 @@ class _MainWrapperState extends State<MainWrapper> {
               "Exit App",
               "Press back again to exit",
               snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.black.withOpacity(0.8),
+              backgroundColor: Colors.black.withValues(alpha: 0.8),
               colorText: Colors.white,
               duration: const Duration(seconds: 2),
               margin: const EdgeInsets.all(20),
@@ -64,7 +72,7 @@ class _MainWrapperState extends State<MainWrapper> {
             onDestinationSelected: (index) =>
                 controller.selectedIndex.value = index,
             backgroundColor: isDark ? TColors.dark : Colors.white,
-            indicatorColor: TColors.primary.withOpacity(0.1),
+            indicatorColor: TColors.primary.withValues(alpha: 0.1),
             destinations: controller.navItems,
           ),
         ),

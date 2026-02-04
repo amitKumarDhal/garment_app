@@ -32,7 +32,7 @@ class SalesManagerDashboard extends StatelessWidget {
           onDestinationSelected: (index) =>
               controller.selectedIndex.value = index,
           backgroundColor: isDark ? TColors.dark : Colors.white,
-          indicatorColor: Colors.purple.withOpacity(0.1),
+          indicatorColor: Colors.purple.withValues(alpha: 0.1),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),
