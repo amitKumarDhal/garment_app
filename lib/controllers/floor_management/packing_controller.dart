@@ -8,20 +8,34 @@ class PackingController extends GetxController {
 
   final packingFormKey = GlobalKey<FormState>();
 
-  // 📦 Carton Identification
+  // --- Input Controllers ---
   final cartonNo = TextEditingController();
-
-  // Optional: Add Style No if you need to track which style is in the carton
   final styleNo = TextEditingController();
 
-  // 📏 Category selection for the entire carton
+  // --- State Variables ---
   var selectedCartonSize = 'M'.obs;
   final List<String> sizeOptions = ['S', 'M', 'L', 'XL', 'XXL'];
 
-  // 📝 Live Inventory List (Synced from Firestore)
+  // --- Inventory Data (Live from Firestore) ---
   var inventoryList = <Map<String, dynamic>>[].obs;
 
-  // 📊 Specific quantities inside the carton
+  // --- SEARCH & FILTER STATE ---
+  final RxString searchQuery = ''.obs;
+  final RxString activeFilter = 'All'.obs;
+
+  List<Map<String, dynamic>> get filteredInventory {
+    return inventoryList.where((item) {
+      final query = searchQuery.value.toLowerCase();
+      final cNo = item['cartonNo']?.toString().toLowerCase() ?? '';
+      final sNo = item['styleNo']?.toString().toLowerCase() ?? '';
+      bool matchesSearch = cNo.contains(query) || sNo.contains(query);
+      bool matchesFilter =
+          activeFilter.value == 'All' || item['category'] == activeFilter.value;
+      return matchesSearch && matchesFilter;
+    }).toList();
+  }
+
+  // --- Input Grid Controllers ---
   final Map<String, TextEditingController> boxContents = {
     'S': TextEditingController(),
     'M': TextEditingController(),
@@ -36,15 +50,15 @@ class PackingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _bindInventoryStream(); // Start listening to Firestore immediately
+    _bindInventoryStream();
   }
 
-  // --- 1. REAL-TIME FIRESTORE LISTENER ---
   void _bindInventoryStream() {
     FirebaseFirestore.instance
         .collection('packing_entries')
         .orderBy('timestamp', descending: true)
-        .snapshots() // This creates the live connection
+        .limit(100)
+        .snapshots()
         .listen(
           (snapshot) {
             inventoryList.value = snapshot.docs
@@ -52,14 +66,11 @@ class PackingController extends GetxController {
                 .toList();
           },
           onError: (e) {
-            if (kDebugMode) {
-              print("Error fetching inventory: $e");
-            }
+            if (kDebugMode) print("Firestore Error: $e");
           },
         );
   }
 
-  // --- 2. COMPUTED STATS (Now use real firestore data) ---
   int get countSmall => inventoryList.where((c) => c['category'] == 'S').length;
   int get countMedium =>
       inventoryList.where((c) => c['category'] == 'M').length;
@@ -69,47 +80,47 @@ class PackingController extends GetxController {
 
   int get totalPiecesInFactory => inventoryList.fold(
     0,
-    (totalsum, item) => totalsum + (item['totalPieces'] as int? ?? 0),
+    (sum, item) => sum + (item['totalPieces'] as int? ?? 0),
   );
 
-  // --- 3. CALCULATION LOGIC ---
   void calculateBoxTotal() {
     int sum = 0;
     for (final controller in boxContents.values) {
-      if (controller.text.isNotEmpty) {
-        sum += int.tryParse(controller.text) ?? 0;
-      }
+      if (controller.text.isNotEmpty) sum += int.tryParse(controller.text) ?? 0;
     }
     totalInBox.value = sum;
   }
 
-  // --- 4. SUBMIT TO CLOUD ---
+  void clearForm() {
+    cartonNo.clear();
+    styleNo.clear();
+    for (final controller in boxContents.values) controller.clear();
+    totalInBox.value = 0;
+  }
+
+  // --- ✅ UPDATED SUBMIT LOGIC ---
   Future<void> submitCarton() async {
     if (!packingFormKey.currentState!.validate()) return;
-
-    // Ensure calculation is up to date before submit
     calculateBoxTotal();
 
     if (totalInBox.value == 0) {
       Get.snackbar(
         "Error",
         "Carton cannot be empty",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
+        backgroundColor: Colors.red.withOpacity(0.1),
       );
       return;
     }
 
     isSubmitting.value = true;
+    final firestore = FirebaseFirestore.instance;
 
     try {
-      // Create the data object
       final newEntry = {
         "cartonNo": cartonNo.text.trim(),
-        "styleNo": styleNo.text.trim(), // Optional but recommended
+        "styleNo": styleNo.text.trim(),
         "category": selectedCartonSize.value,
         "totalPieces": totalInBox.value,
-        // Save the detailed breakdown too
         "breakdown": {
           "S": int.tryParse(boxContents['S']!.text) ?? 0,
           "M": int.tryParse(boxContents['M']!.text) ?? 0,
@@ -117,42 +128,42 @@ class PackingController extends GetxController {
           "XL": int.tryParse(boxContents['XL']!.text) ?? 0,
           "XXL": int.tryParse(boxContents['XXL']!.text) ?? 0,
         },
-        "timestamp": FieldValue.serverTimestamp(), // Use Server Time
+        "timestamp": FieldValue.serverTimestamp(),
         "status": "Packed",
       };
 
-      // Write to Firestore
-      await FirebaseFirestore.instance
-          .collection('packing_entries')
-          .add(newEntry);
+      // 1. Save detailed entry
+      await firestore.collection('packing_entries').add(newEntry);
+
+      // ✅ 2. BROADCAST TO LIVE FEED
+      await firestore.collection('activities').add({
+        "title": "Packed: ${styleNo.text.trim()}",
+        "subtitle": "Carton ${cartonNo.text} (${totalInBox.value} Pcs)",
+        "time": FieldValue.serverTimestamp(),
+        "iconCode": Icons.inventory_2.codePoint,
+        "colorValue": Colors.brown.value,
+      });
+
+      Get.toNamed('/factory-stock-summary');
 
       Get.snackbar(
-        "Inventory Updated",
-        "Carton ${cartonNo.text} synced to Cloud.",
-        backgroundColor: Colors.green.withValues(alpha: 0.1),
-        colorText: Colors.green,
+        "Success",
+        "Carton ${cartonNo.text} Added to Factory Stock",
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
       );
 
-      _resetForm();
+      clearForm();
     } catch (e) {
       Get.snackbar(
         "Error",
-        "Cloud sync failed: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
+        "Save failed: $e",
+        backgroundColor: Colors.red.withOpacity(0.1),
       );
     } finally {
       isSubmitting.value = false;
     }
-  }
-
-  void _resetForm() {
-    cartonNo.clear();
-    styleNo.clear();
-    for (final controller in boxContents.values) {
-      controller.clear();
-    }
-    totalInBox.value = 0;
-    // Don't reset selectedCartonSize, user might be packing multiple of same size
   }
 
   @override

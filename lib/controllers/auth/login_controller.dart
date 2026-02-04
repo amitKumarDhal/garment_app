@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import '../../routes/route_names.dart';
-import '../navigation_controller.dart';
+import '../../../../routes/route_names.dart';
+import '../../../../controllers/navigation_controller.dart';
+import '../../screens/sales/sales_dashboard.dart';
+import '../../screens/sales/manager/sales_manager_dashboard.dart';
 
 class LoginController extends GetxController {
   static LoginController get instance => Get.find();
@@ -19,37 +21,41 @@ class LoginController extends GetxController {
   final hidePassword = true.obs;
   final selectedRole = 'Worker'.obs;
 
-  // --- Role Config (THIS WAS MISSING) ---
+  // --- ✅ UPDATED HIERARCHY ---
   final List<String> roles = [
-    'Worker',
-    'Unit Supervisor',
-    'Shift Supervisor',
     'Admin',
+    'Sales Manager',
+    'Shift Supervisor',
+    'Unit Supervisor',
+    'Worker',
+    'Sales Associate', // ✅ Changed from 'Sales Agent'
   ];
 
-  // FIX: Added the missing map here
   final Map<String, IconData> roleIcons = {
-    'Worker': Icons.engineering_outlined,
-    'Unit Supervisor': Icons.manage_accounts_outlined,
-    'Shift Supervisor': Icons.supervisor_account_outlined,
     'Admin': Icons.admin_panel_settings_outlined,
+    'Sales Manager': Icons.domain_verification,
+    'Shift Supervisor': Icons.domain_outlined,
+    'Unit Supervisor': Icons.engineering_outlined,
+    'Worker': Icons.assignment_ind_outlined,
+    'Sales Associate': Icons.support_agent, // ✅ Updated Key
   };
 
-  /// --- Real Login Logic ---
+  /// --- Login Logic ---
   Future<void> login() async {
     if (!loginFormKey.currentState!.validate()) return;
 
     try {
       isLoading.value = true;
 
-      // 1. Authenticate
+      // 1. Authenticate with Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
             email: email.text.trim(),
             password: password.text.trim(),
           );
 
-      // 2. Fetch User Profile
+      // 2. Fetch User Profile from Firestore
+      // We look in 'id_requests' because that's where the specific role/status lives
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('id_requests')
           .doc(userCredential.user!.uid)
@@ -65,7 +71,7 @@ class LoginController extends GetxController {
       final dbStatus = userData['status'] ?? 'Pending';
       final dbRole = userData['role'] ?? 'Worker';
 
-      // 3. Security Checks
+      // 3. Security Checks (Status & Role Match)
       if (dbStatus == 'Pending') {
         await FirebaseAuth.instance.signOut();
         _showError("Account awaiting approval.");
@@ -76,35 +82,24 @@ class LoginController extends GetxController {
         return;
       }
 
-      if (dbRole != selectedRole.value) {
-        await FirebaseAuth.instance.signOut();
-        _showError("You are not registered as a ${selectedRole.value}.");
-        return;
-      }
-
-      // 4. Success - Save Data & Navigate
+      // 4. Success - Save Data
       GetStorage().write('user_role', dbRole);
 
-      // Prepare Navigation Controller
+      // --- RESET NAVIGATION CONTROLLER ---
       if (Get.isRegistered<NavigationController>()) {
         Get.delete<NavigationController>();
       }
-      final navController = Get.put(NavigationController());
-
-      if (dbRole == 'Admin') {
-        navController.selectedIndex.value = 0;
-      } else {
-        navController.selectedIndex.value = 1;
-      }
+      Get.put(NavigationController());
 
       Get.snackbar(
         "Welcome",
         "Logged in as ${userData['name']}",
-        backgroundColor: Colors.green.withValues(alpha: 0.1),
+        backgroundColor: Colors.green.withOpacity(0.1),
         colorText: Colors.green,
       );
 
-      Get.offAllNamed(AppRouteNames.mainWrapper);
+      // 5. ✅ REDIRECT BASED ON ROLE
+      _redirectUser(dbRole);
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? "Login failed");
     } catch (e) {
@@ -114,11 +109,27 @@ class LoginController extends GetxController {
     }
   }
 
+  // ✅ NEW: Smart Redirection updated for 'Sales Associate'
+  void _redirectUser(String role) {
+    if (role == 'Sales Manager' || role == 'manager') {
+      Get.offAll(() => const SalesManagerDashboard());
+    }
+    // ✅ Updated to check for 'Sales Associate' (Keep 'Agent' for old users)
+    else if (role == 'Sales Associate' ||
+        role == 'Sales Agent' ||
+        role == 'sales_agent') {
+      Get.offAll(() => const SalesDashboard());
+    } else {
+      // Default for Admin, Workers, Supervisors
+      Get.offAllNamed(AppRouteNames.mainWrapper);
+    }
+  }
+
   void _showError(String message) {
     Get.snackbar(
       "Access Denied",
       message,
-      backgroundColor: Colors.red.withValues(alpha: 0.1),
+      backgroundColor: Colors.red.withOpacity(0.1),
       colorText: Colors.red,
     );
   }

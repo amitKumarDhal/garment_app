@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 import '../../utils/widgets/custom_text_field.dart';
-import '../../controllers/auth/signup_controller.dart'; // IMPORTED
+import '../../controllers/auth/signup_controller.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -16,18 +16,25 @@ class _SignupScreenState extends State<SignupScreen> {
   // Initialize the Controller
   final controller = Get.put(SignupController());
 
+  // ✅ UPDATED: Changed 'Sales Agent' to 'Sales Associate'
   final Map<String, IconData> roleIcons = {
     'Worker': Icons.engineering_outlined,
     'Unit Supervisor': Icons.manage_accounts_outlined,
     'Shift Supervisor': Icons.supervisor_account_outlined,
     'Admin': Icons.admin_panel_settings_outlined,
+    'Sales Associate': Icons.support_agent, // ✅ Updated Key
+    'Sales Manager': Icons.domain_verification,
   };
 
   String selectedRole = 'Worker';
+
+  // ✅ UPDATED: Changed 'Sales Agent' to 'Sales Associate' in List
   final List<String> roles = [
     'Worker',
     'Unit Supervisor',
     'Shift Supervisor',
+    'Sales Associate', // ✅ Updated Option
+    'Sales Manager',
     'Admin',
   ];
 
@@ -46,7 +53,6 @@ class _SignupScreenState extends State<SignupScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(TSizes.lg),
         child: Form(
-          // ADDED FORM WRAPPER
           key: controller.signupFormKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,6 +76,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: TSizes.sm),
+
+              // Role Grid
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -77,13 +85,12 @@ class _SignupScreenState extends State<SignupScreen> {
                   crossAxisCount: 2, // 2 items per row
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  mainAxisExtent: 80, // Height of the card
+                  mainAxisExtent: 80,
                 ),
                 itemCount: roles.length,
                 itemBuilder: (context, index) {
                   final role = roles[index];
                   final isSelected = selectedRole == role;
-                  // Use the icon from your map, fallback to a default if not found
                   final icon = roleIcons[role] ?? Icons.person_outline;
 
                   return GestureDetector(
@@ -144,10 +151,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: TSizes.xl),
 
-              // --- INPUT FIELDS (CONNECTED TO CONTROLLER) ---
+              // --- INPUT FIELDS ---
               TCustomTextField(
                 label: "Full Name",
-                controller: controller.fullName, // CONNECTED
+                controller: controller.fullName,
                 prefixIcon: Icons.person_outline,
                 validator: (val) =>
                     val!.isEmpty ? "Enter your full name" : null,
@@ -155,7 +162,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: TSizes.md),
               TCustomTextField(
                 label: "Official Email / Phone",
-                controller: controller.email, // CONNECTED
+                controller: controller.email,
                 prefixIcon: Icons.contact_mail_outlined,
                 validator: (val) =>
                     val!.isEmpty ? "Enter email or phone" : null,
@@ -163,13 +170,13 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: TSizes.md),
               TCustomTextField(
                 label: "Employee ID (If assigned)",
-                controller: controller.employeeId, // CONNECTED
+                controller: controller.employeeId,
                 prefixIcon: Icons.badge_outlined,
               ),
               const SizedBox(height: TSizes.md),
               TCustomTextField(
                 label: "Set Password",
-                controller: controller.password, // CONNECTED
+                controller: controller.password,
                 prefixIcon: Icons.lock_outline,
                 obscureText: true,
                 validator: (val) =>
@@ -178,6 +185,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: TSizes.xl),
 
+              // Dynamic Approval Message
               _buildApprovalInfoBox(isDark),
 
               const SizedBox(height: TSizes.xl),
@@ -190,9 +198,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   () => ElevatedButton(
                     onPressed: controller.isLoading.value
                         ? null
-                        : () => controller.submitIdRequest(
-                            selectedRole,
-                          ), // CALLS CONTROLLER
+                        : () => controller.submitIdRequest(selectedRole),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TColors.primary,
                       shape: RoundedRectangleBorder(
@@ -227,37 +233,48 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // Visual guide helper (Unchanged logic)
+  // ✅ UPDATED: Changed 'Sales Agent' to 'Sales Associate' Logic
   Widget _buildApprovalInfoBox(bool isDark) {
     String chain = "";
+    Color boxColor = isDark
+        ? Colors.blue.withValues(alpha: 0.1)
+        : Colors.blue.withValues(alpha: 0.05);
+    Color iconColor = TColors.primary;
+
     if (selectedRole == 'Worker') {
       chain = "Unit Supervisor ➔ Shift Supervisor ➔ Admin";
+    } else if (selectedRole == 'Unit Supervisor') {
+      chain = "Shift Supervisor ➔ Admin";
+    } else if (selectedRole == 'Shift Supervisor') {
+      chain = "Admin Final Approval";
+    } else if (selectedRole == 'Sales Associate') {
+      // ✅ Updated Condition
+      chain = "Admin Verification (Direct Access to Sales Dashboard)";
+      boxColor = Colors.orange.withValues(alpha: 0.1);
+      iconColor = Colors.orange;
+    } else if (selectedRole == 'Sales Manager') {
+      chain = "Admin High-Level Verification (Access to Manager Console)";
+      boxColor = Colors.purple.withValues(alpha: 0.1);
+      iconColor = Colors.purple;
+    } else if (selectedRole == 'Admin') {
+      chain = "System Owner Verification";
     }
-    if (selectedRole == 'Unit Supervisor') chain = "Shift Supervisor ➔ Admin";
-    if (selectedRole == 'Shift Supervisor') chain = "Admin Final Approval";
-    if (selectedRole == 'Admin') chain = "System Owner Verification";
 
     return Container(
       padding: const EdgeInsets.all(TSizes.md),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.blue.withValues(alpha: 0.1)
-            : Colors.blue.withValues(alpha: 0.05),
+        color: boxColor,
         borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-        border: Border.all(color: TColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: iconColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(
-                Icons.account_tree_outlined,
-                size: 18,
-                color: TColors.primary,
-              ),
-              SizedBox(width: 8),
-              Text(
+              Icon(Icons.account_tree_outlined, size: 18, color: iconColor),
+              const SizedBox(width: 8),
+              const Text(
                 "Required Approval Chain:",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
@@ -266,9 +283,9 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 8),
           Text(
             chain,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: TColors.primary,
+              color: iconColor,
               fontWeight: FontWeight.w500,
             ),
           ),

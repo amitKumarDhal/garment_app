@@ -14,19 +14,21 @@ class AgentDetailScreen extends StatelessWidget {
     final controller = Get.find<MarketingController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Sync the filtered list with this agent's specific clients
+    // ✅ DYNAMIC: Sync the filtered list with the agent's actual list of orders/clients
+    // Note: 'clients' in our dynamic map is actually the list of Order objects
     controller.initClients(agent['clients'] ?? []);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Agent Portfolio"),
+        centerTitle: true,
         backgroundColor: TColors.marketing,
         foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
-          // --- STATS HEADER (Based on your sketch) ---
+          // --- STATS HEADER ---
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -35,7 +37,7 @@ class AgentDetailScreen extends StatelessWidget {
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   ),
@@ -45,7 +47,7 @@ class AgentDetailScreen extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: TColors.marketing.withValues(alpha: 0.1),
+                  backgroundColor: TColors.marketing.withOpacity(0.1),
                   child: Text(
                     _getInitials(agent['name'] ?? "??"),
                     style: const TextStyle(
@@ -76,17 +78,17 @@ class AgentDetailScreen extends StatelessWidget {
                             isDark,
                           ),
                           const SizedBox(width: 8),
+                          // ✅ DYNAMIC: Show Unique Clients count from our Aggregator
                           _buildMetricBox(
                             "CLIENTS",
-                            "${agent['clients']?.length ?? 0}",
+                            "${agent['uniqueClientsCount'] ?? 0}",
                             isDark,
                           ),
                           const SizedBox(width: 8),
                           _buildMetricBox(
-                            "STATUS",
-                            "Active",
+                            "ORDERS",
+                            "${agent['orders'] ?? 0}",
                             isDark,
-                            color: Colors.green,
                           ),
                         ],
                       ),
@@ -104,17 +106,10 @@ class AgentDetailScreen extends StatelessWidget {
               onChanged: (value) =>
                   controller.searchClient(agent['clients'] ?? [], value),
               decoration: InputDecoration(
-                hintText: "Search Client Name...",
+                hintText: "Search Client or Organization...",
                 prefixIcon: const Icon(Icons.search, color: TColors.marketing),
                 fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 filled: true,
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: TColors.marketing,
-                    width: 2,
-                  ),
-                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -123,14 +118,14 @@ class AgentDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // Result Count Indicator
+          // Result Indicator
           Obx(
             () => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  "Showing ${controller.filteredClients.length} Clients",
+                  "Showing ${controller.filteredClients.length} Recent Transactions",
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.grey,
@@ -141,82 +136,61 @@ class AgentDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // Client List
+          // --- DYNAMIC CLIENT/ORDER LIST ---
           Expanded(
             child: Obx(() {
               if (controller.filteredClients.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.person_search,
-                        size: 60,
-                        color: Colors.grey.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "No clients found",
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                return const Center(
+                  child: Text("No data available for this agent."),
                 );
               }
 
               return ListView.separated(
                 physics: const BouncingScrollPhysics(),
                 itemCount: controller.filteredClients.length,
-                separatorBuilder: (_, __) => Divider(
-                  height: 1,
-                  color: isDark ? Colors.white10 : Colors.black12,
-                ),
+                separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
-                  final client = controller.filteredClients[index];
+                  final order = controller.filteredClients[index];
+
                   return ListTile(
-                    tileColor: Theme.of(context).scaffoldBackgroundColor,
                     leading: Icon(
-                      _getStatusIcon(client['status'] ?? ""),
-                      color: _getStatusColor(client['status'] ?? ""),
+                      _getStatusIcon(order['status'] ?? ""),
+                      color: _getStatusColor(order['status'] ?? ""),
                     ),
                     title: Text(
-                      client['name'] ?? "Unknown Client",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
+                      order['clientName'] ?? "Unknown Client",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(
-                      client['org'] ?? "No Organization",
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.black54,
-                      ),
-                    ),
-
-                    // --- UPDATED: Navigation Arrow followed by Call Icon ---
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize
-                          .min, // Vital to prevent Row from taking full width
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Navigation Arrow
+                        Text(order['organization'] ?? "No Organization"),
+                        Text(
+                          "Total: ₹${order['totalAmount']?.toStringAsFixed(0) ?? '0'}",
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         const Icon(
                           Icons.arrow_forward_ios,
                           size: 14,
                           color: TColors.marketing,
                         ),
-                        const SizedBox(
-                          width: 16,
-                        ), // Space between Arrow and Call Icon
-                        // SEPARATE CALL WIDGET
+                        const SizedBox(width: 12),
                         GestureDetector(
-                          onTap: () => _makePhoneCall(client['phone'] ?? ""),
+                          onTap: () =>
+                              _makePhoneCall(order['clientPhone'] ?? ""),
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
+                              color: Colors.green.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -229,7 +203,7 @@ class AgentDetailScreen extends StatelessWidget {
                       ],
                     ),
                     onTap: () =>
-                        Get.to(() => ClientDetailScreen(client: client)),
+                        Get.to(() => ClientDetailScreen(client: order)),
                   );
                 },
               );
@@ -240,7 +214,42 @@ class AgentDetailScreen extends StatelessWidget {
     );
   }
 
-  // --- Helper: Metric Box UI ---
+  // ✅ ADD THIS METHOD AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
+  String _getInitials(String name) {
+    if (name.isEmpty) return "??";
+    List<String> names = name.trim().split(" ");
+    if (names.length > 1) {
+      // Takes the first letter of the first and last name
+      return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+    }
+    // If only one name, take the first two letters
+    return name.length >= 2
+        ? name.substring(0, 2).toUpperCase()
+        : name[0].toUpperCase();
+  }
+
+  // ✅ ADD THIS METHOD AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        Get.snackbar(
+          "Error",
+          "Could not open dialer for $phoneNumber",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+      }
+    } catch (e) {
+      Get.snackbar("Error", "An unexpected error occurred: $e");
+    }
+  }
+
+  // ✅ ADD THIS METHOD AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
   Widget _buildMetricBox(
     String label,
     String value,
@@ -255,6 +264,7 @@ class AgentDetailScreen extends StatelessWidget {
         border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
@@ -277,38 +287,20 @@ class AgentDetailScreen extends StatelessWidget {
     );
   }
 
-  // Helper to extract initials for the Avatar
-  String _getInitials(String name) {
-    List<String> names = name.trim().split(" ");
-    if (names.length > 1) {
-      return (names[0][0] + names[1][0]).toUpperCase();
-    }
-    return names[0][0].toUpperCase();
-  }
-
-  // URL Launcher for Phone Calls
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    } else {
-      Get.snackbar(
-        "Error",
-        "Could not open dialer for $phoneNumber",
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    }
-  }
+  // ✅ ADD THESE METHODS AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
 
   IconData _getStatusIcon(String status) {
-    switch (status) {
-      case "Delivered":
+    switch (status.toLowerCase()) {
+      case "delivered":
+      case "approved":
         return Icons.check_circle;
-      case "Processing":
+      case "processing":
+      case "pending":
         return Icons.sync;
-      case "Cancelled":
+      case "cancelled":
+      case "rejected":
         return Icons.cancel;
-      case "Dispatched":
+      case "dispatched":
         return Icons.local_shipping;
       default:
         return Icons.info;
@@ -316,17 +308,23 @@ class AgentDetailScreen extends StatelessWidget {
   }
 
   Color _getStatusColor(String status) {
-    switch (status) {
-      case "Delivered":
+    switch (status.toLowerCase()) {
+      case "delivered":
+      case "approved":
         return Colors.green;
-      case "Processing":
+      case "processing":
+      case "pending":
         return Colors.orange;
-      case "Cancelled":
+      case "cancelled":
+      case "rejected":
         return Colors.red;
-      case "Dispatched":
+      case "dispatched":
         return Colors.blue;
       default:
         return Colors.grey;
     }
   }
+
+  // Helper UI methods (Keep your existing _buildMetricBox, _getInitials, _makePhoneCall, etc.)
+  // ...
 }

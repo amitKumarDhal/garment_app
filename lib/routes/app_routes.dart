@@ -1,30 +1,51 @@
 import 'package:get/get.dart';
 import 'package:yoobbel/controllers/auth/login_controller.dart';
+import 'package:yoobbel/screens/sales/manager/sales_manager_dashboard.dart';
 import 'route_names.dart';
 
-// Screens
+// --- Screens ---
+// Auth
 import '../screens/auth/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/status_check_screen.dart';
+
+// Admin
 import '../screens/admin/admin_dashboard.dart';
 import '../screens/admin/pending_approvals_screen.dart';
+import '../screens/admin/production_reports_screen.dart';
+import '../screens/admin/inventory_screen.dart';
+import '../screens/admin/worker_list_screen.dart';
+
+// Core
 import '../screens/main_wrapper.dart';
+
+// Floor / Factory
 import '../screens/floor_management/supervisor_menu_screen.dart';
-import '../screens/floor_management/agent_list_screen.dart';
-import '../screens/floor_management/marketing_upload_screen.dart';
 import '../screens/floor_management/cutting_entry_screen.dart';
 import '../screens/floor_management/printing_entry_screen.dart';
 import '../screens/floor_management/stitching_entry_screen.dart';
 import '../screens/floor_management/packing_entry_screen.dart';
 import '../screens/floor_management/factory_stock_summary_screen.dart';
 
-// Controllers
+// Marketing / Sales
+import '../screens/floor_management/agent_list_screen.dart';
+import '../screens/floor_management/marketing_upload_screen.dart';
+import '../screens/sales/sales_dashboard.dart';
+// Ensure this exists if you use it
+
+// --- Controllers ---
 import '../controllers/auth/splash_controller.dart';
 import '../controllers/auth/signup_controller.dart';
 import '../controllers/admin/admin_controller.dart';
+import '../controllers/admin/inventory_controller.dart';
 import '../controllers/navigation_controller.dart';
 import '../controllers/floor_management/marketing_controller.dart';
-import '../controllers/floor_management/marketing_upload_controller.dart';
+
+// ✅ CRITICAL FIX: Alias the controller import to avoid name conflict with the Screen
+import '../controllers/floor_management/marketing_upload_controller.dart'
+    as upload_ctrl;
+
 import '../controllers/floor_management/cutting_controller.dart';
 import '../controllers/floor_management/printing_controller.dart';
 import '../controllers/floor_management/stitching_controller.dart';
@@ -32,7 +53,7 @@ import '../controllers/floor_management/packing_controller.dart';
 
 class AppRoutes {
   static final pages = [
-    // Splash & Auth
+    // --- 1. SPLASH & AUTH ---
     GetPage(
       name: AppRouteNames.splash,
       page: () => const SplashScreen(),
@@ -50,23 +71,27 @@ class AppRoutes {
     GetPage(
       name: AppRouteNames.signup,
       page: () => const SignupScreen(),
-      // FIX: Use { } for safety
       binding: BindingsBuilder(() {
         Get.lazyPut(() => SignupController());
       }),
     ),
+    GetPage(
+      name: AppRouteNames.statusCheck,
+      page: () => const StatusCheckScreen(),
+    ),
 
-    // Shell & Admin
+    // --- 2. MAIN SHELL (Navigation Wrapper) ---
     GetPage(
       name: AppRouteNames.mainWrapper,
       page: () => const MainWrapper(),
-      // FIX: Add FadeIn for smooth "No Glitch" navigation
       transition: Transition.fadeIn,
       binding: BindingsBuilder(() {
         Get.put(NavigationController());
-        Get.put(AdminController());
+        Get.lazyPut(() => AdminController());
       }),
     ),
+
+    // --- 3. ADMIN SECTION ---
     GetPage(
       name: AppRouteNames.adminDashboard,
       page: () => const AdminDashboard(),
@@ -75,14 +100,52 @@ class AppRoutes {
       name: AppRouteNames.pendingApprovals,
       page: () => const PendingApprovalsScreen(),
     ),
+    GetPage(
+      name: AppRouteNames.inventory,
+      page: () => const InventoryScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => InventoryController());
+      }),
+    ),
+    GetPage(
+      name: AppRouteNames.productionReports,
+      page: () => const ProductionReportsScreen(),
+    ),
+    GetPage(
+      name: AppRouteNames.workerList,
+      page: () => const WorkerListScreen(),
+    ),
 
-    // Supervisor Floor
+    // --- 4. SALES & MARKETING SECTION ---
+    GetPage(
+      name: AppRouteNames.salesDashboard,
+      page: () => const SalesDashboard(),
+    ),
+    GetPage(
+      name: AppRouteNames.salesManagerDashboard,
+      page: () => const SalesManagerDashboard(),
+    ),
+    GetPage(
+      name: AppRouteNames.agentList,
+      page: () => const AgentListScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => MarketingController());
+      }),
+    ),
+    GetPage(
+      name: AppRouteNames.marketingUpload,
+      page: () => const MarketingUploadScreen(),
+      binding: BindingsBuilder(() {
+        // ✅ USE THE ALIAS HERE TO REFER TO THE CONTROLLER
+        Get.lazyPut(() => upload_ctrl.MarketingUploadController());
+      }),
+    ),
+
+    // --- 5. FACTORY FLOOR SECTION ---
     GetPage(
       name: AppRouteNames.supervisorMenu,
       page: () => const SupervisorMenuScreen(),
     ),
-
-    // Production Sections
     GetPage(
       name: AppRouteNames.cuttingEntry,
       page: () => const CuttingEntryScreen(),
@@ -104,8 +167,6 @@ class AppRoutes {
         Get.lazyPut(() => StitchingController());
       }),
     ),
-
-    // Packing Entry Page
     GetPage(
       name: AppRouteNames.packingEntry,
       page: () => const PackingEntryScreen(),
@@ -113,29 +174,11 @@ class AppRoutes {
         Get.lazyPut(() => PackingController());
       }),
     ),
-
-    // Factory Stock Summary
     GetPage(
       name: AppRouteNames.factoryStock,
       page: () => const FactoryStockSummaryScreen(),
       binding: BindingsBuilder(() {
         Get.lazyPut(() => PackingController());
-      }),
-    ),
-
-    // Marketing
-    GetPage(
-      name: AppRouteNames.agentList,
-      page: () => const AgentListScreen(),
-      binding: BindingsBuilder(() {
-        Get.lazyPut(() => MarketingController());
-      }),
-    ),
-    GetPage(
-      name: AppRouteNames.marketingUpload,
-      page: () => const MarketingUploadScreen(),
-      binding: BindingsBuilder(() {
-        Get.lazyPut(() => MarketingUploadController());
       }),
     ),
   ];

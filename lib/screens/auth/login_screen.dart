@@ -5,23 +5,22 @@ import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 import '../../utils/widgets/custom_text_field.dart';
 import '../../routes/route_names.dart';
+import '../../screens/auth/status_check_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Inject the controller. Get.put() ensures it's created if not found.
+    // Inject the controller
     final controller = Get.put(LoginController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
-      // OPTIMIZATION: Dismiss keyboard when tapping background
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         backgroundColor: isDark ? TColors.dark : TColors.light,
         body: SafeArea(
-          // OPTIMIZATION: Avoid system notches
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(TSizes.lg),
             child: Column(
@@ -80,8 +79,9 @@ class LoginScreen extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        mainAxisExtent: 85, // Fixed height for consistent look
+        mainAxisExtent: 85,
       ),
+      // This list now contains "Sales Associate" from your updated controller
       itemCount: controller.roles.length,
       itemBuilder: (context, index) {
         final role = controller.roles[index];
@@ -116,7 +116,7 @@ class LoginScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    controller.roleIcons[role],
+                    controller.roleIcons[role] ?? Icons.person_outline,
                     color: isSelected ? Colors.white : TColors.primary,
                   ),
                   const SizedBox(height: 5),
@@ -172,7 +172,7 @@ class LoginScreen extends StatelessWidget {
           ),
           const SizedBox(height: TSizes.lg),
 
-          // --- Full Width Login Button ---
+          // --- Login Button ---
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -212,19 +212,35 @@ class LoginScreen extends StatelessWidget {
   }
 
   Widget _buildSignUpFooter() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        const Text("Need an account? "),
-        GestureDetector(
-          onTap: () => Get.toNamed(AppRouteNames.signup),
-          child: const Text(
-            "Create ID Request",
-            style: TextStyle(
-              color: TColors.primary,
-              fontWeight: FontWeight.bold,
-              decoration: TextDecoration.underline,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("Need an account? "),
+            GestureDetector(
+              onTap: () => Get.toNamed(AppRouteNames.signup),
+              child: const Text(
+                "Create ID Request",
+                style: TextStyle(
+                  color: TColors.primary,
+                  fontWeight: FontWeight.bold,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
             ),
+          ],
+        ),
+
+        const SizedBox(height: 15),
+
+        TextButton.icon(
+          onPressed: () => Get.to(() => const StatusCheckScreen()),
+          icon: const Icon(Icons.track_changes, size: 16),
+          label: const Text("Check Application Status"),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.grey,
+            textStyle: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
       ],

@@ -1,21 +1,40 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrderModel {
-  final String? id; // Unique Document ID from Firestore
+  final String? id;
+  final String? manualOrderNo;
   final String clientName;
+  final String? clientPhone;
+  final String? organization;
+
+  // Single Product Fields (Keep these for backward compatibility)
+  final String? productCode;
   final String productName;
+  final String? productDetails;
+
   final int quantity;
-  final String priority; // e.g., Low, Medium, High
+  final String priority;
   final DateTime orderDate;
   final DateTime deliveryDate;
   final String marketingPersonName;
-  final String status; // e.g., Pending, Processing, Completed
+  final String status;
+
   final double totalAmount;
+  final double gstPercentage;
+  final String? imageUrl;
+
+  // ✅ ADDED: The List of Products (Required for the new UI)
+  final List<Map<String, dynamic>> products;
 
   OrderModel({
     this.id,
+    this.manualOrderNo,
     required this.clientName,
+    this.clientPhone,
+    this.organization,
+    this.productCode,
     required this.productName,
+    this.productDetails,
     required this.quantity,
     required this.priority,
     required this.orderDate,
@@ -23,13 +42,22 @@ class OrderModel {
     required this.marketingPersonName,
     this.status = 'Pending',
     required this.totalAmount,
+    this.gstPercentage = 0.0,
+    this.imageUrl,
+    // ✅ Initialize with empty list if not provided
+    this.products = const [],
   });
 
   /// --- Convert Model to JSON Map for Firestore Storage ---
   Map<String, dynamic> toJson() {
     return {
+      "manualOrderNo": manualOrderNo,
       "clientName": clientName,
+      "clientPhone": clientPhone,
+      "organization": organization,
+      "productCode": productCode,
       "productName": productName,
+      "productDetails": productDetails,
       "quantity": quantity,
       "priority": priority,
       "orderDate": orderDate,
@@ -37,8 +65,11 @@ class OrderModel {
       "marketingPersonName": marketingPersonName,
       "status": status,
       "totalAmount": totalAmount,
-      "createdAt":
-          FieldValue.serverTimestamp(), // Database-side timestamp for sorting
+      "gstPercentage": gstPercentage,
+      "imageUrl": imageUrl,
+      "createdAt": FieldValue.serverTimestamp(),
+      // ✅ Save the list to Firestore
+      "products": products,
     };
   }
 
@@ -46,19 +77,79 @@ class OrderModel {
   factory OrderModel.fromSnapshot(
     DocumentSnapshot<Map<String, dynamic>> document,
   ) {
-    final data = document.data()!;
+    final data = document.data();
+
+    if (data == null) {
+      throw Exception("Document ${document.id} is empty!");
+    }
+
+    // ✅ SMART PARSING: Handle both Old (Single) and New (List) Data
+    List<Map<String, dynamic>> parsedProducts = [];
+
+    if (data['products'] is List) {
+      // If it's a new order with a list, use it
+      parsedProducts = List<Map<String, dynamic>>.from(data['products']);
+    } else {
+      // If it's an old order (no list), create a list from the single fields
+      // This prevents the UI from crashing or showing empty details
+      parsedProducts.add({
+        'productName': data['productName'] ?? '',
+        'qty': _parseInt(data['quantity']),
+        'price': _parseDouble(data['totalAmount']), // Estimate price
+        'total': _parseDouble(data['totalAmount']),
+      });
+    }
+
     return OrderModel(
       id: document.id,
-      clientName: data['clientName'] ?? '',
+      manualOrderNo: data['manualOrderNo'] ?? '',
+      clientName: data['clientName'] ?? 'Unknown Client',
+      clientPhone: data['clientPhone'] ?? '',
+      organization: data['organization'] ?? '',
+      productCode: data['productCode'] ?? '',
       productName: data['productName'] ?? '',
-      quantity: data['quantity'] ?? 0,
+      productDetails: data['productDetails'] ?? '',
+
+      quantity: _parseInt(data['quantity']),
       priority: data['priority'] ?? 'Medium',
-      // Convert Firestore Timestamp objects back to Dart DateTime objects
-      orderDate: (data['orderDate'] as Timestamp).toDate(),
-      deliveryDate: (data['deliveryDate'] as Timestamp).toDate(),
-      marketingPersonName: data['marketingPersonName'] ?? '',
+
+      orderDate: _parseTimestamp(data['orderDate']),
+      deliveryDate: _parseTimestamp(data['deliveryDate']),
+
+      marketingPersonName: data['marketingPersonName'] ?? 'Unknown Agent',
       status: data['status'] ?? 'Pending',
-      totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
+
+      totalAmount: _parseDouble(data['totalAmount']),
+      gstPercentage: _parseDouble(data['gstPercentage']),
+
+      imageUrl: data['imageUrl'] ?? '',
+
+      // ✅ Assign the parsed list
+      products: parsedProducts,
     );
+  }
+
+  /// --- HELPER FUNCTIONS ---
+  static DateTime _parseTimestamp(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    if (value is double) return value.toInt();
+    return 0;
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 }

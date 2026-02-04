@@ -27,44 +27,84 @@ class SignupController extends GetxController {
       isLoading.value = true;
 
       // 1. Create User in Firebase Authentication
-      // This creates the secure login credentials
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: email.text.trim(),
             password: password.text.trim(),
           );
 
-      // 2. Prepare User Data using UserModel
+      String uid = userCredential.user!.uid;
+
+      // --- LOGIC UPDATE: Determine Pre-Approvals ---
+      // ✅ CHANGED 'Sales Agent' to 'Sales Associate' here
+      // Sales Associates, Managers, and Admins skip Unit/Shift approval.
+      bool bypassLowerLevels =
+          (role == 'Sales Associate' ||
+          role == 'Sales Manager' ||
+          role == 'Admin');
+
+      // 2. Prepare User Data (For id_requests model)
       final newUser = UserModel(
-        id: userCredential.user!.uid,
+        id: uid,
         name: fullName.text.trim(),
         email: email.text.trim(),
         employeeId: employeeId.text.trim(),
         role: role,
-        status: "Pending", // Crucial for Admin Approval Queue
-        unitApproved: false,
-        shiftApproved: false,
-        adminApproved: false,
+        status: "Pending",
+
+        // Auto-approve lower levels so Admin is the only gatekeeper
+        unitApproved: bypassLowerLevels ? true : false,
+        shiftApproved: bypassLowerLevels ? true : false,
+        adminApproved: false, // Always requires final Admin check
+
         createdAt: DateTime.now(),
       );
 
-      // 3. Save to Firestore 'id_requests' collection
-      await FirebaseFirestore.instance
-          .collection('id_requests')
-          .doc(newUser.id)
-          .set(newUser.toJson());
+      // 3. BATCH WRITE: Save to BOTH 'id_requests' AND 'users'
+      // This ensures the profile exists immediately so "New Order" works correctly.
+      WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      // 4. Success Feedback & Redirect
+      // Ref 1: Request for Admin Approval
+      DocumentReference requestRef = FirebaseFirestore.instance
+          .collection('id_requests')
+          .doc(uid);
+
+      // Ref 2: Actual User Profile (Vital for fetching Name in App)
+      DocumentReference userProfileRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid);
+
+      // Data for 'users' collection
+      Map<String, dynamic> userData = {
+        "FullName": fullName.text.trim(), // ✅ Key field for "New Order" logic
+        "Email": email.text.trim(),
+        "Role": role,
+        "EmployeeID": employeeId.text.trim(),
+        "Status": "Pending",
+        "CreatedAt": FieldValue.serverTimestamp(),
+      };
+
+      batch.set(requestRef, newUser.toJson());
+      batch.set(userProfileRef, userData);
+
+      await batch.commit();
+
+      // 4. Force Sign Out (Critical)
+      // Prevents auto-login to dashboard before approval
+      await FirebaseAuth.instance.signOut();
+
+      // 5. Success Feedback & Redirect
       Get.defaultDialog(
         title: "Request Submitted",
-        middleText:
-            "Your ID request has been sent to the $role hierarchy for approval.",
+        middleText: bypassLowerLevels
+            ? "Your request has been sent directly to the System Admin for approval."
+            : "Your ID request has been sent to the $role hierarchy.",
         textConfirm: "OK",
         confirmTextColor: Colors.white,
+        buttonColor: Colors.green,
         onConfirm: () {
-          // Close dialog and go to Login
-          Get.back();
-          Get.offAllNamed(AppRouteNames.login);
+          Get.back(); // Close dialog
+          Get.offAllNamed(AppRouteNames.login); // Go to Login
         },
         barrierDismissible: false,
       );
@@ -88,7 +128,6 @@ class SignupController extends GetxController {
     }
   }
 
-  // Helper to make error messages user-friendly
   String _handleAuthError(String code) {
     switch (code) {
       case 'email-already-in-use':
@@ -104,7 +143,6 @@ class SignupController extends GetxController {
 
   @override
   void onClose() {
-    // Memory cleanup for 8GB RAM optimization
     fullName.dispose();
     email.dispose();
     employeeId.dispose();

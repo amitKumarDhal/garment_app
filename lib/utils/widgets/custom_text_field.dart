@@ -16,8 +16,9 @@ class TCustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final List<TextInputFormatter>? inputFormatters;
 
-  // ✅ ADD THIS MISSING PARAMETER
+  // ✅ ADDED THESE PARAMETERS
   final TextInputAction? textInputAction;
+  final int maxLines;
 
   const TCustomTextField({
     super.key,
@@ -32,9 +33,10 @@ class TCustomTextField extends StatelessWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.inputFormatters,
-
-    // ✅ ADD THIS TO CONSTRUCTOR
     this.textInputAction,
+
+    // ✅ DEFAULT TO 1 LINE (Standard behavior)
+    this.maxLines = 1,
   });
 
   @override
@@ -48,9 +50,10 @@ class TCustomTextField extends StatelessWidget {
       validator: validator,
       onChanged: onChanged,
       inputFormatters: inputFormatters,
-
-      // ✅ PASS IT TO THE WIDGET
       textInputAction: textInputAction,
+
+      // ✅ CONNECTED MAX LINES
+      maxLines: maxLines,
 
       style: TextStyle(
         color: isDark ? Colors.white : TColors.textPrimary,
@@ -59,6 +62,8 @@ class TCustomTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
+        alignLabelWithHint:
+            maxLines > 1, // Ensures label stays at top for big text boxes
         hintStyle: TextStyle(
           color: isDark ? Colors.grey[600] : Colors.grey[400],
           fontSize: 12,

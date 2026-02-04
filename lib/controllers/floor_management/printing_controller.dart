@@ -43,8 +43,10 @@ class PrintingController extends GetxController {
         damageData[size] = int.tryParse(controller.text) ?? 0;
       });
 
-      // Save to Firestore
-      await FirebaseFirestore.instance.collection('printing_entries').add({
+      final firestore = FirebaseFirestore.instance;
+
+      // 1. Save to Firestore (Detailed Record)
+      await firestore.collection('printing_entries').add({
         "styleNo": styleNo.text.trim(),
         "receivedFromCutting": int.tryParse(receivedFromCutting.text) ?? 0,
         "damagedQuantities": damageData,
@@ -54,10 +56,19 @@ class PrintingController extends GetxController {
         "status": "Printing Completed",
       });
 
+      // ✅ 2. BROADCAST TO LIVE FEED
+      await firestore.collection('activities').add({
+        "title": "Printing: ${styleNo.text.trim()}",
+        "subtitle": "${netGoodPieces.value} OK | ${totalDamaged.value} Defect",
+        "time": FieldValue.serverTimestamp(),
+        "iconCode": Icons.print.codePoint,
+        "colorValue": Colors.orange.value,
+      });
+
       Get.snackbar(
         "Success",
         "Sent ${netGoodPieces.value} pieces to Stitching",
-        backgroundColor: Colors.green.withValues(alpha: 0.1),
+        backgroundColor: Colors.green.withOpacity(0.1),
         colorText: Colors.green,
       );
 
@@ -81,7 +92,6 @@ class PrintingController extends GetxController {
 
   @override
   void onClose() {
-    // Memory disposal for 8GB RAM performance
     for (var c in [styleNo, receivedFromCutting]) {
       c.dispose();
     }

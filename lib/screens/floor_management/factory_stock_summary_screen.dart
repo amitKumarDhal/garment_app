@@ -9,198 +9,107 @@ class FactoryStockSummaryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // We use Get.find because the controller is already alive from the previous screen
     final controller = Get.find<PackingController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Factory Inventory Stock"),
+        title: const Text("Factory Production Summary"),
         centerTitle: true,
         backgroundColor: TColors.packing,
         foregroundColor: Colors.white,
         elevation: 0,
+        // Pro-Tip: Add a back button that explicitly returns to Packing Entry
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Get.back(),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(TSizes.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- 1. TOTAL PIECES OVERVIEW ---
-            _buildMainInventoryCard(controller),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(TSizes.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- 1. TOTAL STOCK & GOAL PROGRESS ---
+              _buildMainInventoryCard(controller),
 
-            const SizedBox(height: TSizes.lg),
+              const SizedBox(height: TSizes.lg),
 
-            // --- 2. CARTONS BY SIZE CATEGORY ---
-            const Text(
-              "Stock by Carton Size",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+              // --- 2. ACTION: RETURN TO PACKING ---
+              _buildPackNextButton(),
 
-            const SizedBox(height: TSizes.md),
+              const SizedBox(height: TSizes.xl),
 
-            Obx(
-              () => GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                mainAxisSpacing: TSizes.md,
-                crossAxisSpacing: TSizes.md,
-                childAspectRatio: 1.5, // Slightly wider for better fit
-                children: [
-                  _buildSizeBox(
-                    "Small (S)",
-                    controller.countSmall,
-                    Colors.blue,
-                    isDark,
-                  ),
-                  _buildSizeBox(
-                    "Medium (M)",
-                    controller.countMedium,
-                    Colors.green,
-                    isDark,
-                  ),
-                  _buildSizeBox(
-                    "Large (L)",
-                    controller.countLarge,
-                    Colors.orange,
-                    isDark,
-                  ),
-                  _buildSizeBox(
-                    "X-Large (XL)",
-                    controller.countXL,
-                    Colors.red,
-                    isDark,
-                  ),
-                  _buildSizeBox(
-                    "XX-Large (XXL)",
-                    controller.countXXL,
-                    Colors.purple,
-                    isDark,
-                  ),
-                ],
+              // --- 3. SIZE BREAKDOWN GRID ---
+              const Text(
+                "Stock by Size Category",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            ),
-
-            const SizedBox(height: TSizes.lg),
-
-            // --- 3. RECENT PRODUCTION LOG ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Recent Packing Logs",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              const SizedBox(height: TSizes.md),
+              Obx(
+                () => GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  mainAxisSpacing: TSizes.md,
+                  crossAxisSpacing: TSizes.md,
+                  childAspectRatio: 1.6,
+                  children: [
+                    _buildSizeBox(
+                      "Small (S)",
+                      controller.countSmall,
+                      Colors.blue,
+                      isDark,
+                    ),
+                    _buildSizeBox(
+                      "Medium (M)",
+                      controller.countMedium,
+                      Colors.green,
+                      isDark,
+                    ),
+                    _buildSizeBox(
+                      "Large (L)",
+                      controller.countLarge,
+                      Colors.orange,
+                      isDark,
+                    ),
+                    _buildSizeBox(
+                      "X-Large (XL)",
+                      controller.countXL,
+                      Colors.red,
+                      isDark,
+                    ),
+                    _buildSizeBox(
+                      "XXL",
+                      controller.countXXL,
+                      Colors.purple,
+                      isDark,
+                    ),
+                  ],
                 ),
-                // Optional: Export Feature
-                IconButton(
-                  icon: const Icon(
-                    Icons.download,
-                    size: 20,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () =>
-                      Get.snackbar("Info", "Export to CSV coming soon"),
-                ),
-              ],
-            ),
+              ),
 
-            Obx(() {
-              if (controller.inventoryList.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Column(
-                      children: [
-                        Icon(Icons.inbox, size: 40, color: Colors.grey),
-                        SizedBox(height: 10),
-                        Text(
-                          "No cartons recorded yet.",
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
+              const SizedBox(height: TSizes.xl),
+              const Divider(),
+              const SizedBox(height: TSizes.md),
 
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                // FIX: Limit to 10 items, but keep ORIGINAL order (Newest First)
-                itemCount: controller.inventoryList.length > 10
-                    ? 10
-                    : controller.inventoryList.length,
-                itemBuilder: (context, index) {
-                  // FIX: Removed .reversed so we see the newest item at the top
-                  final item = controller.inventoryList[index];
+              // --- 4. SEARCH & RECENT LOGS ---
+              _buildSearchAndFilterSection(context, controller, isDark),
+              const SizedBox(height: TSizes.md),
+              _buildLogList(controller, isDark),
 
-                  return Card(
-                    elevation: 0,
-                    color: isDark ? TColors.dark : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                      ),
-                    ),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: TColors.packing.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: TColors.packing,
-                        ),
-                      ),
-                      title: Text(
-                        "Carton #${item['cartonNo']}",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        "Size: ${item['category']}  |  Qty: ${item['totalPieces']} Pcs",
-                        style: TextStyle(
-                          color: isDark ? Colors.grey[400] : Colors.grey[700],
-                        ),
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 16,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            "Packed",
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            }),
-            const SizedBox(height: 50), // Bottom padding for scrolling
-          ],
+              const SizedBox(height: 50),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // --- UI Helpers ---
+  // --- UI Components ---
 
   Widget _buildMainInventoryCard(PackingController controller) {
     return Container(
@@ -224,32 +133,206 @@ class FactoryStockSummaryScreen extends StatelessWidget {
       child: Column(
         children: [
           const Text(
-            "TOTAL STOCK IN FACTORY",
+            "TOTAL FACTORY PACKED STOCK",
             style: TextStyle(
               color: Colors.white70,
               fontWeight: FontWeight.bold,
               letterSpacing: 1,
+              fontSize: 12,
             ),
           ),
-          const SizedBox(height: TSizes.sm),
+          const SizedBox(height: 8),
           Obx(
             () => Text(
               "${controller.totalPiecesInFactory}",
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 42,
+                fontSize: 48,
                 fontWeight: FontWeight.w900,
               ),
             ),
           ),
-          const SizedBox(height: 5),
-          const Text(
-            "Ready for Dispatch",
-            style: TextStyle(color: Colors.white60, fontSize: 12),
+          const SizedBox(height: 12),
+          // --- TARGET PROGRESS BAR (Practical Requirement) ---
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Daily Goal Progress",
+                style: TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+              Text(
+                "75%",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: const LinearProgressIndicator(
+              value: 0.75, // Replace with dynamic calculation later
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              minHeight: 8,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildPackNextButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => Get.back(),
+        icon: const Icon(Icons.add_box_rounded),
+        label: const Text("PACK ANOTHER CARTON"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: TColors.packing.withValues(alpha: 0.1),
+          foregroundColor: TColors.packing,
+          elevation: 0,
+          side: const BorderSide(color: TColors.packing),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilterSection(
+    BuildContext context,
+    PackingController controller,
+    bool isDark,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? Colors.white12 : Colors.grey.shade300,
+            ),
+          ),
+          child: TextField(
+            onChanged: (val) => controller.searchQuery.value = val,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              icon: const Icon(Icons.search, color: TColors.packing),
+              hintText: "Find Carton # or Style...",
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              border: InputBorder.none,
+              suffixIcon: Obx(
+                () => controller.searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () => controller.searchQuery.value = '',
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              "All",
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL",
+            ].map((size) => _buildFilterChip(size, controller)).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterChip(String label, PackingController controller) {
+    return Obx(() {
+      final isSelected = controller.activeFilter.value == label;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8.0),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: isSelected,
+          showCheckmark: false,
+          selectedColor: TColors.packing,
+          labelStyle: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey,
+            fontWeight: FontWeight.bold,
+          ),
+          backgroundColor: Colors.transparent,
+          side: BorderSide(
+            color: isSelected
+                ? TColors.packing
+                : Colors.grey.withValues(alpha: 0.3),
+          ),
+          onSelected: (val) {
+            if (val) controller.activeFilter.value = label;
+          },
+        ),
+      );
+    });
+  }
+
+  Widget _buildLogList(PackingController controller, bool isDark) {
+    return Obx(() {
+      final list = controller.filteredInventory;
+      if (list.isEmpty) {
+        return const Center(child: Text("No matching cartons."));
+      }
+
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final item = list[index];
+          return Card(
+            elevation: 0,
+            color: isDark ? TColors.dark : Colors.white,
+            margin: const EdgeInsets.only(bottom: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: isDark ? Colors.white10 : Colors.grey.shade200,
+              ),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.inventory_2, color: TColors.packing),
+              title: Text(
+                "#${item['cartonNo'] ?? '?'}",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                "Style: ${item['styleNo']} | Size ${item['category']}",
+              ),
+              trailing: Text(
+                "${item['totalPieces']} pcs",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: TColors.packing,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
   }
 
   Widget _buildSizeBox(String label, int count, Color color, bool isDark) {
@@ -258,13 +341,6 @@ class FactoryStockSummaryScreen extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
         border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -277,7 +353,7 @@ class FactoryStockSummaryScreen extends StatelessWidget {
               fontSize: 12,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 5),
           Text(
             "$count",
             style: TextStyle(
@@ -285,11 +361,6 @@ class FactoryStockSummaryScreen extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : Colors.black87,
             ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            "Cartons",
-            style: TextStyle(fontSize: 10, color: Colors.grey),
           ),
         ],
       ),

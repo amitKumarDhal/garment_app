@@ -9,7 +9,7 @@ class AgentListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Finding the controller (initialized in AppRoutes or here)
+    // Finding the controller
     final controller = Get.put(MarketingController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -17,12 +17,13 @@ class AgentListScreen extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Sales Agents"),
+        centerTitle: true,
         backgroundColor: TColors.marketing,
         foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
-          // Search Bar
+          // --- 1. SEARCH BAR ---
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -30,7 +31,7 @@ class AgentListScreen extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: "Search Agent Name...",
                 prefixIcon: const Icon(Icons.search, color: TColors.marketing),
-                fillColor: isDark ? TColors.darkCard : Colors.white,
+                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 filled: true,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -40,13 +41,27 @@ class AgentListScreen extends StatelessWidget {
             ),
           ),
 
-          // Agent List
+          // --- 2. AGENT LIST ---
           Expanded(
-            child: Obx(
-              () => ListView.builder(
+            child: Obx(() {
+              // Show loader while Firestore aggregator is working
+              if (controller.isLoading.value) {
+                return const Center(
+                  child: CircularProgressIndicator(color: TColors.marketing),
+                );
+              }
+
+              if (controller.filteredAgents.isEmpty) {
+                return const Center(
+                  child: Text("No agents found with sales records."),
+                );
+              }
+
+              return ListView.builder(
                 itemCount: controller.filteredAgents.length,
                 itemBuilder: (context, index) {
                   final agent = controller.filteredAgents[index];
+
                   return Card(
                     elevation: 0,
                     margin: const EdgeInsets.symmetric(
@@ -59,18 +74,16 @@ class AgentListScreen extends StatelessWidget {
                         color: isDark ? Colors.white10 : Colors.black12,
                       ),
                     ),
-                    color: isDark ? TColors.darkCard : Colors.white,
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     child: ListTile(
                       contentPadding: const EdgeInsets.all(12),
                       onTap: () =>
                           Get.to(() => AgentDetailScreen(agent: agent)),
 
-                      // --- INITIALS AVATAR (AS) ---
+                      // --- DYNAMIC AVATAR ---
                       leading: CircleAvatar(
                         radius: 25,
-                        backgroundColor: TColors.marketing.withValues(
-                          alpha: 0.1,
-                        ),
+                        backgroundColor: TColors.marketing.withOpacity(0.1),
                         child: Text(
                           agent['avatar'] ?? "??",
                           style: const TextStyle(
@@ -84,7 +97,7 @@ class AgentListScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            agent['name'],
+                            agent['name'] ?? "Unknown",
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -92,7 +105,7 @@ class AgentListScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
 
-                          // --- STATS ROW FROM YOUR SKETCH ---
+                          // --- DYNAMIC STATS ROW ---
                           Row(
                             children: [
                               _buildMetricBox(
@@ -103,13 +116,13 @@ class AgentListScreen extends StatelessWidget {
                               const SizedBox(width: 8),
                               _buildMetricBox(
                                 "CLIENTS",
-                                "${agent['clients'].length}",
+                                "${agent['uniqueClientsCount'] ?? 0}", // ✅ Dynamic Unique Count
                                 isDark,
                               ),
                               const SizedBox(width: 8),
                               _buildMetricBox(
                                 "ORDERS",
-                                "${agent['orders'] ?? 0}",
+                                "${agent['orders'] ?? 0}", // ✅ Dynamic Order Count
                                 isDark,
                               ),
                             ],
@@ -124,15 +137,15 @@ class AgentListScreen extends StatelessWidget {
                     ),
                   );
                 },
-              ),
-            ),
+              );
+            }),
           ),
         ],
       ),
     );
   }
 
-  // Helper Widget to create the rectangular boxes under the name
+  // Helper Widget for the metric boxes
   Widget _buildMetricBox(String label, String value, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

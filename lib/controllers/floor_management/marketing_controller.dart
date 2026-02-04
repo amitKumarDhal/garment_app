@@ -1,113 +1,126 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
+import '../../data/models/order_model.dart';
 
 class MarketingController extends GetxController {
-  // Observables for state management
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // --- Observables ---
   var allAgents = <Map<String, dynamic>>[].obs;
   var filteredAgents = <Map<String, dynamic>>[].obs;
+
+  // ✅ ADD THIS LINE: It was missing and causing the "undefined" error
   var filteredClients = <Map<String, dynamic>>[].obs;
+
+  var isLoading = true.obs;
 
   @override
   void onInit() {
     super.onInit();
-    _loadDummyData();
+    fetchDynamicAgentStats();
   }
 
-  void _loadDummyData() {
-    allAgents.value = [
-      {
-        "name": "Amit Sharma",
-        "avatar": "AS",
-        "revenue": "₹18.2L", // Formatted for UI
-        "orders": 2,
-        "clients": [
-          {
-            "name": "Global Tech Corp",
-            "org": "GT Solutions",
-            "status": "Processing",
-            "qty": 500,
-            "value": "₹5,40,000",
-            "numericValue": 540000, // Used for calculation
-            "phone": "9876543210",
-            "address": "Bhubaneswar, Odisha",
-            "gst": "18%",
-            "targetDate": "25 Jan 2026",
-          },
-          {
-            "name": "Pioneer Industries",
-            "org": "Pioneer Group",
-            "status": "Delivered",
-            "qty": 1200,
-            "value": "₹12,80,000",
-            "numericValue": 1280000,
-            "phone": "9988776655",
-            "address": "Cuttack, Odisha",
-            "gst": "12%",
-            "targetDate": "10 Feb 2026",
-          },
-        ],
-      },
-      {
-        "name": "Sneha Reddy",
-        "avatar": "SR",
-        "revenue": "₹0",
-        "orders": 0,
-        "clients": [],
-      },
-    ];
-    filteredAgents.assignAll(allAgents);
+  // --- 1. Initialize the clients list for the detail page ---
+  void initClients(List<dynamic> clients) {
+    filteredClients.assignAll(clients.cast<Map<String, dynamic>>());
   }
 
-  // --- Helper to update totals dynamically ---
-  // Call this whenever a new order is added to an agent
-  void calculateAgentStats(int agentIndex) {
-    double totalRevenue = 0;
-    List clients = allAgents[agentIndex]['clients'];
+  // --- 2. Search logic specifically for the detail page list ---
+  void searchClient(List<dynamic> allClients, String query) {
+    final clients = allClients.cast<Map<String, dynamic>>();
 
-    for (var client in clients) {
-      totalRevenue += (client['numericValue'] ?? 0);
+    if (query.isEmpty) {
+      filteredClients.assignAll(clients);
+    } else {
+      String lowerQuery = query.toLowerCase();
+      filteredClients.assignAll(
+        clients.where((c) {
+          final name = (c['clientName'] ?? c['name'] ?? "")
+              .toString()
+              .toLowerCase();
+          final org = (c['organization'] ?? c['org'] ?? "")
+              .toString()
+              .toLowerCase();
+          return name.contains(lowerQuery) || org.contains(lowerQuery);
+        }).toList(),
+      );
     }
-
-    // Convert to Lakhs format (e.g., 1820000 -> 18.2L)
-    allAgents[agentIndex]['revenue'] =
-        "₹${(totalRevenue / 100000).toStringAsFixed(1)}L";
-    allAgents[agentIndex]['orders'] = clients.length;
-
-    allAgents.refresh(); // Notifies the Obx listeners in the UI
-    filteredAgents.assignAll(allAgents); // Syncs the search list
   }
 
-  // --- Search Logic for Agents ---
+  // --- 3. The Real-Time Aggregator ---
+  void fetchDynamicAgentStats() {
+    isLoading.value = true;
+
+    _db.collection('orders').snapshots().listen((snapshot) {
+      final allOrders = snapshot.docs
+          .map((doc) => OrderModel.fromSnapshot(doc))
+          .toList();
+
+      Map<String, Map<String, dynamic>> agentMap = {};
+
+      for (var order in allOrders) {
+        String agentName = order.marketingPersonName;
+
+        if (!agentMap.containsKey(agentName)) {
+          agentMap[agentName] = {
+            "name": agentName,
+            "avatar": agentName.length >= 2
+                ? agentName.substring(0, 2).toUpperCase()
+                : "A",
+            "revenue": 0.0,
+            "orders": 0,
+            "clients": <Map<String, dynamic>>[],
+            "uniqueClientNames": <String>{},
+          };
+        }
+
+        var agent = agentMap[agentName]!;
+        agent["clients"].add(order.toJson());
+        agent["uniqueClientNames"].add(order.clientName.toLowerCase().trim());
+        agent["orders"] += 1;
+
+        if (order.status.toLowerCase() == 'approved') {
+          agent["revenue"] += order.totalAmount;
+        }
+      }
+
+      // ✅ Syntax Fixed here (removed extra comma/parameter in .map)
+      final List<Map<String, dynamic>> dynamicList = agentMap.values.map((
+        agent,
+      ) {
+        double rev = agent["revenue"];
+
+        return {
+          "name": agent["name"],
+          "avatar": agent["avatar"],
+          "revenue": "₹${(rev / 100000).toStringAsFixed(1)}L",
+          "orders": agent["orders"],
+          "clients": agent["clients"],
+          "uniqueClientsCount": agent["uniqueClientNames"].length,
+        };
+      }).toList();
+
+      dynamicList.sort((a, b) => b["revenue"].compareTo(a["revenue"]));
+
+      allAgents.assignAll(dynamicList);
+      filteredAgents.assignAll(dynamicList);
+      isLoading.value = false;
+    });
+  }
+
+  // --- 4. Search Logic for Agent List ---
   void searchAgent(String query) {
     if (query.isEmpty) {
       filteredAgents.assignAll(allAgents);
     } else {
       filteredAgents.assignAll(
-        allAgents.where(
-          (a) =>
-              a['name'].toString().toLowerCase().contains(query.toLowerCase()),
-        ),
-      );
-    }
-  }
-
-  // --- Client Management ---
-  void initClients(List<dynamic> clients) {
-    filteredClients.assignAll(clients.cast<Map<String, dynamic>>());
-  }
-
-  void searchClient(List<dynamic> allClients, String query) {
-    final clients = allClients.cast<Map<String, dynamic>>();
-    if (query.isEmpty) {
-      filteredClients.assignAll(clients);
-    } else {
-      filteredClients.assignAll(
-        clients.where(
-          (c) =>
-              c['name'].toString().toLowerCase().contains(
+        allAgents
+            .where(
+              (a) => a['name'].toString().toLowerCase().contains(
                 query.toLowerCase(),
-              ) ||
-              c['org'].toString().toLowerCase().contains(query.toLowerCase()),
-        ),
+              ),
+            )
+            .toList(),
       );
     }
   }

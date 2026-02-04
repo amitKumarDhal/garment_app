@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart'; // Add this package to pubspec.yaml if missing
+import 'package:intl/intl.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 import '../../utils/constants/text_strings.dart';
@@ -14,7 +14,7 @@ class CuttingEntryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<CuttingController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Date Controller (Local for UI display)
     final TextEditingController dateController = TextEditingController(
       text: DateFormat('dd MMM yyyy').format(DateTime.now()),
@@ -29,9 +29,9 @@ class CuttingEntryScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // Practical: Quick History Button
           IconButton(
-            onPressed: () => Get.snackbar("History", "Showing last 5 entries..."),
+            onPressed: () =>
+                Get.snackbar("History", "Showing last 5 entries..."),
             icon: const Icon(Icons.history),
             tooltip: "Recent Logs",
           ),
@@ -44,25 +44,24 @@ class CuttingEntryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              
               // --- 1. DATE & SHIFT (Context) ---
               Row(
                 children: [
                   Expanded(
                     child: _buildReadOnlyField(
-                      context, 
-                      icon: Icons.calendar_today, 
-                      label: "Date", 
-                      value: dateController.text
+                      context,
+                      icon: Icons.calendar_today,
+                      label: "Date",
+                      value: dateController.text,
                     ),
                   ),
                   const SizedBox(width: TSizes.md),
                   Expanded(
                     child: _buildReadOnlyField(
-                      context, 
-                      icon: Icons.access_time, 
-                      label: "Shift", 
-                      value: "Morning (A)" // You can make this dynamic later
+                      context,
+                      icon: Icons.access_time,
+                      label: "Shift",
+                      value: "Morning (A)",
                     ),
                   ),
                 ],
@@ -70,7 +69,10 @@ class CuttingEntryScreen extends StatelessWidget {
               const SizedBox(height: TSizes.md),
 
               // --- 2. JOB DETAILS (With Scanner) ---
-              _buildSectionHeader("Job Sheet Details", Icons.assignment_outlined),
+              _buildSectionHeader(
+                "Job Sheet Details",
+                Icons.assignment_outlined,
+              ),
               Container(
                 padding: const EdgeInsets.all(TSizes.md),
                 decoration: _buildBoxDecoration(context),
@@ -84,20 +86,23 @@ class CuttingEntryScreen extends StatelessWidget {
                             controller: controller.styleNo,
                             prefixIcon: Icons.tag,
                             textInputAction: TextInputAction.next,
-                            validator: (value) => value!.isEmpty ? "Required" : null,
+                            validator: (value) =>
+                                value!.isEmpty ? "Required" : null,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Practical: Scan Button
+                        // Scan Button
                         Container(
                           decoration: BoxDecoration(
-                            color: TColors.cutting.withValues(alpha: 0.1),
+                            color: TColors.cutting.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: IconButton(
-                            icon: const Icon(Icons.qr_code_scanner, color: TColors.cutting),
+                            icon: const Icon(
+                              Icons.qr_code_scanner,
+                              color: TColors.cutting,
+                            ),
                             onPressed: () {
-                              // Simulate Scan
                               controller.styleNo.text = "STY-2024-001";
                               Get.snackbar("Scanned", "Style No Auto-filled");
                             },
@@ -124,9 +129,25 @@ class CuttingEntryScreen extends StatelessWidget {
                             controller: controller.fabricType,
                             prefixIcon: Icons.layers_outlined,
                             textInputAction: TextInputAction.next,
+                            hintText: "e.g. Cotton", // Added hint
                           ),
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: TSizes.inputFieldSpacing),
+
+                    // ✅ NEW FIELD: CONSUMPTION PER PC
+                    TCustomTextField(
+                      label: "Consumption per Pc (Meters)",
+                      controller: controller.consumption,
+                      prefixIcon: Icons.straighten,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      hintText: "e.g. 1.5",
+                      validator: (val) =>
+                          val!.isEmpty ? "Required for Stock Check" : null,
                     ),
                   ],
                 ),
@@ -144,15 +165,17 @@ class CuttingEntryScreen extends StatelessWidget {
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3, // 3 columns is better for numeric pads
-                        childAspectRatio: 1.8,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 1.8,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
                       itemCount: controller.sizeQuantities.length,
                       itemBuilder: (context, index) {
-                        String sizeKey = controller.sizeQuantities.keys.elementAt(index);
+                        String sizeKey = controller.sizeQuantities.keys
+                            .elementAt(index);
                         return TextFormField(
                           controller: controller.sizeQuantities[sizeKey],
                           keyboardType: TextInputType.number,
@@ -162,24 +185,32 @@ class CuttingEntryScreen extends StatelessWidget {
                           decoration: InputDecoration(
                             labelText: sizeKey,
                             floatingLabelBehavior: FloatingLabelBehavior.always,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             filled: true,
-                            fillColor: isDark ? Colors.black12 : Colors.grey[50],
+                            fillColor: isDark
+                                ? Colors.black12
+                                : Colors.grey[50],
                           ),
                         );
                       },
                     ),
                     const Divider(height: 24),
-                    // Practical: Remarks Field
                     TextFormField(
-                       decoration: InputDecoration(
-                         prefixIcon: const Icon(Icons.note_alt_outlined),
-                         labelText: "Remarks / Defects (Optional)",
-                         hintText: "e.g. Fabric shortage in roll #2",
-                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                       ),
-                       maxLines: 2,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.note_alt_outlined),
+                        labelText: "Remarks / Defects (Optional)",
+                        hintText: "e.g. Fabric shortage in roll #2",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      maxLines: 2,
                     ),
                   ],
                 ),
@@ -192,12 +223,12 @@ class CuttingEntryScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [TColors.cutting, TColors.cutting.withValues(alpha: 0.8)],
+                    colors: [TColors.cutting, TColors.cutting.withOpacity(0.8)],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: TColors.cutting.withValues(alpha: 0.4),
+                      color: TColors.cutting.withOpacity(0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -213,13 +244,23 @@ class CuttingEntryScreen extends StatelessWidget {
                           style: TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white24,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text("Pcs", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        )
+                          child: const Text(
+                            "Pcs",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -246,14 +287,18 @@ class CuttingEntryScreen extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: TColors.cutting,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             elevation: 0,
                           ),
                           child: controller.isLoading.value
                               ? const SizedBox(
-                                  height: 24, 
-                                  width: 24, 
-                                  child: CircularProgressIndicator(strokeWidth: 2)
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -262,7 +307,10 @@ class CuttingEntryScreen extends StatelessWidget {
                                     const SizedBox(width: 8),
                                     Text(
                                       TTexts.submit.toUpperCase(),
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -292,10 +340,10 @@ class CuttingEntryScreen extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: TextStyle(
-              fontSize: 13, 
-              fontWeight: FontWeight.bold, 
-              color: Colors.grey[600], 
-              letterSpacing: 1.1
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+              letterSpacing: 1.1,
             ),
           ),
         ],
@@ -303,14 +351,19 @@ class CuttingEntryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildReadOnlyField(BuildContext context, {required IconData icon, required String label, required String value}) {
+  Widget _buildReadOnlyField(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? TColors.dark : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -319,10 +372,19 @@ class CuttingEntryScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -335,7 +397,7 @@ class CuttingEntryScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.03),
+          color: Colors.black.withOpacity(0.03),
           blurRadius: 10,
           offset: const Offset(0, 4),
         ),

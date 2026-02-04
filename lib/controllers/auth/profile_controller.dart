@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
-import '../../routes/route_names.dart';
-import '../../controllers/navigation_controller.dart';
+import '../../data/repositories/authentication_repository.dart';
 
 class ProfileController extends GetxController {
   static ProfileController get instance => Get.find();
@@ -24,11 +23,9 @@ class ProfileController extends GetxController {
   Future<void> fetchUserProfile() async {
     try {
       isLoading.value = true;
-      // 1. Get the current logged-in user's ID
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null) {
-        // 2. Fetch their document from the 'id_requests' collection
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('id_requests')
             .doc(currentUser.uid)
@@ -36,7 +33,7 @@ class ProfileController extends GetxController {
 
         if (userDoc.exists) {
           final data = userDoc.data() as Map<String, dynamic>;
-          // 3. Update UI with Real Data
+          // Update UI with Real Data
           name.value = data['name'] ?? "User";
           email.value = data['email'] ?? "";
           role.value = data['role'] ?? "Worker";
@@ -44,26 +41,17 @@ class ProfileController extends GetxController {
         }
       }
     } catch (e) {
-      Get.snackbar("Error", "Could not load profile data.");
+      // Silent error or retry logic
+      print("Error loading profile: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Handles secure logout
+  /// ✅ CALL THE REPO FOR SAFE LOGOUT
   Future<void> logout() async {
-    try {
-      // 1. Sign out from Firebase (Invalidates the session)
-      await FirebaseAuth.instance.signOut();
-
-      // 2. Delete the NavigationController
-      // (This ensures the next user doesn't see the previous user's tabs)
-      Get.delete<NavigationController>();
-
-      // 3. Redirect to Login Screen
-      Get.offAllNamed(AppRouteNames.login);
-    } catch (e) {
-      Get.snackbar("Error", "Logout failed: $e");
-    }
+    // This delegates the logic to AuthenticationRepository
+    // which handles the correct "Navigation First, SignOut Second" order.
+    await AuthenticationRepository.instance.logout();
   }
 }

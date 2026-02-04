@@ -5,13 +5,25 @@ import '../../utils/constants/sizes.dart';
 import '../../routes/route_names.dart';
 import '../../controllers/floor_management/supervisor_controller.dart';
 
+// ✅ LIVE FEED IMPORTS
+import '../../controllers/admin/admin_controller.dart';
+import '../../data/models/activity_item_model.dart';
+import '../admin/production_reports_screen.dart';
+
+// ✅ INVENTORY SCREEN IMPORT
+import '../admin/inventory_screen.dart';
+
 class SupervisorMenuScreen extends StatelessWidget {
   const SupervisorMenuScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Ensure controller is initialized
+    // Ensure controllers are initialized
     final controller = Get.put(SupervisorController());
+
+    // Safely find AdminController (It's put by GeneralBindings now)
+    final adminController = Get.find<AdminController>();
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -19,7 +31,7 @@ class SupervisorMenuScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Yoobbel Production"),
         centerTitle: true,
-        automaticallyImplyLeading: false, // Hides back button
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(TSizes.lg),
@@ -40,7 +52,7 @@ class SupervisorMenuScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: TColors.primary.withValues(alpha: 0.1),
+                      backgroundColor: TColors.primary.withOpacity(0.1),
                       child: const Icon(Icons.person, color: TColors.primary),
                     ),
                     const SizedBox(width: 12),
@@ -67,29 +79,21 @@ class SupervisorMenuScreen extends StatelessWidget {
 
             const SizedBox(height: TSizes.xl),
 
-            // --- Marketing Section ---
-            const Text(
-              "Department Sections",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-
-            _buildMenuCard(
-              "New Order Entry",
-              "Upload and record client orders",
-              Icons.add_shopping_cart,
-              TColors.marketing,
-              () => _safeNavigate(AppRouteNames.marketingUpload),
-            ),
-
-            const Divider(height: 32),
-
-            // --- Production Floor ---
+            // --- Production Floor Section ---
             const Text(
               "Production Floor",
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 12),
+
+            // ✅ NEW: FABRIC INVENTORY (Works for Shift Supervisor & Cutting Check)
+            _buildMenuCard(
+              "Fabric Inventory",
+              "Inward stock & Check availability",
+              Icons.store_mall_directory,
+              Colors.brown,
+              () => Get.to(() => const InventoryScreen()),
+            ),
 
             _buildMenuCard(
               "Cutting Section",
@@ -112,17 +116,58 @@ class SupervisorMenuScreen extends StatelessWidget {
               TColors.stitching,
               () => controller.goToSection(AppRouteNames.stitchingEntry),
             ),
-
-            // --- UPDATED PACKING CARD ---
-            // Renamed to "Packing Section" and removed the inventory button
             _buildMenuCard(
               "Packing Section",
               "Seal cartons & record shipment",
               Icons.inventory_2,
               TColors.packing,
               () => controller.goToSection(AppRouteNames.packingEntry),
-              // No trailing button here anymore. It defaults to the arrow >
             ),
+
+            const SizedBox(height: TSizes.xl),
+
+            // --- Live Feed Section ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Live Floor Updates",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Get.to(() => const ProductionReportsScreen()),
+                  child: const Text("View All", style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            Obx(() {
+              if (adminController.isLoading.value) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              if (adminController.recentActivities.isEmpty) {
+                return const Center(child: Text("No recent activity found."));
+              }
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: adminController.recentActivities.length,
+                itemBuilder: (context, index) => _buildActivityTile(
+                  context,
+                  adminController.recentActivities[index],
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -131,12 +176,57 @@ class SupervisorMenuScreen extends StatelessWidget {
 
   // --- Helpers ---
 
-  void _safeNavigate(String route) {
-    try {
-      Get.toNamed(route);
-    } catch (e) {
-      Get.snackbar("Error", "Page not found: $route");
-    }
+  Widget _buildActivityTile(BuildContext context, ActivityItem item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String formattedDate =
+        "${item.time.day}/${item.time.month} ${item.time.hour}:${item.time.minute.toString().padLeft(2, '0')}";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: item.color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(item.icon, color: item.color, size: 20),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  item.subtitle,
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            formattedDate,
+            style: const TextStyle(fontSize: 10, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMenuCard(
@@ -160,7 +250,7 @@ class SupervisorMenuScreen extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 24),

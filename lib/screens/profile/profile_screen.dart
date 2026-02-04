@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ Required for Status Bar control
 import 'package:get/get.dart';
-import 'package:yoobbel/controllers/auth/profile_controller.dart';
+import '../../controllers/auth/profile_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 
@@ -22,8 +23,17 @@ class ProfileScreen extends StatelessWidget {
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
-        foregroundColor: isDark ? Colors.white : Colors.black,
         elevation: 0,
+
+        // ✅ CRITICAL FIX: Make Status Bar Icons Visible
+        // If Light Mode -> Use Dark Icons (Black)
+        // If Dark Mode -> Use Light Icons (White)
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
+
+        foregroundColor: isDark ? Colors.white : Colors.black,
+
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
@@ -115,21 +125,21 @@ class ProfileScreen extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [TColors.primary, TColors.primary.withValues(alpha: 0.7)],
+          colors: [TColors.primary, TColors.primary.withOpacity(0.7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: TColors.primary.withValues(alpha: 0.3),
+            color: TColors.primary.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // 1. Profile Image
           Container(
@@ -156,13 +166,13 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(width: 15),
 
-          // 2. User Info (Expanded allows text to take available space)
+          // 2. User Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // --- FULL NAME FIX (Wraps text instead of cutting off) ---
+                // --- FULL NAME FIX ---
                 Obx(
                   () => Text(
                     controller.name.value,
@@ -170,10 +180,10 @@ class ProfileScreen extends StatelessWidget {
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                      height: 1.2, // Adds space between lines
+                      height: 1.2,
                     ),
-                    maxLines: 2, // Allow up to 2 lines
-                    softWrap: true, // Enable wrapping
+                    maxLines: 2,
+                    softWrap: true,
                     overflow: TextOverflow.visible,
                   ),
                 ),
@@ -186,7 +196,7 @@ class ProfileScreen extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Obx(
@@ -216,7 +226,7 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(width: 10),
 
-          // 3. QR Code Icon (Visual Only)
+          // 3. QR Code Icon
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -256,11 +266,11 @@ class ProfileScreen extends StatelessWidget {
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1),
+            color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.1),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -304,7 +314,7 @@ class ProfileScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.purple.withValues(alpha: 0.1),
+              color: Colors.purple.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.access_time_filled, color: Colors.purple),
@@ -360,7 +370,7 @@ class ProfileScreen extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5),
         ],
       ),
       child: ListTile(
@@ -398,7 +408,7 @@ class ProfileScreen extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5),
         ],
       ),
       child: ListTile(
@@ -449,7 +459,7 @@ class ProfileScreen extends StatelessWidget {
         },
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: Colors.red.withValues(alpha: 0.1),
+          backgroundColor: Colors.red.withOpacity(0.1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

@@ -16,7 +16,6 @@ class StitchingController extends GetxController {
   final completedQty = TextEditingController();
   final rejectedQty = TextEditingController();
 
-  // --- FIX: Re-adding the missing list for the Dropdown ---
   var availableWorkers = <String>[
     "Worker 001 - Rahul",
     "Worker 002 - Priya",
@@ -46,9 +45,10 @@ class StitchingController extends GetxController {
 
     try {
       isLoading.value = true;
+      final firestore = FirebaseFirestore.instance;
 
-      // Save to 'stitching_entries' collection
-      await FirebaseFirestore.instance.collection('stitching_entries').add({
+      // 1. Save to 'stitching_entries' collection
+      await firestore.collection('stitching_entries').add({
         "workerName": workerName.text.trim(),
         "styleNo": styleNo.text.trim(),
         "operationType": operationType.text.trim(),
@@ -60,10 +60,19 @@ class StitchingController extends GetxController {
         "status": "Stitching Record Added",
       });
 
+      // ✅ 2. BROADCAST TO LIVE FEED
+      await firestore.collection('activities').add({
+        "title": "Stitching: ${styleNo.text.trim()}",
+        "subtitle": "${workerName.text} • ${completedQty.text} Pcs Done",
+        "time": FieldValue.serverTimestamp(),
+        "iconCode": Icons.handyman.codePoint,
+        "colorValue": Colors.teal.value,
+      });
+
       Get.snackbar(
         "Production Saved",
         "Record for ${workerName.text} synced to Cloud.",
-        backgroundColor: Colors.green.withValues(alpha: 0.1),
+        backgroundColor: Colors.green.withOpacity(0.1),
         colorText: Colors.green,
       );
 
@@ -93,7 +102,6 @@ class StitchingController extends GetxController {
 
   @override
   void onClose() {
-    // Memory disposal for 8GB RAM performance
     for (var c in [
       workerName,
       styleNo,

@@ -1,27 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; // Import for phone calls
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../../utils/constants/colors.dart';
 
 class ClientDetailScreen extends StatelessWidget {
   final Map<String, dynamic> client;
   const ClientDetailScreen({super.key, required this.client});
 
-  // Helper for Phone Calls
+  // --- Helper for Phone Calls ---
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      }
+    } catch (e) {
+      debugPrint("Could not launch dialer: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Formatting the Date safely
+    String displayDate = "N/A";
+    if (client['orderDate'] != null) {
+      // If it's a Firestore Timestamp or a DateTime object
+      var date = client['orderDate'];
+      displayDate = DateFormat(
+        'dd MMM yyyy',
+      ).format(date is DateTime ? date : date.toDate());
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Order Details"),
+        centerTitle: true,
         backgroundColor: TColors.marketing,
         foregroundColor: Colors.white,
       ),
@@ -29,20 +43,20 @@ class ClientDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Top Status Summary
+            // --- 1. TOP STATUS CARD ---
             _buildInfoCard(
               context,
               "Order Status",
-              client['status'] ?? "Unknown",
+              (client['status'] ?? "Pending").toString().toUpperCase(),
               color: _getStatusColor(client['status'] ?? ""),
             ),
             const SizedBox(height: 16),
 
-            // Information Grid
+            // --- 2. INFORMATION GRID ---
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Identity Details
+                // Identity Details (Left Side)
                 Expanded(
                   flex: 3,
                   child: Column(
@@ -50,23 +64,25 @@ class ClientDetailScreen extends StatelessWidget {
                       _buildInfoBox(
                         context,
                         "Client Name",
-                        client['name'],
+                        client['clientName'] ?? "Unknown",
                         Icons.person,
                       ),
                       _buildInfoBox(
                         context,
                         "Organization",
-                        client['org'],
+                        client['organization'] ?? "Individual",
                         Icons.business,
                       ),
 
-                      // --- UPDATED: INTERACTIVE PHONE BOX ---
+                      // Interactive Phone Box
                       InkWell(
-                        onTap: () => _makePhoneCall(client['phone'] ?? ""),
+                        onTap: () =>
+                            _makePhoneCall(client['clientPhone'] ?? ""),
+                        borderRadius: BorderRadius.circular(8),
                         child: _buildInfoBox(
                           context,
                           "Phone (Tap to Call)",
-                          client['phone'],
+                          client['clientPhone'] ?? "N/A",
                           Icons.phone,
                           color: Colors.green,
                         ),
@@ -74,21 +90,23 @@ class ClientDetailScreen extends StatelessWidget {
 
                       _buildInfoBox(
                         context,
-                        "Address",
-                        client['address'],
-                        Icons.location_on,
+                        "Product Details",
+                        client['productName'] ?? "N/A",
+                        Icons.shopping_bag,
+                        color: TColors.marketing,
                       ),
                       _buildInfoBox(
                         context,
                         "GST Info",
-                        client['gst'],
+                        "${client['gstPercentage']}% Tax Applied",
                         Icons.receipt_long,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Order Specifics
+
+                // Order Specifics (Right Side)
                 Expanded(
                   flex: 2,
                   child: Column(
@@ -96,21 +114,28 @@ class ClientDetailScreen extends StatelessWidget {
                       _buildInfoBox(
                         context,
                         "Quantity",
-                        "${client['qty']} units",
+                        "${client['quantity']} Pcs",
                         Icons.inventory,
                       ),
                       _buildInfoBox(
                         context,
-                        "Order Value",
-                        client['value'],
+                        "Grand Total",
+                        "₹${client['totalAmount']}",
                         Icons.payments,
+                        color: Colors.green,
                       ),
                       _buildInfoBox(
                         context,
-                        "Target Date",
-                        client['targetDate'],
+                        "Order Date",
+                        displayDate,
                         Icons.event,
                         color: Colors.blue,
+                      ),
+                      _buildInfoBox(
+                        context,
+                        "Manual No",
+                        client['manualOrderNo'] ?? "N/A",
+                        Icons.tag,
                       ),
                     ],
                   ),
@@ -121,17 +146,17 @@ class ClientDetailScreen extends StatelessWidget {
         ),
       ),
 
-      // --- ADDED: BOTTOM ACTION BAR ---
+      // --- 3. BOTTOM ACTION BAR ---
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton.icon(
           onPressed: () {
-            // Placeholder for future feature
+            // Future: Generate PDF or WhatsApp share
           },
-          icon: const Icon(Icons.download, color: Colors.white),
+          icon: const Icon(Icons.share, color: Colors.white),
           label: const Text(
-            "DOWNLOAD ORDER SLIP",
-            style: TextStyle(color: Colors.white),
+            "SHARE ORDER SUMMARY",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: TColors.marketing,
@@ -145,15 +170,20 @@ class ClientDetailScreen extends StatelessWidget {
     );
   }
 
+  // --- HELPER METHODS ---
+
   Color _getStatusColor(String status) {
-    switch (status) {
-      case "Delivered":
+    switch (status.toLowerCase()) {
+      case "approved":
+      case "delivered":
         return Colors.green;
-      case "Processing":
+      case "pending":
+      case "processing":
         return Colors.orange;
-      case "Cancelled":
+      case "rejected":
+      case "cancelled":
         return Colors.red;
-      case "Dispatched":
+      case "dispatched":
         return Colors.blue;
       default:
         return Colors.grey;
@@ -175,7 +205,7 @@ class ClientDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
           ),
         ],
@@ -223,7 +253,7 @@ class ClientDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
             blurRadius: 5,
           ),
         ],
