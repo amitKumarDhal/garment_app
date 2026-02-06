@@ -191,9 +191,10 @@ class SalesManagerController extends GetxController {
         var rawAmount = data['totalAmount'];
         double amount = 0.0;
 
-        if (rawAmount is num)
+        if (rawAmount is num) {
           amount = rawAmount.toDouble();
-        else if (rawAmount is String)
+        } else if (rawAmount is String)
+          // ignore: curly_braces_in_flow_control_structures
           amount = double.tryParse(rawAmount) ?? 0.0;
 
         print("   -> Order ${doc.id}:");

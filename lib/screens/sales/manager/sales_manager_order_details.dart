@@ -43,7 +43,7 @@ class SalesManagerOrderDetails extends StatelessWidget {
                 children: [
                   _buildDetailRow(
                     Icons.person,
-                    "Agent",
+                    "Associates",
                     order.marketingPersonName,
                   ),
                   const Divider(),

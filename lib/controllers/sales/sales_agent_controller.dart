@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 class SalesAgentController extends GetxController {
   static SalesAgentController get instance => Get.find();
@@ -15,8 +15,8 @@ class SalesAgentController extends GetxController {
   final agentName = "".obs;
   final monthlyAchievement = 0.0.obs;
 
-  // Target Configuration (Could be fetched from DB later)
-  final double monthlyTarget = 1000000.0; // ₹10,00,000
+  // Target Configuration (e.g., ₹10,00,000)
+  final double monthlyTarget = 1000000.0;
 
   @override
   void onInit() {
@@ -24,137 +24,171 @@ class SalesAgentController extends GetxController {
     loadDashboardData();
   }
 
-  /// Master function to load everything
+  /// Master function to reload all data
   Future<void> loadDashboardData() async {
     isLoading.value = true;
-    await fetchAgentIdentity(); // 1. Get Name First
-    await Future.wait([
-      fetchAgentStats(), // 2. Get Personal Stats
-      fetchLeaderboard(), // 3. Get Leaderboard
-    ]);
+    await fetchAgentIdentity();
+    await Future.wait([fetchAgentStats(), fetchLeaderboard()]);
     isLoading.value = false;
   }
 
-  /// 1. Get the Agent's Name from 'id_requests'
+  // --- 1. Get Agent Identity ---
   Future<void> fetchAgentIdentity() async {
     try {
       final user = _auth.currentUser;
       if (user != null) {
         String name = user.displayName ?? "Unknown";
 
-        // Check Firestore for the official registered name
-        final userDoc = await _db.collection('id_requests').doc(user.uid).get();
+        // Try to fetch specific profile name from 'users' collection
+        final userDoc = await _db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
-          name = userDoc.data()?['name'] ?? name;
+          name = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? name;
         }
         agentName.value = name;
       }
     } catch (e) {
-      debugPrint("Error fetching identity: $e");
+      print("Error fetching identity: $e");
     }
   }
 
-  /// 2. Calculate "My Achievement" for the current month
+  // --- 2. Calculate My Personal Stats (Current Month) ---
   Future<void> fetchAgentStats() async {
-    if (agentName.value.isEmpty) return;
+    final user = _auth.currentUser;
+    if (user == null) return;
 
     try {
-      final DateTime now = DateTime.now();
+      // Define Current Month Range
+      DateTime now = DateTime.now();
+      DateTime startOfMonth = DateTime(now.year, now.month, 1);
+      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      // Query all orders for this agent
-      // (Optimization: In the future, you can add .where('orderDate') here with an index)
+      // Query by 'orderDate' for better reliability
       final snapshot = await _db
           .collection('orders')
-          .where('marketingPersonName', isEqualTo: agentName.value)
+          .where('marketingPersonId', isEqualTo: user.uid)
+          .where(
+            'orderDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+          )
+          .where(
+            'orderDate',
+            isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
+          )
           .get();
 
-      double totalApproved = 0.0;
+      double total = 0.0;
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final String status = data['status'] ?? '';
-        final Timestamp? orderTimestamp = data['orderDate'] as Timestamp?;
-        final double amount = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        String status = data['status'] ?? 'Pending';
 
-        if (orderTimestamp != null) {
-          DateTime date = orderTimestamp.toDate();
-
-          // ✅ Filter: Must be 'Approved' AND in the current Month/Year
-          if (status == 'Approved' &&
-              date.month == now.month &&
-              date.year == now.year) {
-            totalApproved += amount;
-          }
+        // ✅ Check Status (Case Insensitive)
+        if (status == 'Approved' || status == 'approved') {
+          // ✅ Parse Amount Safely
+          double amount = _parseAmount(data['totalAmount']);
+          total += amount;
         }
       }
 
-      monthlyAchievement.value = totalApproved;
+      monthlyAchievement.value = total;
     } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Failed to load stats: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
-      );
+      print("Stats Error: $e");
     }
   }
 
-  /// 3. Calculate Leaderboard (Top Agents this Month)
+  // --- 3. Calculate Team Leaderboard (Current Month) ---
   Future<void> fetchLeaderboard() async {
     try {
-      final DateTime now = DateTime.now();
+      isLoading.value = true;
+      DateTime now = DateTime.now();
+      DateTime startOfMonth = DateTime(now.year, now.month, 1);
+      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      // Fetch ALL approved orders
+      print("🔍 Fetching Leaderboard: ${DateFormat('MMM yyyy').format(now)}");
+
+      // Query ALL orders for this month using 'orderDate'
       final snapshot = await _db
           .collection('orders')
-          .where('status', isEqualTo: 'Approved')
+          .where(
+            'orderDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+          )
+          .where(
+            'orderDate',
+            isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
+          )
           .get();
 
-      // Map to aggregate totals: { "Agent Name": 50000.0 }
+      print("📄 Found ${snapshot.docs.length} orders this month.");
+
       Map<String, double> agentTotals = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final Timestamp? timestamp = data['orderDate'] as Timestamp?;
-        final String name = data['marketingPersonName'] ?? 'Unknown';
-        final double amount = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        String name = data['marketingPersonName'] ?? 'Unknown Agent';
+        String status = data['status'] ?? 'Pending';
 
-        if (timestamp != null) {
-          DateTime date = timestamp.toDate();
-          // ✅ Only count orders from THIS month
-          if (date.month == now.month && date.year == now.year) {
-            agentTotals[name] = (agentTotals[name] ?? 0.0) + amount;
+        // ✅ 1. Check Status
+        if (status == 'Approved' || status == 'approved') {
+          // ✅ 2. Parse Amount Safely
+          double amount = _parseAmount(data['totalAmount']);
+
+          // ✅ 3. Aggregate Totals
+          if (agentTotals.containsKey(name)) {
+            agentTotals[name] = agentTotals[name]! + amount;
+          } else {
+            agentTotals[name] = amount;
           }
         }
       }
 
-      // Convert Map to List of Maps for the UI
-      List<Map<String, dynamic>> sortedList = agentTotals.entries.map((e) {
+      // Sort: Highest First
+      var sortedEntries = agentTotals.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      // Calculate Highest Sale for Progress Bar (Prevent divide by zero)
+      double highestSale = sortedEntries.isNotEmpty
+          ? sortedEntries.first.value
+          : 1.0;
+      if (highestSale == 0) highestSale = 1.0;
+
+      // Map to UI Structure
+      leaderboardData.value = sortedEntries.asMap().entries.map((entry) {
+        int rank = entry.key + 1;
+        double amount = entry.value.value;
+
         return {
-          "name": e.key,
-          "totalVal": e.value,
-          // Format: 1.5L
-          "totalDisplay": "₹${(e.value / 100000).toStringAsFixed(1)}L",
-          // Calculate progress bar (0.0 to 1.0)
-          "progress": (e.value / monthlyTarget).clamp(0.0, 1.0),
+          "rank": rank.toString(),
+          "name": entry.value.key,
+          "amount": amount, // Store exact double for calculations
+          "totalDisplay": NumberFormat.compactCurrency(
+            symbol: '₹',
+            locale: 'en_IN',
+          ).format(amount),
+          "progress": (amount / highestSale),
         };
       }).toList();
-
-      // Sort: Highest Value First
-      sortedList.sort((a, b) => b['totalVal'].compareTo(a['totalVal']));
-
-      // Assign Rank (1, 2, 3...)
-      for (int i = 0; i < sortedList.length; i++) {
-        sortedList[i]['rank'] = (i + 1).toString();
-      }
-
-      leaderboardData.assignAll(sortedList);
     } catch (e) {
-      debugPrint("Leaderboard Error: $e");
+      print("Leaderboard Error: $e");
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  /// ✅ Helper: Get Progress % for UI (0.0 to 1.0)
+  // --- ✅ CRITICAL HELPER: Safely parse numbers ---
+  double _parseAmount(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    if (value is String) {
+      // Remove commas or currency symbols if present
+      String clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
+      return double.tryParse(clean) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  // Helper for UI Progress Bar
   double get achievementPercentage {
     if (monthlyTarget <= 0) return 0.0;
     return (monthlyAchievement.value / monthlyTarget).clamp(0.0, 1.0);

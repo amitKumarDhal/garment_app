@@ -227,7 +227,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
           ),
           Text(
-            "Agent: ${order.marketingPersonName}",
+            "Associate: ${order.marketingPersonName}",
             style: TextStyle(color: Colors.grey[600], fontSize: 13),
           ),
           const Divider(height: 20),

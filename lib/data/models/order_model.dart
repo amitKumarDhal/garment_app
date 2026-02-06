@@ -19,11 +19,17 @@ class OrderModel {
   final String marketingPersonName;
   final String status;
 
+  final String? sizeDescription;
+
   final double totalAmount;
   final double gstPercentage;
+
+  // ✅ ADDED: Shipping Charge Field
+  final double shippingCharge;
+
   final String? imageUrl;
 
-  // ✅ ADDED: The List of Products (Required for the new UI)
+  // The List of Products (Required for the new UI)
   final List<Map<String, dynamic>> products;
 
   OrderModel({
@@ -43,8 +49,13 @@ class OrderModel {
     this.status = 'Pending',
     required this.totalAmount,
     this.gstPercentage = 0.0,
+
+    this.sizeDescription,
+
+    // ✅ Initialize with default 0.0
+    this.shippingCharge = 0.0,
+
     this.imageUrl,
-    // ✅ Initialize with empty list if not provided
     this.products = const [],
   });
 
@@ -66,9 +77,14 @@ class OrderModel {
       "status": status,
       "totalAmount": totalAmount,
       "gstPercentage": gstPercentage,
+
+      "sizeDescription": sizeDescription,
+
+      // ✅ Save shipping charge to Firestore
+      "shippingCharge": shippingCharge,
+
       "imageUrl": imageUrl,
       "createdAt": FieldValue.serverTimestamp(),
-      // ✅ Save the list to Firestore
       "products": products,
     };
   }
@@ -83,19 +99,16 @@ class OrderModel {
       throw Exception("Document ${document.id} is empty!");
     }
 
-    // ✅ SMART PARSING: Handle both Old (Single) and New (List) Data
+    // SMART PARSING: Handle both Old (Single) and New (List) Data
     List<Map<String, dynamic>> parsedProducts = [];
 
     if (data['products'] is List) {
-      // If it's a new order with a list, use it
       parsedProducts = List<Map<String, dynamic>>.from(data['products']);
     } else {
-      // If it's an old order (no list), create a list from the single fields
-      // This prevents the UI from crashing or showing empty details
       parsedProducts.add({
         'productName': data['productName'] ?? '',
         'qty': _parseInt(data['quantity']),
-        'price': _parseDouble(data['totalAmount']), // Estimate price
+        'price': _parseDouble(data['totalAmount']),
         'total': _parseDouble(data['totalAmount']),
       });
     }
@@ -122,9 +135,12 @@ class OrderModel {
       totalAmount: _parseDouble(data['totalAmount']),
       gstPercentage: _parseDouble(data['gstPercentage']),
 
-      imageUrl: data['imageUrl'] ?? '',
+      sizeDescription: data['sizeDescription'] ?? '',
 
-      // ✅ Assign the parsed list
+      // ✅ Parse shipping charge safely
+      shippingCharge: _parseDouble(data['shippingCharge']),
+
+      imageUrl: data['imageUrl'] ?? '',
       products: parsedProducts,
     );
   }

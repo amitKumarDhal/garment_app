@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:yoobbel/screens/sales/client_list_screen.dart';
 import 'package:yoobbel/screens/sales/sales_catalog_screen.dart';
 import '../../controllers/sales/sales_agent_controller.dart';
@@ -175,9 +176,10 @@ class SalesDashboard extends StatelessWidget {
     });
   }
 
-  // --- WIDGET: Team Leaderboard (Live Data) ---
+  // --- WIDGET: Team Leaderboard (Shows Exact Amount) ---
   Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
     return Obx(() {
+      // 1. Loading State
       if (controller.isLoading.value && controller.leaderboardData.isEmpty) {
         return const Center(
           child: Padding(
@@ -187,6 +189,7 @@ class SalesDashboard extends StatelessWidget {
         );
       }
 
+      // 2. Empty State
       if (controller.leaderboardData.isEmpty) {
         return Container(
           width: double.infinity,
@@ -196,83 +199,102 @@ class SalesDashboard extends StatelessWidget {
         );
       }
 
+      // 3. List of Agents
       return Column(
-        children: controller.leaderboardData
-            .map(
-              (agent) => Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 15,
-                      backgroundColor: agent['rank'] == "1"
-                          ? Colors.orange
-                          : Colors.grey.shade200,
-                      child: Text(
-                        agent['rank'],
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: agent['rank'] == "1"
-                              ? Colors.white
-                              : Colors.black,
-                        ),
-                      ),
+        children: controller.leaderboardData.map((agent) {
+          // ✅ STEP A: Get the Raw Amount safely
+          double rawAmount = 0.0;
+          if (agent['amount'] is num) {
+            rawAmount = (agent['amount'] as num).toDouble();
+          } else if (agent['amount'] is String) {
+            rawAmount = double.tryParse(agent['amount']) ?? 0.0;
+          }
+
+          // ✅ STEP B: Format as Exact Currency (₹1,24,500)
+          // decimalDigits: 0 removes the .00 cents for cleaner look
+          String exactAmountDisplay = NumberFormat.currency(
+            locale: 'en_IN',
+            symbol: '₹',
+            decimalDigits: 0,
+          ).format(rawAmount);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            ),
+            child: Row(
+              children: [
+                // Rank Badge
+                CircleAvatar(
+                  radius: 15,
+                  backgroundColor: agent['rank'] == "1"
+                      ? Colors.orange
+                      : Colors.grey.shade200,
+                  child: Text(
+                    agent['rank'],
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: agent['rank'] == "1" ? Colors.white : Colors.black,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                agent['name'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              Text(
-                                agent['totalDisplay'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: TColors.primary,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            agent['name'],
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: agent['progress'],
-                              minHeight: 6,
-                              backgroundColor: Colors.grey.shade100,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                agent['progress'] > 0.8
-                                    ? Colors.green
-                                    : (agent['progress'] > 0.5
-                                          ? Colors.blue
-                                          : Colors.orange),
-                              ),
+                          // ✅ STEP C: Display the Exact Amount
+                          Text(
+                            exactAmountDisplay,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: TColors.primary,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+
+                      // Progress Bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: agent['progress'],
+                          minHeight: 6,
+                          backgroundColor: Colors.grey.shade100,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            agent['progress'] > 0.8
+                                ? Colors.green
+                                : (agent['progress'] > 0.5
+                                      ? Colors.blue
+                                      : Colors.orange),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            )
-            .toList(),
+              ],
+            ),
+          );
+        }).toList(),
       );
     });
   }

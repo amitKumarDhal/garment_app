@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
+import '../../../utils/constants/colors.dart';
 
 class OrderApprovalScreen extends StatelessWidget {
-  final OrderModel order; // Received from the list screen
+  final OrderModel order;
   const OrderApprovalScreen({super.key, required this.order});
 
   @override
   Widget build(BuildContext context) {
-    // Access the manager controller logic
-    final controller = Get.find<SalesManagerController>();
+    // Inject the controller
+    final controller = Get.put(SalesManagerController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? TColors.dark : Colors.grey[50],
       appBar: AppBar(
         title: const Text("Verify Order"),
         centerTitle: true,
@@ -25,29 +27,95 @@ class OrderApprovalScreen extends StatelessWidget {
         child: Column(
           children: [
             // --- 1. CLIENT & AGENT SECTION ---
-            _buildDetailCard("Identity", [
-              _buildRow("Client", order.clientName),
-              _buildRow("Organization", order.organization ?? "Individual"),
-              _buildRow("Associate", order.marketingPersonName),
+            _buildDetailCard("Identity Info", [
+              _buildRow("Client Name", order.clientName),
+              _buildRow("Organization", order.organization ?? "N/A"),
+              _buildRow("Phone", order.clientPhone ?? "N/A"),
+              const Divider(),
+              _buildRow(
+                "Sales Associate",
+                order.marketingPersonName,
+                color: Colors.blue,
+              ),
+              _buildRow("Order Date", _formatDate(order.orderDate)),
             ], isDark),
 
             const SizedBox(height: 16),
 
-            // --- 2. PRODUCT SECTION ---
-            _buildDetailCard("Order Specifics", [
-              _buildRow("Product", order.productName),
-              _buildRow("Quantity", "${order.quantity} Pcs"),
+            // --- 2. PRODUCT & SIZES SECTION ---
+            _buildDetailCard("Product Details", [
+              _buildRow("Product Name:", order.productName),
+              _buildRow("SKU / Code:", order.productCode ?? "N/A"),
+              _buildRow("Total Quantity:", "${order.quantity} Pcs"),
+
+              // ✅ NEW: UNIT PRICE ROW
               _buildRow(
-                "Total Amount",
-                "₹${order.totalAmount}",
-                color: Colors.green,
+                "Unit Price:",
+                _calculateUnitPrice(order),
+                color: Colors.red,
+                isBold: true,
               ),
-              _buildRow("Manual No.", order.manualOrderNo ?? "N/A"),
+
+              const SizedBox(height: 8),
+              const Text(
+                "Size Breakdown:",
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.black26 : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                ),
+                child: Text(
+                  order.sizeDescription?.isNotEmpty == true
+                      ? order.sizeDescription!
+                      : "No specific size breakdown provided.",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+
+              if (order.productDetails?.isNotEmpty == true) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  "Special Notes:",
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                Text(
+                  order.productDetails!,
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ],
+            ], isDark),
+
+            const SizedBox(height: 16),
+
+            // --- 3. FINANCIAL SUMMARY ---
+            _buildDetailCard("Financials", [
+              _buildRow("GST Percentage", "${order.gstPercentage}%"),
+              _buildRow(
+                "Shipping Charge",
+                "₹${order.shippingCharge.toStringAsFixed(2)}",
+              ),
+              const Divider(),
+              _buildRow(
+                "TOTAL AMOUNT",
+                "₹${order.totalAmount.toStringAsFixed(2)}",
+                color: Colors.green,
+                isBold: true,
+                size: 18,
+              ),
             ], isDark),
 
             const SizedBox(height: 40),
 
-            // --- 3. ACTION BUTTONS ---
+            // --- 4. ACTION BUTTONS ---
             Row(
               children: [
                 Expanded(
@@ -55,7 +123,7 @@ class OrderApprovalScreen extends StatelessWidget {
                     onPressed: () =>
                         _confirmAction(context, "Reject", Colors.red, () {
                           controller.rejectOrder(order.id!);
-                          Get.back(); // Close this screen after rejection
+                          Get.back();
                         }),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
@@ -77,7 +145,7 @@ class OrderApprovalScreen extends StatelessWidget {
                     onPressed: () =>
                         _confirmAction(context, "Approve", Colors.green, () {
                           controller.approveOrder(order.id!);
-                          Get.back(); // Close this screen after approval
+                          Get.back();
                         }),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
@@ -95,6 +163,7 @@ class OrderApprovalScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -110,7 +179,13 @@ class OrderApprovalScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,30 +195,71 @@ class OrderApprovalScreen extends StatelessWidget {
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.grey,
-              fontSize: 12,
+              fontSize: 13,
             ),
           ),
-          const Divider(),
+          const SizedBox(height: 12),
           ...children,
         ],
       ),
     );
   }
 
-  Widget _buildRow(String label, String value, {Color? color}) {
+  // ✅ FIXED: Using Expanded to prevent Overflow
+  Widget _buildRow(
+    String label,
+    String value, {
+    Color? color,
+    bool isBold = false,
+    double size = 14,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start, // Align to top
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(
-            value,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          // Label
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+
+          const SizedBox(width: 16),
+          // Value (Wrapped in Expanded)
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                color: color,
+                fontSize: size,
+              ),
+              softWrap: true,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year}";
+  }
+
+  // ✅ NEW HELPER: Calculate Unit Price
+  String _calculateUnitPrice(OrderModel order) {
+    if (order.quantity == 0) return "₹0.00";
+
+    // 1. Remove Shipping
+    double amountWithoutShipping = order.totalAmount - order.shippingCharge;
+
+    // 2. Remove GST (Reverse calculation: Total / 1.18 if GST is 18%)
+    double gstMultiplier = 1 + (order.gstPercentage / 100);
+    double baseTotal = amountWithoutShipping / gstMultiplier;
+
+    // 3. Divide by Quantity
+    double unitPrice = baseTotal / order.quantity;
+
+    return "₹${unitPrice.toStringAsFixed(2)}";
   }
 
   void _confirmAction(
@@ -161,7 +277,7 @@ class OrderApprovalScreen extends StatelessWidget {
       buttonColor: color,
       onConfirm: () {
         onConfirm();
-        Get.back(); // Closes the dialog
+        Get.back(); // Close dialog
       },
     );
   }
