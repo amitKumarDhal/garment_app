@@ -4,9 +4,15 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import '../../routes/route_names.dart';
 
-// ✅ IMPORTS FOR REDIRECTION
-import '../../screens/sales/manager/sales_manager_dashboard.dart'; // Manager Screen
-import '../../screens/auth/status_check_screen.dart'; // Status Check Screen
+// ✅ 1. ADD ALL THESE IMPORTS (Required to find the controllers)
+import '../../controllers/navigation_controller.dart';
+import '../../controllers/admin/inventory_controller.dart';
+import '../../controllers/admin/admin_controller.dart';
+import '../../controllers/admin/worker_report_controller.dart'; // Adjust name if your file is named differently
+
+// ✅ IMPORTS FOR SCREENS
+import '../../screens/sales/manager/sales_manager_dashboard.dart';
+import '../../screens/auth/status_check_screen.dart';
 
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();
@@ -23,19 +29,18 @@ class AuthenticationRepository extends GetxController {
     ever(firebaseUser, _setInitialScreen);
   }
 
-  /// ✅ REDIRECTION LOGIC
   Future<void> _setInitialScreen(User? user) async {
-    // 1. If logged out, go to Login
+    // 1. Logged Out
     if (user == null) {
       Get.offAllNamed(AppRouteNames.login);
       return;
     }
 
-    // 2. Wait for stack to clear
+    // 2. Clear Stack
     await Future.delayed(const Duration(milliseconds: 500));
 
     try {
-      // 3. Check Role & Status in Firestore
+      // 3. Fetch Role
       DocumentSnapshot doc = await _db
           .collection('id_requests')
           .doc(user.uid)
@@ -46,26 +51,23 @@ class AuthenticationRepository extends GetxController {
         String role = data['role'] ?? "Worker";
         String status = data['status'] ?? "Pending";
 
-        // 🛑 SECURITY CHECK: Kick out if Pending or Rejected
+        // 🛑 Security Check
         if (status == 'Pending' || status == 'Rejected') {
           await _auth.signOut();
           Get.offAll(() => const StatusCheckScreen());
           return;
         }
 
-        // ✅ Save Role Locally
-        await _storage.write('role', role);
+        // ✅ Save Role Correctly
+        await _storage.write('user_role', role);
 
-        // ✅ ROUTING LOGIC
+        // ✅ Routing Logic
         if (role == 'Sales Manager') {
-          // Managers get the special standalone dashboard
           Get.offAll(() => const SalesManagerDashboard());
         } else {
-          // Agents, Workers, Admin go to MainWrapper (Tabs handled by NavigationController)
           Get.offAllNamed(AppRouteNames.mainWrapper);
         }
       } else {
-        // Fallback if profile is missing
         await _auth.signOut();
         Get.offAllNamed(AppRouteNames.login);
       }
@@ -76,11 +78,42 @@ class AuthenticationRepository extends GetxController {
     }
   }
 
+  // ✅ UPDATED LOGOUT FUNCTION (The "Terminator")
   Future<void> logout() async {
     try {
+      // 1. Clear local storage
       await _storage.erase();
+
+      // 2. Kill the UI immediately
       Get.offAllNamed(AppRouteNames.login);
-      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 3. FORCE DELETE ALL ADMIN CONTROLLERS
+      // This stops the Streams before we lose permission.
+
+      if (Get.isRegistered<NavigationController>()) {
+        Get.delete<NavigationController>(force: true);
+      }
+
+      // Fixes 'inventory' permission error
+      if (Get.isRegistered<InventoryController>()) {
+        Get.delete<InventoryController>(force: true);
+      }
+
+      // Fixes 'orders' permission error
+      if (Get.isRegistered<AdminController>()) {
+        Get.delete<AdminController>(force: true);
+      }
+
+      // Fixes 'packing_entries', 'stitching_entries' errors
+      // (Assuming your report controller is named WorkerReportController based on your folder structure)
+      if (Get.isRegistered<WorkerReportController>()) {
+        Get.delete<WorkerReportController>(force: true);
+      }
+
+      // 4. Wait for cleanup (Critical Step)
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // 5. NOW sign out
       await _auth.signOut();
     } catch (e) {
       Get.snackbar("Error", "Logout failed: $e");

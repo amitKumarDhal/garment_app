@@ -87,7 +87,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                               : "Date",
                           style: TextStyle(
                             fontSize: 12,
-                            color: hasDate ? Colors.purple : Colors.black,
+                            color: hasDate ? Colors.purple : Colors.blueGrey,
                           ),
                         ),
                       );

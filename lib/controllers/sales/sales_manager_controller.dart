@@ -11,6 +11,7 @@ class SalesManagerController extends GetxController {
 
   // Observables
   var pendingOrders = <OrderModel>[].obs;
+  var approvedOrders = <OrderModel>[].obs; // ✅ NEW: Added Approved List
   var topAgents = <Map<String, dynamic>>[].obs;
   var totalRevenue = 0.0.obs;
   var isLoading = true.obs;
@@ -24,7 +25,6 @@ class SalesManagerController extends GetxController {
     fetchAllData();
 
     // 🔍 DEBUG: Auto-investigate this agent on launch
-    // Look at your Debug Console for the output starting with "🕵️‍♂️"
     investigateAgent("Satyabrata Majhi");
   }
 
@@ -32,10 +32,11 @@ class SalesManagerController extends GetxController {
   void fetchAllData() async {
     try {
       isLoading.value = true;
-      await Future.wait([
-        fetchPendingOrders(),
-        fetchMonthlyStats(), // Now uses selectedMonth
-      ]);
+      // Start all listeners
+      fetchPendingOrders();
+      fetchApprovedOrders(); // ✅ NEW: Start fetching approved orders
+
+      await fetchMonthlyStats(); // Now uses selectedMonth
     } catch (e) {
       debugPrint("Error fetching dashboard data: $e");
     } finally {
@@ -64,6 +65,25 @@ class SalesManagerController extends GetxController {
           });
     } catch (e) {
       print("Error fetching pending: $e");
+    }
+  }
+
+  // --- 1.5 Fetch Approved Orders (Real-time) ---
+  // ✅ NEW FUNCTION ADDED HERE
+  void fetchApprovedOrders() {
+    try {
+      _db
+          .collection('orders')
+          .where('status', isEqualTo: 'Approved')
+          .orderBy('orderDate', descending: true)
+          .snapshots()
+          .listen((snapshot) {
+            approvedOrders.value = snapshot.docs
+                .map((doc) => OrderModel.fromSnapshot(doc))
+                .toList();
+          });
+    } catch (e) {
+      print("Error fetching approved orders: $e");
     }
   }
 

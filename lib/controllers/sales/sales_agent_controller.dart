@@ -16,7 +16,7 @@ class SalesAgentController extends GetxController {
   final monthlyAchievement = 0.0.obs;
 
   // Target Configuration (e.g., ₹10,00,000)
-  final double monthlyTarget = 1000000.0;
+  final double monthlyTarget = 100000.0;
 
   @override
   void onInit() {
@@ -51,21 +51,19 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- 2. Calculate My Personal Stats (Current Month) ---
+  // --- 2. Calculate My Personal Stats (Approved Only) ---
   Future<void> fetchAgentStats() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    if (agentName.value.isEmpty) await fetchAgentIdentity();
+    if (agentName.value.isEmpty) return;
 
     try {
-      // Define Current Month Range
       DateTime now = DateTime.now();
       DateTime startOfMonth = DateTime(now.year, now.month, 1);
       DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      // Query by 'orderDate' for better reliability
       final snapshot = await _db
           .collection('orders')
-          .where('marketingPersonId', isEqualTo: user.uid)
+          .where('marketingPersonName', isEqualTo: agentName.value)
           .where(
             'orderDate',
             isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
@@ -74,29 +72,32 @@ class SalesAgentController extends GetxController {
             'orderDate',
             isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
           )
+          // ✅ FIX: Match your existing Firestore Index (Descending)
+          .orderBy('orderDate', descending: true)
           .get();
 
       double total = 0.0;
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        String status = data['status'] ?? 'Pending';
+        // Convert status to lowercase to handle 'Approved', 'approved', 'APPROVED'
+        String status = (data['status'] ?? 'pending').toString().toLowerCase();
 
-        // ✅ Check Status (Case Insensitive)
-        if (status == 'Approved' || status == 'approved') {
-          // ✅ Parse Amount Safely
+        // ✅ FIXED: Only count strictly 'approved'
+        if (status == 'approved') {
           double amount = _parseAmount(data['totalAmount']);
           total += amount;
         }
       }
 
       monthlyAchievement.value = total;
+      print("💰 Total Approved Achievement: $total");
     } catch (e) {
-      print("Stats Error: $e");
+      print("❌ Stats Error: $e");
     }
   }
 
-  // --- 3. Calculate Team Leaderboard (Current Month) ---
+  // --- 3. Calculate Team Leaderboard (With Greetings & Overachievement) ---
   Future<void> fetchLeaderboard() async {
     try {
       isLoading.value = true;
@@ -104,9 +105,7 @@ class SalesAgentController extends GetxController {
       DateTime startOfMonth = DateTime(now.year, now.month, 1);
       DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      print("🔍 Fetching Leaderboard: ${DateFormat('MMM yyyy').format(now)}");
-
-      // Query ALL orders for this month using 'orderDate'
+      // Query ALL orders for this month
       final snapshot = await _db
           .collection('orders')
           .where(
@@ -117,23 +116,18 @@ class SalesAgentController extends GetxController {
             'orderDate',
             isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
           )
+          .orderBy('orderDate', descending: true)
           .get();
-
-      print("📄 Found ${snapshot.docs.length} orders this month.");
 
       Map<String, double> agentTotals = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String name = data['marketingPersonName'] ?? 'Unknown Agent';
-        String status = data['status'] ?? 'Pending';
+        String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        // ✅ 1. Check Status
-        if (status == 'Approved' || status == 'approved') {
-          // ✅ 2. Parse Amount Safely
+        if (status == 'approved') {
           double amount = _parseAmount(data['totalAmount']);
-
-          // ✅ 3. Aggregate Totals
           if (agentTotals.containsKey(name)) {
             agentTotals[name] = agentTotals[name]! + amount;
           } else {
@@ -142,30 +136,39 @@ class SalesAgentController extends GetxController {
         }
       }
 
-      // Sort: Highest First
       var sortedEntries = agentTotals.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
 
-      // Calculate Highest Sale for Progress Bar (Prevent divide by zero)
-      double highestSale = sortedEntries.isNotEmpty
-          ? sortedEntries.first.value
-          : 1.0;
-      if (highestSale == 0) highestSale = 1.0;
-
-      // Map to UI Structure
       leaderboardData.value = sortedEntries.asMap().entries.map((entry) {
         int rank = entry.key + 1;
         double amount = entry.value.value;
 
+        // ✅ 1. Remove .clamp() to allow > 100% progress
+        double progress = (monthlyTarget > 0) ? (amount / monthlyTarget) : 0.0;
+
+        // ✅ 2. Add a Fun Greeting based on Rank
+        String greeting = "";
+        if (rank == 1)
+          greeting = "👑 Leading the Pack!";
+        else if (rank == 2)
+          greeting = "🔥 On Fire!";
+        else if (rank == 3)
+          greeting = "🚀 Sky High!";
+        else if (progress >= 1.0)
+          greeting = "🌟 Super Star!"; // Overachiever
+        else
+          greeting = "💪 Keep Pushing!";
+
         return {
           "rank": rank.toString(),
           "name": entry.value.key,
-          "amount": amount, // Store exact double for calculations
+          "amount": amount,
           "totalDisplay": NumberFormat.compactCurrency(
             symbol: '₹',
             locale: 'en_IN',
           ).format(amount),
-          "progress": (amount / highestSale),
+          "progress": progress, // Raw value (can be 1.2, 1.5 etc.)
+          "greeting": greeting, // New field you can show in UI!
         };
       }).toList();
     } catch (e) {
@@ -175,20 +178,18 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- ✅ CRITICAL HELPER: Safely parse numbers ---
+  // --- Helper: Safely parse numbers ---
   double _parseAmount(dynamic value) {
     if (value == null) return 0.0;
     if (value is int) return value.toDouble();
     if (value is double) return value;
     if (value is String) {
-      // Remove commas or currency symbols if present
       String clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
       return double.tryParse(clean) ?? 0.0;
     }
     return 0.0;
   }
 
-  // Helper for UI Progress Bar
   double get achievementPercentage {
     if (monthlyTarget <= 0) return 0.0;
     return (monthlyAchievement.value / monthlyTarget).clamp(0.0, 1.0);

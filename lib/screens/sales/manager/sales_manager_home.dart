@@ -77,12 +77,15 @@ class SalesManagerHome extends StatelessWidget {
                     child: Obx(
                       () => _buildStatCard(
                         context,
-                        "Pending Requests",
-                        controller.pendingOrders.length.toString(),
-                        Colors.orange,
-                        Icons.pending_actions,
-                        onTap: () =>
-                            Get.to(() => const SalesManagerApprovals()),
+                        "Total Approved", // ✅ Label Changed
+                        controller.approvedOrders.length
+                            .toString(), // ✅ Point to Approved List
+                        Colors.green, // ✅ Color: Green implies success/approved
+                        Icons.check_circle_outline, // ✅ Icon: Checkmark
+                        onTap: () {
+                          // Optional: Navigate to an "Order History" or "Approved List" screen
+                          // Get.to(() => const SalesHistoryScreen());
+                        },
                       ),
                     ),
                   ),
@@ -224,7 +227,7 @@ class SalesManagerHome extends StatelessWidget {
         contentPadding: const EdgeInsets.all(12),
         onTap: () => Get.to(() => OrderApprovalScreen(order: order)),
         leading: CircleAvatar(
-          backgroundColor: Colors.orange.withOpacity(0.1),
+          backgroundColor: Colors.orange.withValues(alpha: 0.1),
           child: const Icon(
             Icons.priority_high,
             color: Colors.orange,
@@ -284,7 +287,7 @@ class SalesManagerHome extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -296,7 +299,7 @@ class SalesManagerHome extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -332,7 +335,7 @@ class SalesManagerHome extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [

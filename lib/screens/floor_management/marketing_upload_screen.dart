@@ -11,6 +11,7 @@ class MarketingUploadScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Initialize Controller
     final controller = Get.put(MarketingUploadController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -22,17 +23,13 @@ class MarketingUploadScreen extends StatelessWidget {
         backgroundColor: TColors.primary,
         foregroundColor: Colors.white,
       ),
-
-      // ✅ 1. Wrap the Body in RefreshIndicator
       body: RefreshIndicator(
-        color: TColors.primary, // Loading spinner color
+        color: TColors.primary,
         backgroundColor: isDark ? TColors.dark : Colors.white,
         onRefresh: () async {
-          // ✅ 2. Trigger the refresh function in the controller
           await controller.fetchLastOrderSerial();
         },
         child: SingleChildScrollView(
-          // ✅ 3. Ensure scroll physics allows pulling even if content is short
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(TSizes.md),
           child: Form(
@@ -51,19 +48,20 @@ class MarketingUploadScreen extends StatelessWidget {
                   Icons.assignment_ind_outlined,
                 ),
                 _buildFormCard(isDark, [
-                  // Last Order Number Display
-                  // ✅ UPDATED: Last Order Number Display with Refresh Button
+                  // Serial Number Display
                   Obx(
                     () => Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
-                      ), // Adjusted padding
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -73,8 +71,6 @@ class MarketingUploadScreen extends StatelessWidget {
                             color: Colors.blue,
                           ),
                           const SizedBox(width: 8),
-
-                          // Serial Text
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -91,33 +87,48 @@ class MarketingUploadScreen extends StatelessWidget {
                                 controller.lastOrderSerial.value,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16, // Made it slightly bigger
+                                  fontSize: 16,
                                   color: Colors.blue,
                                 ),
                               ),
                             ],
                           ),
-
-                          const Spacer(), // Pushes the button to the far right
-                          // ✅ THE NEW REFRESH BUTTON
+                          const Spacer(),
                           IconButton(
                             onPressed: () => controller.fetchLastOrderSerial(),
                             icon: const Icon(Icons.refresh, color: Colors.blue),
-                            tooltip: "Refresh Serial",
-                            padding: EdgeInsets.zero, // Compact look
-                            constraints:
-                                const BoxConstraints(), // Removes default extra padding
                           ),
                         ],
                       ),
                     ),
                   ),
 
-                  TCustomTextField(
-                    label: "Order Number",
-                    controller: controller.orderNo,
-                    prefixIcon: Icons.tag,
-                    hintText: "e.g., #ORD-101",
+                  // ✅ UI for Auto-Increment Field
+                  Row(
+                    children: [
+                      Expanded(
+                        child: // ✅ FINAL UI POLISH: Auto-ID Feedback
+                            // ✅ FINAL UI POLISH: Auto-ID Feedback
+                            TCustomTextField(
+                              label: "Order ID (Auto-Generated)",
+                              controller: controller.orderNo,
+                              prefixIcon: Icons.tag,
+                              readOnly: true, // 🔒 Lock it so they can't type
+                              hintText: "Generated automatically on submit...",
+                              // removed fillColor and filled to fix the error
+                            ),
+                      ),
+                      const SizedBox(width: 8),
+                      // The "Spinning" Refresh Button
+                      Obx(
+                        () => IconButton(
+                          onPressed: () => controller.fetchLastOrderSerial(),
+                          icon: controller.isLoading.value
+                              ? CircularProgressIndicator() // Spins when fetching
+                              : Icon(Icons.autorenew),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: TSizes.md),
                   TCustomTextField(
@@ -140,6 +151,16 @@ class MarketingUploadScreen extends StatelessWidget {
                     prefixIcon: Icons.phone,
                     keyboardType: TextInputType.phone,
                   ),
+
+                  // ✅ NEW: ADDRESS FIELD
+                  const SizedBox(height: TSizes.md),
+                  TCustomTextField(
+                    label: "Billing / Shipping Address",
+                    controller: controller.address,
+                    prefixIcon: Icons.location_on_outlined,
+                    maxLines: 2,
+                    hintText: "Full address...",
+                  ),
                 ]),
 
                 const SizedBox(height: TSizes.lg),
@@ -161,7 +182,7 @@ class MarketingUploadScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: TCustomTextField(
-                          label: "Quantity (Pcs)",
+                          label: "Quantity",
                           controller: controller.quantity,
                           prefixIcon: Icons.numbers,
                           keyboardType: TextInputType.number,
@@ -174,7 +195,6 @@ class MarketingUploadScreen extends StatelessWidget {
                           controller: controller.orderValue,
                           prefixIcon: Icons.currency_rupee,
                           keyboardType: TextInputType.number,
-                          hintText: "Price per item",
                         ),
                       ),
                     ],
@@ -215,10 +235,10 @@ class MarketingUploadScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: TSizes.md),
                   TCustomTextField(
-                    label: "Order Sizes (e.g., S:10, M:20, XL:5)",
+                    label: "Order Sizes",
                     controller: controller.sizeDescription,
                     prefixIcon: Icons.straighten,
-                    hintText: "Enter measurement details or size breakdown",
+                    hintText: "e.g., S:10, M:20, XL:5",
                   ),
                 ]),
 
@@ -229,11 +249,13 @@ class MarketingUploadScreen extends StatelessWidget {
                   "Financial Summary",
                   Icons.calculate_outlined,
                 ),
+
+                // ✅ UPDATED: Safe Financial Summary (No logic in build)
                 _buildCalculationSummary(isDark, controller),
 
                 const SizedBox(height: TSizes.xl),
 
-                // --- SUBMIT ---
+                // --- SUBMIT BUTTON ---
                 Obx(
                   () => SizedBox(
                     width: double.infinity,
@@ -269,7 +291,7 @@ class MarketingUploadScreen extends StatelessWidget {
     );
   }
 
-  // --- Image Picker Widget ---
+  // --- Image Picker ---
   Widget _buildImagePicker(bool isDark, MarketingUploadController controller) {
     return Container(
       width: double.infinity,
@@ -313,7 +335,7 @@ class MarketingUploadScreen extends StatelessWidget {
     );
   }
 
-  // --- Calculation Summary ---
+  // ✅ UPDATED: Safe Financial Summary
   Widget _buildCalculationSummary(
     bool isDark,
     MarketingUploadController controller,
@@ -321,87 +343,130 @@ class MarketingUploadScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(TSizes.md),
       decoration: BoxDecoration(
-        color: isDark ? Colors.green.withOpacity(0.05) : Colors.green[50],
+        color: isDark ? Colors.green.withValues(alpha: 0.05) : Colors.green[50],
         borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
-      child: Obx(() {
-        double qty = double.tryParse(controller.quantity.text) ?? 0;
-        double unitPrice = double.tryParse(controller.orderValue.text) ?? 0;
-        double gstPercent = double.tryParse(controller.gstInfo.text) ?? 0;
-        double subTotal = qty * unitPrice;
-        double gstAmt = (subTotal * gstPercent) / 100;
-        double shipping = double.tryParse(controller.shippingCharge.text) ?? 0;
-        double total = controller.grandTotal.value;
+      child: Column(
+        children: [
+          // Inputs (These do NOT need Obx, they have their own listeners)
+          _buildSmallInput(
+            controller.shippingCharge,
+            "Shipping Charge",
+            isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildSmallInput(
+            controller.advanceAmount,
+            "Advance Received (₹)",
+            isDark,
+            isBold: true,
+          ),
 
-        return Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.black26 : Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              ),
-              child: TextField(
-                controller: controller.shippingCharge,
-                keyboardType: TextInputType.number,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: const InputDecoration(
-                  icon: Icon(
-                    Icons.local_shipping_outlined,
-                    size: 20,
-                    color: Colors.grey,
-                  ),
-                  border: InputBorder.none,
-                  labelText: "Shipping Charge (Optional)",
-                  labelStyle: TextStyle(fontSize: 13, color: Colors.grey),
-                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+          const Divider(height: 24),
+
+          // ✅ Obx only wraps the text that changes
+          Obx(
+            () => _buildRow(
+              "Subtotal",
+              "₹${controller.subTotal.value.toStringAsFixed(2)}",
+              isDark,
+            ),
+          ),
+
+          // Note: For complex strings combining Rx and text, make sure to read .value
+          Obx(
+            () => _buildRow(
+              "Tax & Shipping",
+              "+ ₹${(controller.taxAmount.value + (double.tryParse(controller.shippingCharge.text) ?? 0)).toStringAsFixed(2)}",
+              isDark,
+            ),
+          ),
+
+          Obx(
+            () => _buildRow(
+              "Grand Total",
+              "₹${controller.grandTotal.value.toStringAsFixed(2)}",
+              isDark,
+              isBold: true,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+          // We can use Obx for Advance text too if we want, but reading controller.text is fine here
+          // However, to fix the specific error, we avoid large Obx blocks.
+          _buildRow(
+            "Less: Advance",
+            "- ₹${(double.tryParse(controller.advanceAmount.text) ?? 0).toStringAsFixed(2)}",
+            isDark,
+            isRed: true,
+          ),
+
+          const Divider(),
+
+          // Balance Due
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "BALANCE DUE",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.redAccent,
                 ),
               ),
-            ),
-            const Divider(),
-            _buildRow(
-              "Subtotal ($qty × $unitPrice)",
-              "₹${subTotal.toStringAsFixed(2)}",
-              isDark,
-            ),
-            const SizedBox(height: 8),
-            _buildRow(
-              "Tax (GST ${controller.gstInfo.text}%)",
-              "+ ₹${gstAmt.toStringAsFixed(2)}",
-              isDark,
-              isRed: true,
-            ),
-            const SizedBox(height: 8),
-            _buildRow(
-              "Shipping Charge",
-              "+ ₹${shipping.toStringAsFixed(2)}",
-              isDark,
-              isRed: false,
-            ),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "GRAND TOTAL",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Text(
-                  "₹${total.toStringAsFixed(2)}",
+              Obx(
+                () => Text(
+                  "₹${controller.balanceDue.value.toStringAsFixed(2)}",
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: TColors.primary,
+                    color: Colors.redAccent,
                   ),
                 ),
-              ],
-            ),
-          ],
-        );
-      }),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Helper for Small Inputs inside Summary
+  Widget _buildSmallInput(
+    TextEditingController controller,
+    String label,
+    bool isDark, {
+    bool isBold = false,
+  }) {
+    return Container(
+      height: 45,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black26 : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isBold ? Colors.green : Colors.grey.withValues(alpha: 0.3),
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        style: TextStyle(
+          color: isDark ? Colors.white : Colors.black,
+          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+        ),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          labelText: label,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            color: isBold ? Colors.green : Colors.grey,
+          ),
+          contentPadding: const EdgeInsets.only(bottom: 6),
+        ),
+      ),
     );
   }
 
@@ -410,6 +475,7 @@ class MarketingUploadScreen extends StatelessWidget {
     String val,
     bool isDark, {
     bool isRed = false,
+    bool isBold = false,
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -419,12 +485,13 @@ class MarketingUploadScreen extends StatelessWidget {
           style: TextStyle(
             color: isDark ? Colors.grey[400] : Colors.grey[600],
             fontSize: 13,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         Text(
           val,
           style: TextStyle(
-            fontWeight: FontWeight.w600,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
             color: isRed ? Colors.red : (isDark ? Colors.white : Colors.black),
           ),
         ),
@@ -456,7 +523,7 @@ class MarketingUploadScreen extends StatelessWidget {
       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
       boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
       ],
     ),
     child: Column(children: children),

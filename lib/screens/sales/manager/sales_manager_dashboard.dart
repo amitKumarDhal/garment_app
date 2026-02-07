@@ -48,7 +48,7 @@ class SalesManagerDashboard extends StatelessWidget {
             },
 
             backgroundColor: isDark ? TColors.dark : Colors.white,
-            indicatorColor: Colors.purple.withOpacity(0.5),
+            indicatorColor: Colors.purple.withValues(alpha: 0.5),
             destinations: const [
               // Index 0: Overview
               NavigationDestination(

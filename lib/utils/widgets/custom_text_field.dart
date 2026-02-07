@@ -15,6 +15,7 @@ class TCustomTextField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final List<TextInputFormatter>? inputFormatters;
+  final bool readOnly; // ✅ Added this
 
   // ✅ ADDED THESE PARAMETERS
   final TextInputAction? textInputAction;
@@ -27,6 +28,7 @@ class TCustomTextField extends StatelessWidget {
     this.controller,
     this.prefixIcon,
     this.prefixText,
+    this.readOnly = false, // ✅ Added default value
     this.keyboardType = TextInputType.text,
     this.validator,
     this.onChanged,
@@ -51,7 +53,7 @@ class TCustomTextField extends StatelessWidget {
       onChanged: onChanged,
       inputFormatters: inputFormatters,
       textInputAction: textInputAction,
-
+      readOnly: readOnly, // ✅ Pass it to the underlying Flutter widget
       // ✅ CONNECTED MAX LINES
       maxLines: maxLines,
 

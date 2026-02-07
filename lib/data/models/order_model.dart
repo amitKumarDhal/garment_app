@@ -7,6 +7,13 @@ class OrderModel {
   final String? clientPhone;
   final String? organization;
 
+  // ✅ 1. ADDED: New Fields for Sorting & filtering
+  final DateTime? createdAt;
+  final String? marketingPersonId;
+
+  // ✅ ADDED: Address Field
+  final String? clientAddress;
+
   // Single Product Fields (Keep these for backward compatibility)
   final String? productCode;
   final String productName;
@@ -24,8 +31,10 @@ class OrderModel {
   final double totalAmount;
   final double gstPercentage;
 
-  // ✅ ADDED: Shipping Charge Field
+  // ✅ ADDED: Financial Fields
   final double shippingCharge;
+  final double advanceAmount; // <--- NEW
+  final double balanceDue; // <--- NEW
 
   final String? imageUrl;
 
@@ -38,6 +47,7 @@ class OrderModel {
     required this.clientName,
     this.clientPhone,
     this.organization,
+    this.clientAddress, // <--- NEW
     this.productCode,
     required this.productName,
     this.productDetails,
@@ -49,11 +59,14 @@ class OrderModel {
     this.status = 'Pending',
     required this.totalAmount,
     this.gstPercentage = 0.0,
-
     this.sizeDescription,
 
-    // ✅ Initialize with default 0.0
+    this.createdAt,
+    this.marketingPersonId,
+
     this.shippingCharge = 0.0,
+    this.advanceAmount = 0.0, // <--- NEW (Default 0)
+    this.balanceDue = 0.0, // <--- NEW (Default 0)
 
     this.imageUrl,
     this.products = const [],
@@ -66,6 +79,14 @@ class OrderModel {
       "clientName": clientName,
       "clientPhone": clientPhone,
       "organization": organization,
+
+      // ✅ Save Address
+      "clientAddress": clientAddress,
+
+      // ✅ Save to Firestore
+      "createdAt": createdAt ?? FieldValue.serverTimestamp(),
+      "marketingPersonId": marketingPersonId,
+
       "productCode": productCode,
       "productName": productName,
       "productDetails": productDetails,
@@ -80,11 +101,12 @@ class OrderModel {
 
       "sizeDescription": sizeDescription,
 
-      // ✅ Save shipping charge to Firestore
+      // ✅ Save Financials
       "shippingCharge": shippingCharge,
+      "advanceAmount": advanceAmount,
+      "balanceDue": balanceDue,
 
       "imageUrl": imageUrl,
-      "createdAt": FieldValue.serverTimestamp(),
       "products": products,
     };
   }
@@ -119,12 +141,20 @@ class OrderModel {
       clientName: data['clientName'] ?? 'Unknown Client',
       clientPhone: data['clientPhone'] ?? '',
       organization: data['organization'] ?? '',
+
+      // ✅ Parse Address
+      clientAddress: data['clientAddress'] ?? '',
+
       productCode: data['productCode'] ?? '',
       productName: data['productName'] ?? '',
       productDetails: data['productDetails'] ?? '',
 
       quantity: _parseInt(data['quantity']),
       priority: data['priority'] ?? 'Medium',
+
+      // ✅ Read from Firestore
+      createdAt: _parseTimestamp(data['createdAt']),
+      marketingPersonId: data['marketingPersonId'],
 
       orderDate: _parseTimestamp(data['orderDate']),
       deliveryDate: _parseTimestamp(data['deliveryDate']),
@@ -137,8 +167,10 @@ class OrderModel {
 
       sizeDescription: data['sizeDescription'] ?? '',
 
-      // ✅ Parse shipping charge safely
+      // ✅ Parse Financials Safely
       shippingCharge: _parseDouble(data['shippingCharge']),
+      advanceAmount: _parseDouble(data['advanceAmount']),
+      balanceDue: _parseDouble(data['balanceDue']),
 
       imageUrl: data['imageUrl'] ?? '',
       products: parsedProducts,
