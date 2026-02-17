@@ -13,22 +13,21 @@ class MainWrapper extends StatefulWidget {
 
 class _MainWrapperState extends State<MainWrapper> {
   DateTime? currentBackPressTime;
-  late final NavigationController controller; // Declare it here
+  late final NavigationController controller; 
 
   @override
   void initState() {
     super.initState();
-    // Initialize it once when the screen loads
+    // ✅ Initialize ONCE when the screen inserts into the tree
     controller = Get.put(NavigationController());
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Safe Injection
-    final controller = Get.put(NavigationController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Obx(() {
+      // Safety Check: Wait for controller to load screens based on Role
       if (controller.screens.isEmpty) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
@@ -37,14 +36,17 @@ class _MainWrapperState extends State<MainWrapper> {
         canPop: false,
         onPopInvokedWithResult: (didPop, result) async {
           if (didPop) return;
+
+          // 1. If not on Home Tab, go to Home Tab
           if (controller.selectedIndex.value != 0) {
             controller.selectedIndex.value = 0;
             return;
           }
+
+          // 2. If on Home Tab, handle Double Press to Exit
           final now = DateTime.now();
           if (currentBackPressTime == null ||
-              now.difference(currentBackPressTime!) >
-                  const Duration(seconds: 2)) {
+              now.difference(currentBackPressTime!) > const Duration(seconds: 2)) {
             currentBackPressTime = now;
             Get.snackbar(
               "Exit App",
@@ -57,10 +59,11 @@ class _MainWrapperState extends State<MainWrapper> {
               borderRadius: 20,
             );
           } else {
-            SystemNavigator.pop();
+            SystemNavigator.pop(); // Exit App
           }
         },
         child: Scaffold(
+          // ✅ Keeps state of tabs alive (won't reload when switching)
           body: IndexedStack(
             index: controller.selectedIndex.value,
             children: controller.screens,
@@ -69,8 +72,7 @@ class _MainWrapperState extends State<MainWrapper> {
             height: 70,
             elevation: 3,
             selectedIndex: controller.selectedIndex.value,
-            onDestinationSelected: (index) =>
-                controller.selectedIndex.value = index,
+            onDestinationSelected: (index) => controller.selectedIndex.value = index,
             backgroundColor: isDark ? TColors.dark : Colors.white,
             indicatorColor: TColors.primary.withValues(alpha: 0.1),
             destinations: controller.navItems,

@@ -1,16 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import '../../routes/route_names.dart';
 
-// ✅ 1. ADD ALL THESE IMPORTS (Required to find the controllers)
+// ✅ CONTROLLER IMPORTS (For Cleanup)
 import '../../controllers/navigation_controller.dart';
 import '../../controllers/admin/inventory_controller.dart';
 import '../../controllers/admin/admin_controller.dart';
-import '../../controllers/admin/worker_report_controller.dart'; // Adjust name if your file is named differently
+import '../../controllers/admin/worker_report_controller.dart';
 
-// ✅ IMPORTS FOR SCREENS
+// ✅ SCREEN IMPORTS (For Redirection)
 import '../../screens/sales/manager/sales_manager_dashboard.dart';
 import '../../screens/auth/status_check_screen.dart';
 
@@ -19,7 +18,6 @@ class AuthenticationRepository extends GetxController {
 
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
-  final _storage = GetStorage();
   late final Rx<User?> firebaseUser;
 
   @override
@@ -29,91 +27,84 @@ class AuthenticationRepository extends GetxController {
     ever(firebaseUser, _setInitialScreen);
   }
 
+  /// 🔄 CENTRAL NAVIGATION LOGIC
+  /// ❌ No GetStorage: Always fetches from Database for maximum security.
   Future<void> _setInitialScreen(User? user) async {
-    // 1. Logged Out
+    // 1. Logged Out? -> Login Screen
     if (user == null) {
       Get.offAllNamed(AppRouteNames.login);
       return;
     }
 
-    // 2. Clear Stack
-    await Future.delayed(const Duration(milliseconds: 500));
-
     try {
-      // 3. Fetch Role
-      DocumentSnapshot doc = await _db
-          .collection('id_requests')
-          .doc(user.uid)
-          .get();
+      print("⏳ Auth Repo: Verifying user permissions from Database...");
+      
+      // 2. Always fetch fresh data from Firestore
+      DocumentSnapshot doc = await _db.collection('id_requests').doc(user.uid).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         String role = data['role'] ?? "Worker";
         String status = data['status'] ?? "Pending";
 
-        // 🛑 Security Check
+        // 🛑 SECURITY CHECK: Kick out Pending/Rejected users instantly
         if (status == 'Pending' || status == 'Rejected') {
+          print("⛔ Access Revoked: Status is $status");
           await _auth.signOut();
           Get.offAll(() => const StatusCheckScreen());
           return;
         }
 
-        // ✅ Save Role Correctly
-        await _storage.write('user_role', role);
+        // ✅ VALID USER: Redirect based on DB Role
+        print("✅ Access Granted: User is $role");
+        _navigateToDashboard(role);
 
-        // ✅ Routing Logic
-        if (role == 'Sales Manager') {
-          Get.offAll(() => const SalesManagerDashboard());
-        } else {
-          Get.offAllNamed(AppRouteNames.mainWrapper);
-        }
       } else {
+        // User exists in Auth but has no Profile in Database
+        print("❌ Error: No user profile found.");
         await _auth.signOut();
         Get.offAllNamed(AppRouteNames.login);
       }
     } catch (e) {
-      print("Auth Error: $e");
+      print("🔥 Auth Error: $e");
+      // Safety: Stay on Login if verification fails (e.g., no internet)
+      Get.snackbar("Connection Error", "Could not verify account permissions.");
       await _auth.signOut();
       Get.offAllNamed(AppRouteNames.login);
     }
   }
 
-  // ✅ UPDATED LOGOUT FUNCTION (The "Terminator")
+  // ... imports ...
+
+  // Helper to handle routing
+  void _navigateToDashboard(String role) {
+    String cleanRole = role.toLowerCase().replaceAll(' ', '');
+
+    // 1. Sales Managers still get their own dedicated dashboard
+    if (cleanRole == 'salesmanager') {
+      Get.offAll(() => const SalesManagerDashboard());
+    } 
+    // 2. ✅ FIX: Sales Associates now go to MainWrapper (to get the Navbar)
+    else {
+      // Admin, Worker, Supervisor, AND Sales Associate
+      Get.offAllNamed(AppRouteNames.mainWrapper);
+    }
+  }
+
+  // ✅ CLEAN LOGOUT (The Terminator)
   Future<void> logout() async {
     try {
-      // 1. Clear local storage
-      await _storage.erase();
-
-      // 2. Kill the UI immediately
+      // 1. Kill UI immediately
       Get.offAllNamed(AppRouteNames.login);
 
-      // 3. FORCE DELETE ALL ADMIN CONTROLLERS
-      // This stops the Streams before we lose permission.
+      // 2. Kill Admin/Worker Controllers to stop Streams
+      if (Get.isRegistered<NavigationController>()) Get.delete<NavigationController>(force: true);
+      if (Get.isRegistered<InventoryController>()) Get.delete<InventoryController>(force: true);
+      if (Get.isRegistered<AdminController>()) Get.delete<AdminController>(force: true);
+      if (Get.isRegistered<WorkerReportController>()) Get.delete<WorkerReportController>(force: true);
 
-      if (Get.isRegistered<NavigationController>()) {
-        Get.delete<NavigationController>(force: true);
-      }
-
-      // Fixes 'inventory' permission error
-      if (Get.isRegistered<InventoryController>()) {
-        Get.delete<InventoryController>(force: true);
-      }
-
-      // Fixes 'orders' permission error
-      if (Get.isRegistered<AdminController>()) {
-        Get.delete<AdminController>(force: true);
-      }
-
-      // Fixes 'packing_entries', 'stitching_entries' errors
-      // (Assuming your report controller is named WorkerReportController based on your folder structure)
-      if (Get.isRegistered<WorkerReportController>()) {
-        Get.delete<WorkerReportController>(force: true);
-      }
-
-      // 4. Wait for cleanup (Critical Step)
-      await Future.delayed(const Duration(milliseconds: 1000));
-
-      // 5. NOW sign out
+      // 3. Small delay to ensure UI is gone before auth cuts connection
+      await Future.delayed(const Duration(milliseconds: 500));
       await _auth.signOut();
     } catch (e) {
       Get.snackbar("Error", "Logout failed: $e");

@@ -94,7 +94,9 @@ class PackingController extends GetxController {
   void clearForm() {
     cartonNo.clear();
     styleNo.clear();
-    for (final controller in boxContents.values) controller.clear();
+    for (final controller in boxContents.values) {
+      controller.clear();
+    }
     totalInBox.value = 0;
   }
 

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Import Auth
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../utils/constants/colors.dart';
@@ -5,7 +6,6 @@ import '../../utils/constants/sizes.dart';
 import '../../controllers/admin/admin_controller.dart';
 import '../../routes/route_names.dart';
 
-// ✅ ALIGNED WITH YOUR TREE STRUCTURE
 import 'worker_list_screen.dart';
 import 'inventory_screen.dart';
 import '../floor_management/agent_list_screen.dart';
@@ -15,8 +15,15 @@ class AdminDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Using find() because it's injected in NavigationController
-    final controller = Get.find<AdminController>();
+    // 1. Initialize Controller (Lazy Put recommended in binding, but this works)
+    final controller = Get.put(AdminController());
+
+    // 2. ✅ CRITICAL FIX: Trigger Data Fetch Here
+    // This ensures data is requested ONLY when the screen is actually built and user is logged in.
+    if (FirebaseAuth.instance.currentUser != null) {
+      controller.startAdminListeners();
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -86,7 +93,7 @@ class AdminDashboard extends StatelessWidget {
               ),
               const SizedBox(height: TSizes.sm),
 
-              // 1. Pending Approvals (Only Admin primary task remains here)
+              // 1. Pending Approvals
               _buildActionCard(
                 context,
                 title: "Pending Approvals",
@@ -95,8 +102,6 @@ class AdminDashboard extends StatelessWidget {
                 color: Colors.orange,
                 onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
               ),
-
-              // Note: Marketing Upload has been removed as it is now in the Sales Agent Tab
             ],
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Added Auth
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:yoobbel/data/models/order_model.dart';
@@ -8,6 +9,7 @@ import '../../data/models/activity_item_model.dart';
 class AdminController extends GetxController {
   static AdminController get instance => Get.find();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance; // ✅ Auth Instance
 
   // --- Observables ---
   var totalDailyProduction = 0.0.obs;
@@ -15,35 +17,31 @@ class AdminController extends GetxController {
   var activeWorkers = 0.obs;
   var totalDamages = 0.obs;
 
-  // --- REPORTING VARIABLES (New) ---
+  // --- REPORTING VARIABLES ---
   var reportDate = DateTime.now().obs;
-  var reportSection =
-      'All'.obs; // Options: All, Orders, Cutting, Printing, Stitching, Packing
+  var reportSection = 'All'.obs; 
   RxList<ActivityItem> reportList = <ActivityItem>[].obs;
   var isReportLoading = false.obs;
 
   // --- Lists ---
   RxList<Map<String, dynamic>> pendingRequests = <Map<String, dynamic>>[].obs;
-  RxList<Map<String, dynamic>> allApprovedWorkers =
-      <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> allApprovedWorkers = <Map<String, dynamic>>[].obs;
 
   RxList<OrderModel> recentOrders = <OrderModel>[].obs;
-  RxList<Map<String, dynamic>> recentCuttingEntries =
-      <Map<String, dynamic>>[].obs;
-  RxList<Map<String, dynamic>> recentPrintingEntries =
-      <Map<String, dynamic>>[].obs;
-  RxList<Map<String, dynamic>> recentStitchingEntries =
-      <Map<String, dynamic>>[].obs;
-  RxList<Map<String, dynamic>> recentPackingEntries =
-      <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> recentCuttingEntries = <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> recentPrintingEntries = <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> recentStitchingEntries = <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> recentPackingEntries = <Map<String, dynamic>>[].obs;
   RxList<ActivityItem> recentActivities = <ActivityItem>[].obs;
 
   var pendingApprovalsCount = 0.obs;
   var isLoading = false.obs;
 
-  @override
-  void onInit() {
-    super.onInit();
+
+  // ✅ MASTER START FUNCTION (Call this from UI)
+  void startAdminListeners() {
+    if (_auth.currentUser == null) return; // Safety Check
+
     _bindPendingRequests();
     _bindApprovedWorkers();
     _bindTodaysOrders();
@@ -56,111 +54,108 @@ class AdminController extends GetxController {
 
   // --- 1. WORKFORCE STREAMS ---
   void _bindApprovedWorkers() {
-    _db
-        .collection('id_requests')
+    if (_auth.currentUser == null) return;
+    _db.collection('id_requests')
         .where('status', isEqualTo: 'Approved')
         .snapshots()
         .listen((snapshot) {
-          allApprovedWorkers.assignAll(
-            snapshot.docs.map((doc) {
-              var data = doc.data();
-              data['id'] = doc.id;
-              return data;
-            }).toList(),
-          );
-          activeWorkers.value = allApprovedWorkers.length;
-        });
+      allApprovedWorkers.assignAll(
+        snapshot.docs.map((doc) {
+          var data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList(),
+      );
+      activeWorkers.value = allApprovedWorkers.length;
+    });
   }
 
   void _bindPendingRequests() {
-    _db
-        .collection('id_requests')
+    if (_auth.currentUser == null) return;
+    _db.collection('id_requests')
         .where('status', isEqualTo: 'Pending')
         .snapshots()
         .listen((snapshot) {
-          pendingRequests.assignAll(
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-          );
-          pendingApprovalsCount.value = pendingRequests.length;
-        });
+      pendingRequests.assignAll(
+        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
+      );
+      pendingApprovalsCount.value = pendingRequests.length;
+    });
   }
 
   // --- 2. DEPARTMENT STREAMS (Dashboard) ---
 
   void _bindTodaysOrders() {
+    if (_auth.currentUser == null) return;
     DateTime now = DateTime.now();
     DateTime startOfDay = DateTime(now.year, now.month, now.day);
 
-    _db
-        .collection('orders')
-        .where(
-          'createdAt',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-        )
+    _db.collection('orders')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
-          recentOrders.assignAll(
-            snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList(),
-          );
-          _calculateProductionTotal();
-        });
+      recentOrders.assignAll(
+        snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList(),
+      );
+      _calculateProductionTotal();
+    });
   }
 
   void _bindCuttingStream() {
-    _db
-        .collection('cutting_entries')
+    if (_auth.currentUser == null) return;
+    _db.collection('cutting_entries')
         .orderBy('timestamp', descending: true)
         .limit(10)
         .snapshots()
         .listen((snapshot) {
-          recentCuttingEntries.assignAll(
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-          );
-          _calculateGlobalStats();
-        });
+      recentCuttingEntries.assignAll(
+        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
+      );
+      _calculateGlobalStats();
+    });
   }
 
   void _bindPrintingStream() {
-    _db
-        .collection('printing_entries')
+    if (_auth.currentUser == null) return;
+    _db.collection('printing_entries')
         .orderBy('timestamp', descending: true)
         .limit(10)
         .snapshots()
         .listen((snapshot) {
-          recentPrintingEntries.assignAll(
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-          );
-          _calculateGlobalStats();
-        });
+      recentPrintingEntries.assignAll(
+        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
+      );
+      _calculateGlobalStats();
+    });
   }
 
   void _bindStitchingStream() {
-    _db
-        .collection('stitching_entries')
+    if (_auth.currentUser == null) return;
+    _db.collection('stitching_entries')
         .orderBy('timestamp', descending: true)
         .limit(10)
         .snapshots()
         .listen((snapshot) {
-          recentStitchingEntries.assignAll(
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-          );
-          _calculateGlobalStats();
-        });
+      recentStitchingEntries.assignAll(
+        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
+      );
+      _calculateGlobalStats();
+    });
   }
 
   void _bindPackingStream() {
-    _db
-        .collection('packing_entries')
+    if (_auth.currentUser == null) return;
+    _db.collection('packing_entries')
         .orderBy('timestamp', descending: true)
         .limit(10)
         .snapshots()
         .listen((snapshot) {
-          recentPackingEntries.assignAll(
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-          );
-          _calculateGlobalStats();
-        });
+      recentPackingEntries.assignAll(
+        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
+      );
+      _calculateGlobalStats();
+    });
   }
 
   // --- 3. KPI CALCULATIONS ---
@@ -214,12 +209,10 @@ class AdminController extends GetxController {
 
     // Damages
     int pDamages = recentPrintingEntries.fold(
-      0,
-      (sum, item) => sum + (item['totalDamaged'] as int? ?? 0),
+      0, (sum, item) => sum + (item['totalDamaged'] as int? ?? 0),
     );
     int sDamages = recentStitchingEntries.fold(
-      0,
-      (sum, item) => sum + (item['rejectedQty'] as int? ?? 0),
+      0, (sum, item) => sum + (item['rejectedQty'] as int? ?? 0),
     );
     totalDamages.value = pDamages + sDamages;
   }
@@ -229,13 +222,13 @@ class AdminController extends GetxController {
     totalDailyProduction.value = total;
   }
 
-  // --- 4. LIVE FEED LOGIC (Dashboard) ---
+  // --- 4. LIVE FEED LOGIC ---
   void fetchRecentActivities() async {
+    if (_auth.currentUser == null) return;
     isLoading.value = true;
     List<ActivityItem> allActivities = [];
     try {
-      var orders = await _db
-          .collection('orders')
+      var orders = await _db.collection('orders')
           .orderBy('createdAt', descending: true)
           .limit(3)
           .get();
@@ -252,34 +245,10 @@ class AdminController extends GetxController {
           ),
         );
       }
-      await _fetchDeptLogs(
-        allActivities,
-        'cutting_entries',
-        "Cutting",
-        Icons.content_cut,
-        TColors.cutting,
-      );
-      await _fetchDeptLogs(
-        allActivities,
-        'printing_entries',
-        "Printing",
-        Icons.print,
-        TColors.printing,
-      );
-      await _fetchDeptLogs(
-        allActivities,
-        'stitching_entries',
-        "Stitching",
-        Icons.handyman,
-        TColors.stitching,
-      );
-      await _fetchDeptLogs(
-        allActivities,
-        'packing_entries',
-        "Packing",
-        Icons.inventory_2,
-        TColors.packing,
-      );
+      await _fetchDeptLogs(allActivities, 'cutting_entries', "Cutting", Icons.content_cut, TColors.cutting);
+      await _fetchDeptLogs(allActivities, 'printing_entries', "Printing", Icons.print, TColors.printing);
+      await _fetchDeptLogs(allActivities, 'stitching_entries', "Stitching", Icons.handyman, TColors.stitching);
+      await _fetchDeptLogs(allActivities, 'packing_entries', "Packing", Icons.inventory_2, TColors.packing);
 
       allActivities.sort((a, b) => b.time.compareTo(a.time));
       recentActivities.assignAll(allActivities);
@@ -291,23 +260,17 @@ class AdminController extends GetxController {
   }
 
   Future<void> _fetchDeptLogs(
-    List<ActivityItem> list,
-    String collection,
-    String deptName,
-    IconData icon,
-    Color color,
+    List<ActivityItem> list, String collection, String deptName, IconData icon, Color color,
   ) async {
     try {
-      var snap = await _db
-          .collection(collection)
+      var snap = await _db.collection(collection)
           .orderBy('timestamp', descending: true)
           .limit(3)
           .get();
       for (var doc in snap.docs) {
         final data = doc.data();
         Timestamp? ts = data['timestamp'] as Timestamp?;
-        String qty = (data['completedQty'] ?? data['totalQty'] ?? '0')
-            .toString();
+        String qty = (data['completedQty'] ?? data['totalQty'] ?? '0').toString();
         list.add(
           ActivityItem(
             title: "$deptName Entry",
@@ -323,8 +286,7 @@ class AdminController extends GetxController {
     }
   }
 
-  // --- 5. REPORTING LOGIC (New Screen) ---
-
+  // --- 5. REPORTING LOGIC ---
   void setReportDate(DateTime date) {
     reportDate.value = date;
     fetchReportData();
@@ -336,27 +298,18 @@ class AdminController extends GetxController {
   }
 
   void fetchReportData() async {
+    if (_auth.currentUser == null) return;
     isReportLoading.value = true;
     reportList.clear();
     List<ActivityItem> tempResults = [];
 
-    // Calculate Start & End of selected day
-    DateTime start = DateTime(
-      reportDate.value.year,
-      reportDate.value.month,
-      reportDate.value.day,
-    );
+    DateTime start = DateTime(reportDate.value.year, reportDate.value.month, reportDate.value.day);
     DateTime end = start.add(const Duration(days: 1));
 
     try {
-      // --- ORDERS ---
       if (reportSection.value == 'All' || reportSection.value == 'Orders') {
-        var snap = await _db
-            .collection('orders')
-            .where(
-              'createdAt',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(start),
-            )
+        var snap = await _db.collection('orders')
+            .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('createdAt', isLessThan: Timestamp.fromDate(end))
             .get();
 
@@ -374,53 +327,19 @@ class AdminController extends GetxController {
         }
       }
 
-      // --- DEPARTMENTS ---
       if (reportSection.value == 'All' || reportSection.value == 'Cutting') {
-        await _fetchReportDept(
-          tempResults,
-          'cutting_entries',
-          'Cutting',
-          Icons.content_cut,
-          TColors.cutting,
-          start,
-          end,
-        );
+        await _fetchReportDept(tempResults, 'cutting_entries', 'Cutting', Icons.content_cut, TColors.cutting, start, end);
       }
       if (reportSection.value == 'All' || reportSection.value == 'Printing') {
-        await _fetchReportDept(
-          tempResults,
-          'printing_entries',
-          'Printing',
-          Icons.print,
-          TColors.printing,
-          start,
-          end,
-        );
+        await _fetchReportDept(tempResults, 'printing_entries', 'Printing', Icons.print, TColors.printing, start, end);
       }
       if (reportSection.value == 'All' || reportSection.value == 'Stitching') {
-        await _fetchReportDept(
-          tempResults,
-          'stitching_entries',
-          'Stitching',
-          Icons.handyman,
-          TColors.stitching,
-          start,
-          end,
-        );
+        await _fetchReportDept(tempResults, 'stitching_entries', 'Stitching', Icons.handyman, TColors.stitching, start, end);
       }
       if (reportSection.value == 'All' || reportSection.value == 'Packing') {
-        await _fetchReportDept(
-          tempResults,
-          'packing_entries',
-          'Packing',
-          Icons.inventory_2,
-          TColors.packing,
-          start,
-          end,
-        );
+        await _fetchReportDept(tempResults, 'packing_entries', 'Packing', Icons.inventory_2, TColors.packing, start, end);
       }
 
-      // Sort by Time
       tempResults.sort((a, b) => b.time.compareTo(a.time));
       reportList.assignAll(tempResults);
     } catch (e) {
@@ -431,16 +350,9 @@ class AdminController extends GetxController {
   }
 
   Future<void> _fetchReportDept(
-    List<ActivityItem> list,
-    String collection,
-    String title,
-    IconData icon,
-    Color color,
-    DateTime start,
-    DateTime end,
+    List<ActivityItem> list, String collection, String title, IconData icon, Color color, DateTime start, DateTime end,
   ) async {
-    var snap = await _db
-        .collection(collection)
+    var snap = await _db.collection(collection)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('timestamp', isLessThan: Timestamp.fromDate(end))
         .get();
@@ -470,12 +382,7 @@ class AdminController extends GetxController {
         await docRef.update({'shiftApproved': true});
       } else if (user['adminApproved'] == false) {
         await docRef.update({'adminApproved': true, 'status': 'Approved'});
-        Get.snackbar(
-          "Approved",
-          "${user['name']} access granted",
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        Get.snackbar("Approved", "${user['name']} access granted", backgroundColor: Colors.green, colorText: Colors.white);
       }
     } catch (e) {
       Get.snackbar("Error", e.toString());
@@ -485,12 +392,7 @@ class AdminController extends GetxController {
   Future<void> rejectRequest(String docId) async {
     try {
       await _db.collection('id_requests').doc(docId).delete();
-      Get.snackbar(
-        "Deleted",
-        "Request removed",
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      Get.snackbar("Deleted", "Request removed", backgroundColor: Colors.orange, colorText: Colors.white);
     } catch (e) {
       Get.snackbar("Error", e.toString());
     }

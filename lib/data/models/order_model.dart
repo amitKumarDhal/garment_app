@@ -9,6 +9,7 @@ class OrderModel {
 
   // ✅ 1. ADDED: New Fields for Sorting & filtering
   final DateTime? createdAt;
+  final DateTime? updatedAt; // <--- ✅ ADDED THIS TO TRACK EDITS
   final String? marketingPersonId;
 
   // ✅ ADDED: Address Field
@@ -33,8 +34,8 @@ class OrderModel {
 
   // ✅ ADDED: Financial Fields
   final double shippingCharge;
-  final double advanceAmount; // <--- NEW
-  final double balanceDue; // <--- NEW
+  final double advanceAmount;
+  final double balanceDue;
 
   final String? imageUrl;
 
@@ -47,7 +48,7 @@ class OrderModel {
     required this.clientName,
     this.clientPhone,
     this.organization,
-    this.clientAddress, // <--- NEW
+    this.clientAddress,
     this.productCode,
     required this.productName,
     this.productDetails,
@@ -62,11 +63,12 @@ class OrderModel {
     this.sizeDescription,
 
     this.createdAt,
+    this.updatedAt, // <--- ✅ ADDED TO CONSTRUCTOR
     this.marketingPersonId,
 
     this.shippingCharge = 0.0,
-    this.advanceAmount = 0.0, // <--- NEW (Default 0)
-    this.balanceDue = 0.0, // <--- NEW (Default 0)
+    this.advanceAmount = 0.0,
+    this.balanceDue = 0.0,
 
     this.imageUrl,
     this.products = const [],
@@ -85,6 +87,7 @@ class OrderModel {
 
       // ✅ Save to Firestore
       "createdAt": createdAt ?? FieldValue.serverTimestamp(),
+      "updatedAt": updatedAt, // <--- ✅ SAVE THIS (Controller handles value)
       "marketingPersonId": marketingPersonId,
 
       "productCode": productCode,
@@ -124,14 +127,24 @@ class OrderModel {
     // SMART PARSING: Handle both Old (Single) and New (List) Data
     List<Map<String, dynamic>> parsedProducts = [];
 
+    // Safe integers and doubles for calculation
+    int qty = _parseInt(data['quantity']);
+    double total = _parseDouble(data['totalAmount']);
+
     if (data['products'] is List) {
       parsedProducts = List<Map<String, dynamic>>.from(data['products']);
     } else {
+      // ✅ FIXED LOGIC HERE:
+      // If converting old data, calculate Unit Price correctly.
+      // Old way: Price = Total. (Wrong if Qty > 1)
+      // New way: Price = Total / Qty.
+      double unitPrice = (qty > 0) ? (total / qty) : 0.0;
+
       parsedProducts.add({
         'productName': data['productName'] ?? '',
-        'qty': _parseInt(data['quantity']),
-        'price': _parseDouble(data['totalAmount']),
-        'total': _parseDouble(data['totalAmount']),
+        'qty': qty,
+        'price': unitPrice, // <--- Corrected
+        'total': total,
       });
     }
 
@@ -149,20 +162,25 @@ class OrderModel {
       productName: data['productName'] ?? '',
       productDetails: data['productDetails'] ?? '',
 
-      quantity: _parseInt(data['quantity']),
+      quantity: qty,
       priority: data['priority'] ?? 'Medium',
 
-      // ✅ Read from Firestore
-      createdAt: _parseTimestamp(data['createdAt']),
+      // ✅ Read from Firestore (Nullable timestamps)
+      createdAt: _parseTimestampNullable(data['createdAt']),
+      updatedAt: _parseTimestampNullable(
+        data['updatedAt'],
+      ), // <--- ✅ PARSE THIS
+
       marketingPersonId: data['marketingPersonId'],
 
+      // ✅ Required Dates (Non-nullable, fallback to now())
       orderDate: _parseTimestamp(data['orderDate']),
       deliveryDate: _parseTimestamp(data['deliveryDate']),
 
       marketingPersonName: data['marketingPersonName'] ?? 'Unknown Agent',
       status: data['status'] ?? 'Pending',
 
-      totalAmount: _parseDouble(data['totalAmount']),
+      totalAmount: total,
       gstPercentage: _parseDouble(data['gstPercentage']),
 
       sizeDescription: data['sizeDescription'] ?? '',
@@ -178,6 +196,8 @@ class OrderModel {
   }
 
   /// --- HELPER FUNCTIONS ---
+
+  // 1. For REQUIRED Dates (Never returns null)
   static DateTime _parseTimestamp(dynamic value) {
     if (value is Timestamp) {
       return value.toDate();
@@ -185,6 +205,16 @@ class OrderModel {
       return DateTime.tryParse(value) ?? DateTime.now();
     }
     return DateTime.now();
+  }
+
+  // 2. ✅ For OPTIONAL Dates (Can return null)
+  static DateTime? _parseTimestampNullable(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 
   static int _parseInt(dynamic value) {

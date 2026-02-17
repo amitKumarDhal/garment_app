@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:yoobbel/screens/floor_management/marketing_upload_screen.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/constants/sizes.dart';
 import '../../controllers/sales/sales_history_controller.dart';
-import '../../controllers/floor_management/marketing_upload_controller.dart';
 import '../../data/models/order_model.dart';
+import 'edit_order_screen.dart';
 
 class SalesOrderHistoryScreen extends StatelessWidget {
   const SalesOrderHistoryScreen({super.key});
@@ -47,8 +46,10 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                // ✅ STAGES
                 Obx(
-                  () => SingleChildScrollView(
+                      () => SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
@@ -58,6 +59,21 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         _buildFilterChip(controller, "Approved"),
                         const SizedBox(width: 8),
+
+                        // --- New Production Stages ---
+                        _buildFilterChip(controller, "Cutting"),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(controller, "Stitching"),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(controller, "Printing"),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(controller, "Packing"),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(controller, "Shipping"),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(controller, "Delivered"),
+                        const SizedBox(width: 8),
+
                         _buildFilterChip(controller, "Rejected"),
                       ],
                     ),
@@ -91,7 +107,13 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.all(TSizes.md),
+                // ✅ FIX: Added 120px bottom padding so the last item clears the floating navbar
+                padding: const EdgeInsets.only(
+                  left: TSizes.md,
+                  right: TSizes.md,
+                  top: TSizes.md,
+                  bottom: 120,
+                ),
                 itemCount: controller.displayedOrders.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
@@ -122,10 +144,10 @@ class SalesOrderHistoryScreen extends StatelessWidget {
   }
 
   Widget _buildHistoryCard(
-    BuildContext context,
-    OrderModel order,
-    bool isDark,
-  ) {
+      BuildContext context,
+      OrderModel order,
+      bool isDark,
+      ) {
     return InkWell(
       onTap: () => _showOrderDetails(context, order, isDark),
       borderRadius: BorderRadius.circular(12),
@@ -134,10 +156,10 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -187,7 +209,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    // ✅ Changed: Shows Unit Price instead of Product Name
                     "${order.quantity} Pcs • ₹${_calculateUnitPrice(order)} / pc",
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -200,7 +221,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(order.status).withValues(alpha: 0.1),
+                    color: _getStatusColor(order.status).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -221,7 +242,17 @@ class SalesOrderHistoryScreen extends StatelessWidget {
   }
 
   void _showOrderDetails(BuildContext context, OrderModel order, bool isDark) {
-    final bool isLocked = order.status.toLowerCase() == 'approved';
+    // 1. LOCK EDITING: Lock if Shipping or Delivered
+    final bool isLocked = [
+      'delivered',
+      'shipping',
+    ].contains(order.status.toLowerCase());
+
+    // 2. SAFETY LOCK: Only allow delete if 'Pending' or 'Placed'
+    final bool canDelete = [
+      'pending',
+      'placed',
+    ].contains(order.status.toLowerCase());
 
     showModalBottomSheet(
       context: context,
@@ -259,16 +290,22 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                     "Order Summary",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  if (!isLocked)
+
+                  if (canDelete)
                     IconButton(
                       onPressed: () => _confirmDelete(context, order),
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      tooltip: "Delete Order",
                     )
                   else
-                    const Icon(
-                      Icons.lock_outline,
-                      color: Colors.grey,
-                      size: 20,
+                  // Shows Lock for Approved, Shipping, Delivered
+                    const Tooltip(
+                      message: "Cannot delete active/completed orders",
+                      child: Icon(
+                        Icons.lock_outline,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
                     ),
                 ],
               ),
@@ -289,7 +326,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 ),
               ),
               const Divider(),
-              // ✅ UNIT PRICE: Using the reverse calculation helper
               _modalRow("Unit Price", "₹${_calculateUnitPrice(order)}"),
               _modalRow("Product Code", order.productCode ?? "N/A"),
               _modalRow("Quantity", "${order.quantity} Pcs"),
@@ -321,13 +357,9 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       onPressed: isLocked
                           ? null
                           : () {
-                              Navigator.pop(context);
-                              final uploadController = Get.put(
-                                MarketingUploadController(),
-                              );
-                              uploadController.loadOrderData(order);
-                              Get.to(() => const MarketingUploadScreen());
-                            },
+                        Navigator.pop(context); // Close sheet
+                        Get.to(() => EditOrderScreen(order: order));
+                      },
                       icon: Icon(isLocked ? Icons.lock : Icons.edit, size: 18),
                       label: Text(isLocked ? "Locked" : "Edit Order"),
                       style: OutlinedButton.styleFrom(
@@ -380,11 +412,11 @@ class SalesOrderHistoryScreen extends StatelessWidget {
   }
 
   Widget _modalRow(
-    String label,
-    String value, {
-    bool isStatus = false,
-    bool isBold = false,
-  }) {
+      String label,
+      String value, {
+        bool isStatus = false,
+        bool isBold = false,
+      }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -417,19 +449,29 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       case 'rejected':
         return Colors.red;
       case 'pending':
+      case 'placed':
         return Colors.orange;
+      case 'delivered':
+        return Colors.teal;
+      case 'cutting':
+        return Colors.brown;
+      case 'stitching':
+        return Colors.pinkAccent;
+      case 'printing':
+        return Colors.deepPurple;
+      case 'packing':
+        return Colors.purple;
+      case 'shipping':
+        return Colors.indigo;
       default:
         return Colors.blue;
     }
   }
 
-  // ✅ HELPER: Reverses the total calculation to show the base Unit Price
   String _calculateUnitPrice(OrderModel order) {
     try {
       if (order.quantity <= 0) return "0.00";
-      // Formula: Base Total = Grand Total / (1 + (GST% / 100))
       double baseTotal = order.totalAmount / (1 + (order.gstPercentage / 100));
-      // Unit Price = Base Total / Quantity
       double unitPrice = baseTotal / order.quantity;
       return unitPrice.toStringAsFixed(2);
     } catch (e) {

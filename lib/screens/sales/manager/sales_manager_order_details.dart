@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../controllers/sales/sales_manager_controller.dart'; // ✅ Added Controller Import
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 
@@ -16,14 +17,30 @@ class SalesManagerOrderDetails extends StatefulWidget {
 }
 
 class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
-  // ✅ Local state variable to hold the latest order data
+  // ✅ 1. Initialize Controller
+  final controller = Get.put(SalesManagerController());
+
+  // ✅ 2. Local state variable for the Order and its Status
   late OrderModel currentOrder;
+  late String displayStatus; // Fixes "setter" error by tracking status locally
+
+  // ✅ 3. Production Stages List
+  final List<String> productionStages = [
+    'Approved',
+    'Cutting',
+    'Stitching',
+    'Printing',
+    'Packing',
+    'Shipping',
+    'Delivered'
+  ];
 
   @override
   void initState() {
     super.initState();
     // Initialize with the data passed from the previous screen
     currentOrder = widget.order;
+    displayStatus = widget.order.status; // Sync initial status
   }
 
   // ✅ Logic to Fetch Fresh Data from Firestore
@@ -40,6 +57,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
         final updatedOrder = OrderModel.fromSnapshot(doc);
         setState(() {
           currentOrder = updatedOrder;
+          displayStatus = updatedOrder.status; // Sync status on refresh
         });
       }
     } catch (e) {
@@ -61,7 +79,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     if (currentOrder.products.isNotEmpty) {
       unitPrice =
           double.tryParse(currentOrder.products.first['price'].toString()) ??
-          0.0;
+              0.0;
     }
 
     // ✅ CALCULATE SUBTOTAL
@@ -71,7 +89,8 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
       backgroundColor: isDark ? TColors.dark : Colors.grey[50],
       appBar: AppBar(
         title: Text("Order #${currentOrder.manualOrderNo ?? '---'}"),
-        backgroundColor: _getStatusColor(currentOrder.status),
+        // ✅ Use local displayStatus for dynamic color
+        backgroundColor: _getStatusColor(displayStatus),
         foregroundColor: Colors.white,
       ),
       // ✅ WRAP BODY IN REFRESH INDICATOR
@@ -218,13 +237,18 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
 
               const SizedBox(height: 30),
 
-              // --- 4. ACTION BUTTONS ---
-              if (currentOrder.status == 'Pending') ...[
+              // --- 4. SMART ACTION AREA (Updated) ---
+
+              // CASE A: Pending -> Show Buttons
+              if (displayStatus == 'Placed' || displayStatus == 'Pending') ...[
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Get.back(),
+                        onPressed: () => _confirmAction("Reject", Colors.red, () {
+                          controller.rejectOrder(currentOrder.id!);
+                          Get.back();
+                        }),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           side: const BorderSide(color: Colors.red),
@@ -238,10 +262,14 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          // Connect to Controller Approve Logic here
-                          Get.back();
-                        },
+                        onPressed: () => _confirmAction("Approve", Colors.green,
+                            () async {
+                          await controller.approveOrder(currentOrder.id!);
+                          // ✅ Update LOCAL variable to refresh UI instantly
+                          setState(() {
+                            displayStatus = "Approved";
+                          });
+                        }),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -254,7 +282,89 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     ),
                   ],
                 ),
-              ] else ...[
+              ]
+
+              // CASE B: Approved/Processing -> Show Status Dropdown
+              else if (productionStages.contains(displayStatus)) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF2C2C2C)
+                        : Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.precision_manufacturing,
+                              color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text("Update Production Stage",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.blue)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        // ✅ Use displayStatus here
+                        initialValue: productionStages.contains(displayStatus)
+                            ? displayStatus
+                            : null,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: isDark ? Colors.grey[800] : Colors.white,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                        items: productionStages.map((stage) {
+                          return DropdownMenuItem(
+                              value: stage, child: Text(stage));
+                        }).toList(),
+                        onChanged: (newValue) {
+                          if (newValue != null) {
+                            // ✅ Update LOCAL variable
+                            setState(() => displayStatus = newValue);
+                            controller.updateOrderStatus(
+                                currentOrder.id!, newValue);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ]
+
+              // CASE C: Read Only (Rejected/Delivered/Other)
+              else ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      "Order is $displayStatus. No further actions available.",
+                      style: const TextStyle(
+                          color: Colors.grey, fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+
+              // Print Invoice Button (Always visible unless rejected)
+              if (displayStatus != 'Rejected')
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -270,7 +380,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     ),
                   ),
                 ),
-              ],
+
               const SizedBox(height: 40),
             ],
           ),
@@ -279,7 +389,26 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
-  // --- Helper Widgets ---
+  // --- Helper Functions ---
+
+  void _confirmAction(String action, Color color, VoidCallback onConfirm) {
+    Get.defaultDialog(
+      title: "$action Order",
+      middleText: "Are you sure you want to $action this transaction?",
+      confirm: ElevatedButton(
+        onPressed: () {
+          onConfirm();
+          Get.back(); // Close dialog
+        },
+        style: ElevatedButton.styleFrom(backgroundColor: color),
+        child: const Text("Confirm", style: TextStyle(color: Colors.white)),
+      ),
+      cancel: OutlinedButton(
+        onPressed: () => Get.back(),
+        child: const Text("Cancel"),
+      ),
+    );
+  }
 
   Widget _buildSectionTitle(String title) {
     return Padding(
@@ -389,6 +518,8 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
         return Colors.red;
       case 'pending':
         return Colors.orange;
+      case 'delivered':
+        return Colors.teal;
       default:
         return Colors.blue;
     }

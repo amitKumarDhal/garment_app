@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart'; // ✅ Needed for Colors
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import '../../data/models/order_model.dart'; // ✅ Ensure this is imported
 
 class SalesAgentController extends GetxController {
   static SalesAgentController get instance => Get.find();
@@ -15,17 +16,13 @@ class SalesAgentController extends GetxController {
   final agentName = "".obs;
   final monthlyAchievement = 0.0.obs;
 
-  // Target Configuration (e.g., ₹10,00,000)
+  // Target Configuration
   final double monthlyTarget = 100000.0;
-
-  @override
-  void onInit() {
-    super.onInit();
-    loadDashboardData();
-  }
 
   /// Master function to reload all data
   Future<void> loadDashboardData() async {
+    if (_auth.currentUser == null) return; // Security Check
+
     isLoading.value = true;
     await fetchAgentIdentity();
     await Future.wait([fetchAgentStats(), fetchLeaderboard()]);
@@ -52,6 +49,7 @@ class SalesAgentController extends GetxController {
   }
 
   // --- 2. Calculate My Personal Stats (Approved Only) ---
+  // --- 2. Calculate My Personal Stats (Includes All Revenue Generating Statuses) ---
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
     if (agentName.value.isEmpty) return;
@@ -64,115 +62,178 @@ class SalesAgentController extends GetxController {
       final snapshot = await _db
           .collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
-          .where(
-            'orderDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
-          )
-          .where(
-            'orderDate',
-            isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
-          )
-          // ✅ FIX: Match your existing Firestore Index (Descending)
+          .where('orderDate',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('orderDate',
+              isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
           .orderBy('orderDate', descending: true)
           .get();
 
       double total = 0.0;
 
+      // ✅ DEFINE VALID STATUSES (Money that counts)
+      // We exclude 'Pending', 'Placed', and 'Rejected'
+      List<String> validStatuses = [
+        'approved',
+        'cutting',
+        'stitching',
+        'printing',
+        'packing',
+        'shipping',
+        'delivered', 
+        'completed'
+      ];
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        // Convert status to lowercase to handle 'Approved', 'approved', 'APPROVED'
         String status = (data['status'] ?? 'pending').toString().toLowerCase();
 
-        // ✅ FIXED: Only count strictly 'approved'
-        if (status == 'approved') {
+        // ✅ CHECK IF STATUS IS IN THE VALID LIST
+        if (validStatuses.contains(status)) {
           double amount = _parseAmount(data['totalAmount']);
           total += amount;
         }
       }
 
       monthlyAchievement.value = total;
-      print("💰 Total Approved Achievement: $total");
+      print("💰 Total Achievement (All Stages): $total");
     } catch (e) {
       print("❌ Stats Error: $e");
     }
   }
-
-  // --- 3. Calculate Team Leaderboard (With Greetings & Overachievement) ---
+  // --- 3. Calculate Team Leaderboard ---
+  // --- 3. Calculate Team Leaderboard (Includes All Active Revenue) ---
   Future<void> fetchLeaderboard() async {
     try {
-      isLoading.value = true;
-      DateTime now = DateTime.now();
-      DateTime startOfMonth = DateTime(now.year, now.month, 1);
-      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      isLoading.value = true; 
 
-      // Query ALL orders for this month
+      DateTime now = DateTime.now();
+      DateTime start = DateTime(now.year, now.month, 1);
+      DateTime end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      // ✅ DEFINE VALID REVENUE STATUSES
+      // (Must match the list used in Manager Controller)
+      List<String> revenueStatuses = [
+        'Approved',
+        'Cutting',
+        'Stitching',
+        'Printing',
+        'Packing',
+        'Shipping',
+        'Delivered',
+        // Add lowercase versions if your database has mixed casing
+        'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered'
+      ];
+
       final snapshot = await _db
           .collection('orders')
-          .where(
-            'orderDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
-          )
-          .where(
-            'orderDate',
-            isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
-          )
-          .orderBy('orderDate', descending: true)
+          // ✅ FIX: Use 'whereIn' to catch all stages of the sale
+          .where('status', whereIn: revenueStatuses)
+          .where('orderDate', isGreaterThanOrEqualTo: start)
+          .where('orderDate', isLessThanOrEqualTo: end)
           .get();
 
-      Map<String, double> agentTotals = {};
+      Map<String, double> salesMap = {};
+      Map<String, int> countMap = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        String name = data['marketingPersonName'] ?? 'Unknown Agent';
-        String status = (data['status'] ?? 'Pending').toString().toLowerCase();
+        String agent = data['marketingPersonName'] ?? 'Unknown';
 
-        if (status == 'approved') {
-          double amount = _parseAmount(data['totalAmount']);
-          if (agentTotals.containsKey(name)) {
-            agentTotals[name] = agentTotals[name]! + amount;
-          } else {
-            agentTotals[name] = amount;
-          }
-        }
+        double amount = _parseAmount(data['totalAmount']);
+
+        salesMap[agent] = (salesMap[agent] ?? 0) + amount;
+        countMap[agent] = (countMap[agent] ?? 0) + 1;
       }
 
-      var sortedEntries = agentTotals.entries.toList()
+      // Sort High to Low
+      var sortedEntries = salesMap.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
 
-      leaderboardData.value = sortedEntries.asMap().entries.map((entry) {
-        int rank = entry.key + 1;
-        double amount = entry.value.value;
+      double targetAmount = 100000.0;
 
-        // ✅ 1. Remove .clamp() to allow > 100% progress
-        double progress = (monthlyTarget > 0) ? (amount / monthlyTarget) : 0.0;
+      leaderboardData.value = sortedEntries.map((e) {
+        String name = e.key;
+        double amount = e.value;
+        int count = countMap[name] ?? 0;
 
-        // ✅ 2. Add a Fun Greeting based on Rank
+        double progress = amount / targetAmount;
+
         String greeting = "";
-        if (rank == 1)
-          greeting = "👑 Leading the Pack!";
-        else if (rank == 2)
-          greeting = "🔥 On Fire!";
-        else if (rank == 3)
-          greeting = "🚀 Sky High!";
-        else if (progress >= 1.0)
-          greeting = "🌟 Super Star!"; // Overachiever
-        else
-          greeting = "💪 Keep Pushing!";
+        if (progress >= 1.5) {
+          greeting = "Unstoppable! 🚀";
+        } else if (progress >= 1.0) greeting = "Target Smashed! 🏆";
+        else if (progress >= 0.8) greeting = "Almost there! 🔥";
+        else if (progress >= 0.5) greeting = "Halfway point 💪";
+        else greeting = "Keep Pushing 📉";
 
         return {
-          "rank": rank.toString(),
-          "name": entry.value.key,
-          "amount": amount,
-          "totalDisplay": NumberFormat.compactCurrency(
-            symbol: '₹',
-            locale: 'en_IN',
-          ).format(amount),
-          "progress": progress, // Raw value (can be 1.2, 1.5 etc.)
-          "greeting": greeting, // New field you can show in UI!
+          'name': name,
+          'amount': amount,
+          'count': count,
+          'progress': progress, 
+          'greeting': greeting,
         };
       }).toList();
     } catch (e) {
-      print("Leaderboard Error: $e");
+      print("Error fetching leaderboard: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // --- 4. ✅ UPDATE ORDER (Edit Logic) ---
+  Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
+    try {
+      isLoading.value = true;
+
+      // 1. Calculate new totals
+      double subTotal = newQty * newPrice;
+      
+      // Calculate GST Amount based on percentage
+      double gstAmount = (subTotal * originalOrder.gstPercentage) / 100;
+      
+      // New Grand Total
+      double newTotal = subTotal + gstAmount + originalOrder.shippingCharge;
+      
+      // New Balance Due (Total - Advance already paid)
+      double newBalance = newTotal - originalOrder.advanceAmount;
+
+      // 2. Prepare Data for Firestore
+      Map<String, dynamic> updateData = {
+        'quantity': newQty,
+        'totalAmount': newTotal,
+        'balanceDue': newBalance,
+        'productDetails': newDetails,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Update product price inside the products list (assuming single product editing for now)
+      if (originalOrder.products.isNotEmpty) {
+        List<dynamic> updatedProducts = List.from(originalOrder.products);
+        if (updatedProducts[0] is Map) {
+             Map<String, dynamic> firstProduct = Map<String, dynamic>.from(updatedProducts[0]);
+             firstProduct['price'] = newPrice;
+             updatedProducts[0] = firstProduct;
+        }
+        updateData['products'] = updatedProducts;
+      }
+
+      // 3. Update Firestore
+      await _db
+          .collection('orders')
+          .doc(originalOrder.id)
+          .update(updateData);
+      
+      // 4. Refresh stats to reflect new amounts
+      await fetchAgentStats();
+
+      Get.snackbar("Success", "Order updated successfully!",
+          backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green);
+      
+    } catch (e) {
+      Get.snackbar("Error", "Failed to update order: $e",
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }

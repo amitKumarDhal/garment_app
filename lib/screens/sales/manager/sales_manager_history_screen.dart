@@ -5,7 +5,7 @@ import '../../../controllers/sales/sales_manager_history_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../utils/constants/sizes.dart';
-import 'sales_manager_order_details.dart'; // ✅ Import the Details Screen
+import 'sales_manager_order_details.dart';
 
 class SalesManagerHistoryScreen extends StatelessWidget {
   const SalesManagerHistoryScreen({super.key});
@@ -14,6 +14,14 @@ class SalesManagerHistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(SalesManagerHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // ✅ FORCE "ALL" FILTER ON LOAD
+    // This overrides the "Approved" argument passed from the dashboard
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.currentFilter.value != "All") {
+        controller.filterByStatus("All");
+      }
+    });
 
     return Scaffold(
       backgroundColor: isDark ? TColors.dark : Colors.grey[50],
@@ -63,7 +71,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                         },
                         style: OutlinedButton.styleFrom(
                           backgroundColor: hasDate
-                              ? Colors.purple.withValues(alpha: 0.1)
+                              ? Colors.purple.withOpacity(0.1)
                               : null,
                           side: BorderSide(
                             color: hasDate ? Colors.purple : Colors.grey[400]!,
@@ -95,7 +103,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
                     const SizedBox(width: 10),
 
-                    // B. Status Chips (Scrollable)
+                    // B. ✅ EXPANDED STATUS CHIPS
                     Expanded(
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
@@ -108,6 +116,24 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                               const SizedBox(width: 8),
                               _buildFilterChip(controller, "Approved"),
                               const SizedBox(width: 8),
+
+                              // Production Stages
+                              _buildFilterChip(controller, "Cutting"),
+                              const SizedBox(width: 8),
+                              _buildFilterChip(controller, "Stitching"),
+                              const SizedBox(width: 8),
+                              _buildFilterChip(controller, "Printing"),
+                              const SizedBox(width: 8),
+                              _buildFilterChip(controller, "Packing"),
+                              const SizedBox(width: 8),
+
+                              // Delivery Stages
+                              _buildFilterChip(controller, "Shipping"),
+                              const SizedBox(width: 8),
+                              _buildFilterChip(controller, "Delivered"),
+                              const SizedBox(width: 8),
+
+                              // Cancelled
                               _buildFilterChip(controller, "Rejected"),
                             ],
                           ),
@@ -150,7 +176,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final order = controller.displayedOrders[index];
 
-                  // ✅ CLICKABLE CARD WRAPPER
+                  // CLICKABLE CARD WRAPPER
                   return GestureDetector(
                     onTap: () =>
                         Get.to(() => SalesManagerOrderDetails(order: order)),
@@ -193,10 +219,10 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -257,7 +283,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
+                  color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -280,6 +306,18 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'approved':
         return Colors.green;
+      case 'cutting':
+        return Colors.blueAccent;
+      case 'stitching':
+        return Colors.indigo;
+      case 'printing':
+        return Colors.purpleAccent;
+      case 'packing':
+        return Colors.orangeAccent;
+      case 'shipping':
+        return Colors.teal;
+      case 'delivered':
+        return Colors.green[800]!;
       case 'rejected':
         return Colors.red;
       case 'pending':

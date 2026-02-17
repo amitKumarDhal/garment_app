@@ -1,3 +1,4 @@
+import 'dart:async'; // ✅ Required for StreamSubscription
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,13 +7,19 @@ import '../../data/models/order_model.dart';
 class SalesManagerHistoryController extends GetxController {
   final _db = FirebaseFirestore.instance;
 
+  // ✅ Stream Subscription to manage the listener
+  StreamSubscription<QuerySnapshot>? _listener;
+
   var isLoading = true.obs;
   var allOrders = <OrderModel>[]; // Master list
   var displayedOrders = <OrderModel>[].obs; // Filtered list for UI
   var currentFilter = "All".obs; // Default filter
 
-  // ✅ NEW: Store selected date range
+  // ✅ Store selected date range
   Rx<DateTimeRange?> selectedDateRange = Rx<DateTimeRange?>(null);
+  
+  // ✅ Store search query for real-time persistence
+  var searchQuery = "".obs; 
 
   @override
   void onInit() {
@@ -23,38 +30,44 @@ class SalesManagerHistoryController extends GetxController {
     fetchAllOrders();
   }
 
-  // --- Fetch EVERYONE'S Orders ---
-  void fetchAllOrders() async {
-    try {
-      isLoading.value = true;
-      final snapshot = await _db
-          .collection('orders')
-          .orderBy('orderDate', descending: true)
-          .limit(100)
-          .get();
+  // ✅ NEW: Cancel stream when controller is closed (Logout)
+  @override
+  void onClose() {
+    _listener?.cancel(); // Stops listening to Firebase
+    super.onClose();
+  }
 
+  // --- Fetch EVERYONE'S Orders (REAL-TIME + SAFE CLEANUP) ---
+  void fetchAllOrders() {
+    isLoading.value = true;
+    
+    // ✅ Assign to _listener so we can cancel it later
+    _listener = _db.collection('orders')
+        .orderBy('orderDate', descending: true)
+        .limit(100)
+        .snapshots() // Listen for changes
+        .listen((snapshot) {
+      
       allOrders = snapshot.docs
           .map((doc) => OrderModel.fromSnapshot(doc))
           .toList();
 
+      // Re-apply filters automatically whenever data changes
       applyFilter();
-    } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Could not load history: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
-      );
-    } finally {
+      
       isLoading.value = false;
-    }
+    }, onError: (e) {
+      // ✅ Handle permission errors gracefully (e.g. on logout)
+      print("Stream error or stopped: $e");
+      isLoading.value = false;
+    });
   }
 
-  // ✅ NEW: Method to Pick Date Range
+  // ✅ Method to Pick Date Range
   Future<void> pickDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(2023), // Adjust based on when your app started
+      firstDate: DateTime(2023), 
       lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
@@ -69,11 +82,11 @@ class SalesManagerHistoryController extends GetxController {
 
     if (picked != null) {
       selectedDateRange.value = picked;
-      applyFilter(); // Filter immediately after selection
+      applyFilter(); 
     }
   }
 
-  // ✅ NEW: Clear Date Filter
+  // ✅ Clear Date Filter
   void clearDateFilter() {
     selectedDateRange.value = null;
     applyFilter();
@@ -86,11 +99,12 @@ class SalesManagerHistoryController extends GetxController {
   }
 
   void searchOrders(String query) {
-    applyFilter(searchQuery: query);
+    searchQuery.value = query; // Update the class variable
+    applyFilter();
   }
 
   // --- Main Filter Engine ---
-  void applyFilter({String searchQuery = ''}) {
+  void applyFilter() {
     List<OrderModel> temp = allOrders;
 
     // 1. Filter by Status Tab
@@ -102,7 +116,7 @@ class SalesManagerHistoryController extends GetxController {
           .toList();
     }
 
-    // 2. ✅ NEW: Filter by Date Range
+    // 2. Filter by Date Range
     if (selectedDateRange.value != null) {
       DateTime start = selectedDateRange.value!.start;
       // Set end date to 23:59:59 of the last day to include the full day
@@ -116,8 +130,8 @@ class SalesManagerHistoryController extends GetxController {
     }
 
     // 3. Filter by Search Text
-    if (searchQuery.isNotEmpty) {
-      String lowerQuery = searchQuery.toLowerCase();
+    if (searchQuery.value.isNotEmpty) {
+      String lowerQuery = searchQuery.value.toLowerCase();
       temp = temp.where((o) {
         return o.clientName.toLowerCase().contains(lowerQuery) ||
             o.marketingPersonName.toLowerCase().contains(lowerQuery) ||

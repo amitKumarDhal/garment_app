@@ -85,8 +85,9 @@ class WorkerListScreen extends StatelessWidget {
 
   Color _getRoleColor(String text) {
     String lower = text.toLowerCase();
-    if (lower.contains('sales') || lower.contains('agent'))
+    if (lower.contains('sales') || lower.contains('agent')) {
       return TColors.marketing;
+    }
     if (lower.contains('cutting')) return TColors.cutting;
     if (lower.contains('print')) return TColors.printing;
     if (lower.contains('stitch')) return TColors.stitching;

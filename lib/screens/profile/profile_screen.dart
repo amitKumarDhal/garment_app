@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ Required for Status Bar control
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth/profile_controller.dart';
 import '../../utils/constants/colors.dart';
@@ -10,214 +10,202 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize the controller
     final controller = Get.put(ProfileController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "My Profile",
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            letterSpacing: -0.5,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
-        centerTitle: true,
+        centerTitle: false,
+        titleSpacing: 24,
         backgroundColor: Colors.transparent,
         elevation: 0,
-
-        // ✅ CRITICAL FIX: Make Status Bar Icons Visible
-        // If Light Mode -> Use Dark Icons (Black)
-        // If Dark Mode -> Use Light Icons (White)
-        systemOverlayStyle: isDark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark,
-
-        foregroundColor: isDark ? Colors.white : Colors.black,
-
+        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () {
-              Get.snackbar("Digital ID", "Show this QR code at the gate.");
-            },
-            tooltip: "Show Gate Pass",
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => controller.fetchUserProfile(),
-          ),
+          _buildAppBarAction(Icons.qr_code_scanner_rounded, isDark, () {
+            Get.snackbar("Digital ID", "Show this QR code at the gate.");
+          }),
+          const SizedBox(width: 8),
+          _buildAppBarAction(Icons.refresh_rounded, isDark, () => controller.fetchUserProfile()),
+          const SizedBox(width: 20),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(TSizes.md),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Column(
           children: [
-            // 1. DIGITAL ID CARD (Visual & Practical)
+            // 1. PREMIUM DIGITAL ID CARD
             _buildDigitalIdCard(context, controller),
 
-            const SizedBox(height: TSizes.lg),
+            const SizedBox(height: 32),
 
-            // 2. PERFORMANCE DASHBOARD (Data driven)
+            // 2. PERFORMANCE STATS
+            _buildSectionHeader("Performance Metrics"),
             _buildPerformanceStats(context),
 
-            const SizedBox(height: TSizes.lg),
+            const SizedBox(height: 28),
 
-            // 3. SHIFT DETAILS (Practical Info)
+            // 3. SHIFT INFO
             _buildShiftInfo(context),
 
-            const SizedBox(height: TSizes.lg),
+            const SizedBox(height: 32),
 
             // 4. MENU ITEMS
-            _buildSectionHeader(context, "Account & Security"),
+            _buildSectionHeader("Account & Security"),
             _buildProfileTile(
-              context,
-              icon: Icons.person_outline,
+              icon: Icons.person_outline_rounded,
               title: "Personal Information",
               subtitle: "Update name, phone, address",
+              isDark: isDark,
               onTap: () {},
             ),
             _buildProfileTile(
-              context,
-              icon: Icons.lock_outline,
+              icon: Icons.lock_outline_rounded,
               title: "Change Password",
               subtitle: "Last changed 30 days ago",
+              isDark: isDark,
               onTap: () {},
             ),
 
-            const SizedBox(height: TSizes.md),
-            _buildSectionHeader(context, "App Preferences"),
-            _buildThemeTile(context),
+            const SizedBox(height: 24),
+            _buildSectionHeader("App Preferences"),
+            _buildThemeTile(context, isDark),
             _buildProfileTile(
-              context,
-              icon: Icons.help_outline,
+              icon: Icons.help_outline_rounded,
               title: "Support & Help",
               subtitle: "Report issues or contact HR",
+              isDark: isDark,
               onTap: () {},
             ),
 
-            const SizedBox(height: TSizes.xl),
+            const SizedBox(height: 40),
 
             // 5. LOGOUT
             _buildLogoutButton(controller),
 
-            const SizedBox(height: TSizes.xl),
+            const SizedBox(height: 24),
 
-            // Version Info
             Text(
               "Version 1.0.2 (Build 240)",
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: TSizes.lg),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  // ===================== WIDGETS =====================
+  // ===================== MODERN WIDGETS =====================
 
-  Widget _buildDigitalIdCard(
-    BuildContext context,
-    ProfileController controller,
-  ) {
+  Widget _buildAppBarAction(IconData icon, bool isDark, VoidCallback onTap) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04),
+      ),
+      child: IconButton(
+        icon: Icon(icon, size: 20, color: isDark ? Colors.white : Colors.black87),
+        onPressed: onTap,
+      ),
+    );
+  }
+
+  Widget _buildDigitalIdCard(BuildContext context, ProfileController controller) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [TColors.primary, TColors.primary.withValues(alpha: 0.7)],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6A1B9A), Color(0xFF9C27B0)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: TColors.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF6A1B9A).withOpacity(0.25),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Profile Image
+          // 1. Avatar (Fixed size)
           Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-            ),
+            padding: const EdgeInsets.all(2),
+            decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
             child: CircleAvatar(
-              radius: 35,
-              backgroundColor: Colors.white24,
-              child: Obx(
-                () => Text(
-                  controller.name.value.isNotEmpty
-                      ? controller.name.value[0].toUpperCase()
-                      : "U",
-                  style: const TextStyle(
-                    fontSize: 30,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              radius: 30,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person_rounded, size: 32, color: const Color(0xFF6A1B9A)),
             ),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: 16),
 
-          // 2. User Info
+          // 2. Info Section (Takes remaining space)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // --- FULL NAME FIX ---
-                Obx(
-                  () => Text(
-                    controller.name.value,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                Obx(() => Text(
+                  controller.name.value,
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
                       color: Colors.white,
-                      height: 1.2,
-                    ),
-                    maxLines: 2,
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
+                      letterSpacing: -0.5
                   ),
-                ),
+                  maxLines: 1, // ✅ Prevents name from breaking layout
+                  overflow: TextOverflow.ellipsis, // ✅ Adds "..." if too long
+                )),
                 const SizedBox(height: 4),
 
-                // Role Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Obx(
-                    () => Text(
-                      controller.role.value.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.white,
-                        letterSpacing: 1,
-                        fontWeight: FontWeight.bold,
+                // ✅ THE FIX: Wrap the sub-row to prevent overflow on small screens
+                FittedBox(
+                  fit: BoxFit.scaleDown, // ✅ Automatically shrinks the text if it overflows
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6)
+                        ),
+                        child: Obx(() => Text(
+                          controller.role.value.toUpperCase(),
+                          style: const TextStyle(
+                              fontSize: 9,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5
+                          ),
+                        )),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // ID
-                Obx(
-                  () => Text(
-                    "ID: ${controller.employeeId.value}",
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      const SizedBox(width: 8),
+                      Obx(() => Text(
+                        "E-ID: ${controller.employeeId.value}",
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white.withOpacity(0.7),
+                            fontWeight: FontWeight.w600
+                        ),
+                      )),
+                    ],
                   ),
                 ),
               ],
@@ -226,111 +214,83 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(width: 10),
 
-          // 3. QR Code Icon
+          // 3. QR Code Icon (Fixed size)
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.qr_code_2, color: Colors.black, size: 32),
+            child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 24),
           ),
         ],
       ),
     );
   }
-
   Widget _buildPerformanceStats(BuildContext context) {
     return Row(
       children: [
-        _buildStatBox(context, "Efficiency", "94%", Colors.green),
+        _buildStatBox("Efficiency", "94%", Colors.green, context),
         const SizedBox(width: 12),
-        _buildStatBox(context, "Attendance", "26/30", Colors.orange),
+        _buildStatBox("Attendance", "26/30", Colors.orange, context),
         const SizedBox(width: 12),
-        _buildStatBox(context, "Tasks", "128", Colors.blue),
+        _buildStatBox("Tasks", "128", Colors.blue, context),
       ],
     );
   }
 
-  Widget _buildStatBox(
-    BuildContext context,
-    String label,
-    String value,
-    Color color,
-  ) {
+  Widget _buildStatBox(String label, String value, Color color, BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8), // ✅ Added slight horizontal padding
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03)),
+          boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+            // ✅ Wrapped in FittedBox to automatically shrink if the value (e.g. "100%") is too wide
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color)),
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
+            // ✅ Wrapped in FittedBox to prevent long words like "Efficiency" from breaking
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
             ),
           ],
         ),
       ),
     );
   }
-
   Widget _buildShiftInfo(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.purple.withOpacity(0.2)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.purple.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.access_time_filled, color: Colors.purple),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.access_time_filled_rounded, color: Colors.purple),
           ),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Current Shift",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              const Text(
-                "Morning Shift (08:00 - 16:00)",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
+              Text("Current Shift", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
+              const SizedBox(height: 2),
+              const Text("Morning Shift (08:00 - 16:00)", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
             ],
           ),
         ],
@@ -338,105 +298,61 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      padding: const EdgeInsets.only(left: 4, bottom: 16),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
           title.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-            letterSpacing: 1.2,
-          ),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.5),
         ),
       ),
     );
   }
 
-  Widget _buildProfileTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildProfileTile({required IconData icon, required String title, required String subtitle, required bool isDark, required VoidCallback onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5),
-        ],
+        borderRadius: BorderRadius.circular(20),
       ),
       child: ListTile(
         onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: isDark ? Colors.white : Colors.black87,
-            size: 20,
-          ),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: isDark ? Colors.white : Colors.black87, size: 22),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+        trailing: Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
       ),
     );
   }
 
-  Widget _buildThemeTile(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildThemeTile(BuildContext context, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 5),
-        ],
+        borderRadius: BorderRadius.circular(20),
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.brightness_6,
-            color: isDark ? Colors.white : Colors.black87,
-            size: 20,
-          ),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+          child: Icon(Icons.dark_mode_rounded, color: isDark ? Colors.amber : Colors.indigo, size: 22),
         ),
-        title: const Text(
-          "Dark Mode",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Text(
-          isDark ? "Easy on the eyes" : "Classic light theme",
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        trailing: Switch(
+        title: const Text("Dark Mode", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        subtitle: Text(isDark ? "Easy on the eyes" : "Classic light theme", style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+        trailing: Switch.adaptive(
           value: isDark,
-          activeThumbColor: TColors.primary,
-          onChanged: (value) =>
-              Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light),
+          activeColor: Colors.purple,
+          onChanged: (value) => Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light),
         ),
       ),
     );
@@ -449,25 +365,22 @@ class ProfileScreen extends StatelessWidget {
         onPressed: () {
           Get.defaultDialog(
             title: "Logout",
-            middleText: "Are you sure?",
-            textConfirm: "Yes",
-            textCancel: "No",
+            titleStyle: const TextStyle(fontWeight: FontWeight.w900),
+            middleText: "Are you sure you want to exit?",
+            textConfirm: "Logout",
+            textCancel: "Cancel",
             confirmTextColor: Colors.white,
-            buttonColor: Colors.red,
+            buttonColor: Colors.redAccent,
+            radius: 16,
             onConfirm: () => controller.logout(),
           );
         },
         style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: Colors.red.withValues(alpha: 0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          backgroundColor: Colors.red.withOpacity(0.1),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
-        child: const Text(
-          "Log Out",
-          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-        ),
+        child: const Text("Log Out", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 16)),
       ),
     );
   }

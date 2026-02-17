@@ -7,8 +7,7 @@ import '../../../../utils/constants/colors.dart';
 import 'sales_manager_home.dart'; // 1. Overview
 import '../../floor_management/marketing_upload_screen.dart'; // 2. New Order
 import '../sales_order_history_screen.dart'; // 3. My Orders
-import '../../profile/profile_screen.dart'; // 4. Profile
-import '../sales_dashboard.dart'; // 5. The Full Associate Dashboard
+import '../sales_dashboard.dart'; // 4. The Full Associate Dashboard
 
 class SalesManagerDashboard extends StatelessWidget {
   const SalesManagerDashboard({super.key});
@@ -27,83 +26,179 @@ class SalesManagerDashboard extends StatelessWidget {
       child: Scaffold(
         backgroundColor: isDark ? TColors.dark : TColors.light,
 
+        // ✅ CRITICAL: extendBody allows the screen content to scroll BEHIND the floating nav bar
+        extendBody: true,
+
         // Body changes based on selectedIndex
         body: Obx(() => controller.screens[controller.selectedIndex.value]),
 
-        bottomNavigationBar: Obx(
-          () => NavigationBar(
-            height: 80,
-            elevation: 0,
-            selectedIndex: controller.selectedIndex.value,
+        // ✅ NEW FLOATING GLASS DOCK (4 Items)
+        bottomNavigationBar: _buildFloatingNavBar(isDark, controller),
+      ),
+    );
+  }
 
-            // ✅ CUSTOM NAVIGATION LOGIC
-            onDestinationSelected: (index) {
-              // If User clicks "Agent View" (Index 3), Redirect instead of switching tab
-              if (index == 3) {
-                Get.to(() => const SalesDashboard());
-                return;
-              }
-              // Otherwise, switch tab normally
-              controller.selectedIndex.value = index;
-            },
+  // --- PREMIUM FLOATING DOCK NAV BAR (GRADIENT BORDER) ---
+  Widget _buildFloatingNavBar(bool isDark, SalesManagerNavController controller) {
+    return Padding(
+      // Margin to make it float above the bottom of the screen
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
 
-            backgroundColor: isDark ? TColors.dark : Colors.white,
-            indicatorColor: Colors.purple.withValues(alpha: 0.5),
-            destinations: const [
-              // Index 0: Overview
-              NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard, color: TColors.primary),
-                label: 'Overview',
-              ),
-
-              // Index 1: New Order
-              NavigationDestination(
-                icon: Icon(Icons.add_circle_outline),
-                selectedIcon: Icon(Icons.add_circle, color: TColors.primary),
-                label: 'NewOrder',
-              ),
-
-              // Index 2: My Orders
-              NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long, color: TColors.primary),
-                label: 'MyOrders',
-              ),
-
-              // ✅ Index 3: Agent View (Redirects)
-              NavigationDestination(
-                icon: Icon(Icons.swap_horiz_outlined),
-                selectedIcon: Icon(Icons.swap_horiz, color: TColors.primary),
-                label: 'SalesView',
-              ),
-
-              // Index 4: Profile
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person, color: TColors.primary),
-                label: 'Profile',
-              ),
+      // OUTER CONTAINER: Acts as the Gradient Border & Drop Shadow
+      child: Container(
+        height: 64, // Sleek, compact height
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          // The Gradient for the border
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.purpleAccent,
+              Colors.green,
+              Colors.amber,
             ],
           ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+
+        // The padding here determines the WIDTH of your gradient border (e.g., 1.5 pixels)
+        child: Padding(
+          padding: const EdgeInsets.all(1.5),
+
+          // INNER CONTAINER: Your solid app background color
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? TColors.dark : Colors.white,
+              borderRadius: BorderRadius.circular(30.5), // Inner radius (32 - 1.5 padding)
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30.5),
+              child: Obx(
+                    () => Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(0, Icons.dashboard_rounded, "Overview", isDark, controller),
+                    _buildNavItem(1, Icons.add_circle_rounded, "New", isDark, controller),
+                    _buildNavItem(2, Icons.receipt_long_rounded, "Orders", isDark, controller),
+                    // Index 3 acts purely as a redirect button
+                    _buildNavItem(3, Icons.swap_horiz_rounded, "Sales View", isDark, controller),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- ANIMATED NAV ITEM ---
+  Widget _buildNavItem(int index, IconData icon, String label, bool isDark, SalesManagerNavController controller) {
+    // Note: Index 3 will never actually be 'selected' because it redirects
+    final isSelected = controller.selectedIndex.value == index;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact(); // Premium tactile feel on tap
+
+        // ✅ CUSTOM NAVIGATION LOGIC MAINTAINED
+        if (index == 3) {
+          Get.to(() => const SalesDashboard());
+          return;
+        }
+        controller.selectedIndex.value = index;
+      },
+      // Container animates its width/padding when selected
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutQuint,
+        padding: EdgeInsets.symmetric(
+          // ✅ INCREASED PADDING: More horizontal breathing room since there are only 4 items now
+          horizontal: isSelected ? 16 : 12,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? Colors.white10 : TColors.primary.withOpacity(0.1))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Floating dot indicator + Icon
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: isSelected ? 1.0 : 0.0,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    height: 4,
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white : TColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected
+                      ? (isDark ? Colors.white : TColors.primary)
+                      : Colors.grey.shade500,
+                ),
+              ],
+            ),
+
+            // Text expands smoothly when selected
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutQuint,
+              child: SizedBox(
+                width: isSelected ? null : 0, // Collapses text to 0 width when not selected
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 6, top: 4),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12, // Slightly larger font since we have 4 items
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : TColors.primary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+// ✅ UPDATED CONTROLLER
 class SalesManagerNavController extends GetxController {
   final RxInt selectedIndex = 0.obs;
   DateTime? lastBackPressTime;
 
-  // ✅ Note: We don't need SalesDashboard in this list
-  // because we redirect to it separately!
+  // ✅ REMOVED PROFILE SCREEN FROM CONTROLLER ARRAY
   final screens = [
     const SalesManagerHome(), // Index 0
     const MarketingUploadScreen(), // Index 1
     const SalesOrderHistoryScreen(), // Index 2
     const SizedBox(), // Index 3 (Placeholder for Agent View)
-    const ProfileScreen(), // Index 4
   ];
 
   void handleBackPress() {
