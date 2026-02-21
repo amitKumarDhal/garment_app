@@ -16,6 +16,7 @@ class AdminController extends GetxController {
   var averageEfficiency = 0.0.obs;
   var activeWorkers = 0.obs;
   var totalDamages = 0.obs;
+  var adminName = "".obs;
 
   // --- REPORTING VARIABLES ---
   var reportDate = DateTime.now().obs;
@@ -286,6 +287,15 @@ class AdminController extends GetxController {
     }
   }
 
+  // In your initialization or fetch logic
+  Future<void> fetchAdminName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // You can fetch from 'users' collection similar to SalesAgentController
+      adminName.value = user.displayName ?? "Admin";
+    }
+  }
+
   // --- 5. REPORTING LOGIC ---
   void setReportDate(DateTime date) {
     reportDate.value = date;
@@ -381,14 +391,28 @@ class AdminController extends GetxController {
       } else if (user['shiftApproved'] == false) {
         await docRef.update({'shiftApproved': true});
       } else if (user['adminApproved'] == false) {
+        // 1. Update id_requests
         await docRef.update({'adminApproved': true, 'status': 'Approved'});
-        Get.snackbar("Approved", "${user['name']} access granted", backgroundColor: Colors.green, colorText: Colors.white);
+
+        // 2. CRITICAL FIX: Create/Update the official 'users' document
+        await _db.collection('users').doc(docId).set({
+          'name': user['name'] ?? user['FullName'] ?? 'Unknown',
+          'email': user['email'] ?? user['Email'] ?? '',
+          'role': user['role'] ?? user['Role'] ?? 'Worker',
+          'status': 'Approved',
+          // Duplicates to prevent case-sensitive crashes on older screens
+          'FullName': user['name'] ?? user['FullName'] ?? 'Unknown',
+          'Role': user['role'] ?? user['Role'] ?? 'Worker',
+          'Status': 'Approved',
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        Get.snackbar("Approved", "${user['name'] ?? 'User'} access granted", backgroundColor: Colors.green, colorText: Colors.white);
       }
     } catch (e) {
       Get.snackbar("Error", e.toString());
     }
   }
-
   Future<void> rejectRequest(String docId) async {
     try {
       await _db.collection('id_requests').doc(docId).delete();

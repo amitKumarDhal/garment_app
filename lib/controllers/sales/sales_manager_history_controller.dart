@@ -104,6 +104,7 @@ class SalesManagerHistoryController extends GetxController {
   }
 
   // --- Main Filter Engine ---
+// --- Main Filter Engine ---
   void applyFilter() {
     List<OrderModel> temp = allOrders;
 
@@ -112,14 +113,13 @@ class SalesManagerHistoryController extends GetxController {
       temp = temp
           .where(
             (o) => o.status.toLowerCase() == currentFilter.value.toLowerCase(),
-          )
+      )
           .toList();
     }
 
     // 2. Filter by Date Range
     if (selectedDateRange.value != null) {
       DateTime start = selectedDateRange.value!.start;
-      // Set end date to 23:59:59 of the last day to include the full day
       DateTime end = selectedDateRange.value!.end
           .add(const Duration(days: 1))
           .subtract(const Duration(seconds: 1));
@@ -129,16 +129,25 @@ class SalesManagerHistoryController extends GetxController {
       }).toList();
     }
 
-    // 3. Filter by Search Text
+    // 3. Filter by Search Text (✅ UPGRADED TO SEARCH MULTI-ITEMS)
     if (searchQuery.value.isNotEmpty) {
       String lowerQuery = searchQuery.value.toLowerCase();
       temp = temp.where((o) {
-        return o.clientName.toLowerCase().contains(lowerQuery) ||
+        // Match Client, Agent, or Order ID
+        bool matchBasic = o.clientName.toLowerCase().contains(lowerQuery) ||
             o.marketingPersonName.toLowerCase().contains(lowerQuery) ||
             (o.manualOrderNo?.toLowerCase().contains(lowerQuery) ?? false);
+
+        // ✅ NEW: Match Product Name or SKU inside the dynamic list
+        bool matchProducts = o.products.any((prod) {
+          String pName = (prod['productName'] ?? '').toString().toLowerCase();
+          String pCode = (prod['productCode'] ?? '').toString().toLowerCase();
+          return pName.contains(lowerQuery) || pCode.contains(lowerQuery);
+        });
+
+        return matchBasic || matchProducts;
       }).toList();
     }
 
     displayedOrders.assignAll(temp);
-  }
-}
+  }}

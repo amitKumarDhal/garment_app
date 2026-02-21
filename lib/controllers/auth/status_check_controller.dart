@@ -21,15 +21,19 @@ class StatusCheckController extends GetxController {
     requestData.value = null; // Reset previous result
 
     try {
-      // Find the user document by email
-      final querySnapshot = await FirebaseFirestore.instance
+      // 1. Force lowercase to match the database exactly
+      String searchEmail = emailController.text.trim().toLowerCase();
+
+      // 2. ✅ CRITICAL: Search by email string, NOT by currentUser!
+      // The user is currently logged out, so we query the public 'id_requests'
+      final requestQuery = await FirebaseFirestore.instance
           .collection('id_requests')
-          .where('email', isEqualTo: emailController.text.trim())
+          .where('email', isEqualTo: searchEmail)
           .limit(1)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        requestData.value = querySnapshot.docs.first.data();
+      if (requestQuery.docs.isNotEmpty) {
+        requestData.value = requestQuery.docs.first.data();
       } else {
         Get.snackbar(
           "Not Found",

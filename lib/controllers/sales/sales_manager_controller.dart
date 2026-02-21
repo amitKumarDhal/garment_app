@@ -278,7 +278,7 @@ Future<void> fetchManagerProfile() async {
       Get.snackbar(
         "Status Updated",
         "Order moved to: $newStatus",
-        backgroundColor: Colors.blue.withOpacity(0.1),
+        backgroundColor: Colors.blue.withValues(alpha:0.1),
         colorText: Colors.blue,
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -303,7 +303,7 @@ Future<void> fetchManagerProfile() async {
       Get.snackbar(
         "Order $newStatus",
         "Successfully updated status.",
-        backgroundColor: color.withOpacity(0.1),
+        backgroundColor: color.withValues(alpha:0.1),
         colorText: color,
       );
     } catch (e) {

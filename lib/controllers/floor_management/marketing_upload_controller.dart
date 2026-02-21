@@ -4,40 +4,52 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/order_model.dart';
 
+// ✅ Helper Class for Dynamic Items
+class OrderItemForm {
+  final productCode = TextEditingController();
+  final productDetails = TextEditingController();
+  final sizeDescription = TextEditingController();
+  final quantity = TextEditingController();
+  final orderValue = TextEditingController(); // Unit Price
+  final gstInfo = TextEditingController(); // GST %
+
+  void dispose() {
+    productCode.dispose();
+    productDetails.dispose();
+    sizeDescription.dispose();
+    quantity.dispose();
+    orderValue.dispose();
+    gstInfo.dispose();
+  }
+}
+
 class MarketingUploadController extends GetxController {
   static MarketingUploadController get instance => Get.find();
 
   final uploadFormKey = GlobalKey<FormState>();
-
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  // --- Form Field Controllers ---
+  // --- Client Info Controllers ---
   final orderNo = TextEditingController();
-  final productCode = TextEditingController();
   final clientName = TextEditingController();
   final organization = TextEditingController();
   final phone = TextEditingController();
   final address = TextEditingController();
-  final productDetails = TextEditingController();
-  final sizeDescription = TextEditingController();
-
-  // ✅ Just the Selling Price (No Standard Price)
-  final orderValue = TextEditingController();
-
-  final quantity = TextEditingController();
-  final gstInfo = TextEditingController();
   final deadline = TextEditingController();
+
+  // --- Financial Global Controllers ---
   final shippingCharge = TextEditingController();
   final advanceAmount = TextEditingController();
+
+  // ✅ DYNAMIC ITEM LIST
+  final items = <OrderItemForm>[].obs;
 
   final isLoading = false.obs;
   DateTime? _selectedDeadline;
 
-  // Edit Mode Variables
   final isEditing = false.obs;
   String? editingOrderId;
-
   final RxString selectedImagePath = ''.obs;
 
   // Observables for Financials
@@ -47,70 +59,84 @@ class MarketingUploadController extends GetxController {
   final RxDouble balanceDue = 0.0.obs;
 
   final RxString lastOrderSerial = "Fetching...".obs;
-  final RxBool isFetchingSerial = false.obs;
 
   @override
   void onInit() {
     super.onInit();
-    // Listen to inputs to trigger calculation
-    quantity.addListener(_calculateTotal);
-    orderValue.addListener(_calculateTotal);
-    gstInfo.addListener(_calculateTotal);
+    addNewItem(); // Add first item by default
     shippingCharge.addListener(_calculateTotal);
     advanceAmount.addListener(_calculateTotal);
-
-    // Call this manually in UI to avoid initial build crashes
   }
 
-  // ✅ Logic to Fetch & Increment Serial
+  // ✅ DYNAMIC ITEM MANAGEMENT
+  void addNewItem() {
+    final newItem = OrderItemForm();
+    newItem.quantity.addListener(_calculateTotal);
+    newItem.orderValue.addListener(_calculateTotal);
+    newItem.gstInfo.addListener(_calculateTotal);
+    items.add(newItem);
+  }
+
+  void removeItem(int index) {
+    if (items.length > 1) {
+      items[index].dispose();
+      items.removeAt(index);
+      _calculateTotal();
+    } else {
+      Get.snackbar("Warning", "An order must have at least one item.", backgroundColor: Colors.orange, colorText: Colors.white);
+    }
+  }
+
+  // --- Serial Logic ---
   Future<void> fetchLastOrderSerial() async {
     if (_auth.currentUser == null) return;
-
     isLoading.value = true;
     try {
-      final snapshot = await _db
-          .collection('orders')
-          .orderBy('createdAt', descending: true)
-          .limit(1)
-          .get();
-
+      final snapshot = await _db.collection('orders').orderBy('createdAt', descending: true).limit(1).get();
       if (snapshot.docs.isNotEmpty) {
-        String lastSerial =
-            snapshot.docs.first.data()['manualOrderNo'] ?? "ORD-000";
+        String lastSerial = snapshot.docs.first.data()['manualOrderNo'] ?? "ORD-000";
         lastOrderSerial.value = lastSerial;
         _generateNextSerial(lastSerial);
       } else {
-        orderNo.text = "YB001"; // Default start
+        orderNo.text = "YB001";
       }
     } catch (e) {
-      print("Error fetching serial: $e");
-      orderNo.text = "YB001"; // Fallback
+      orderNo.text = "YB001";
     } finally {
       isLoading.value = false;
     }
   }
 
-  // --- Logic to increment string (Format: YB001) ---
   void _generateNextSerial(String lastSerial) {
     try {
       final match = RegExp(r'^([A-Za-z]+)(\d+)$').firstMatch(lastSerial);
-
       if (match != null) {
-        String numberPart = match.group(2)!;
-        int nextNumber = int.parse(numberPart) + 1;
+        int nextNumber = int.parse(match.group(2)!) + 1;
         orderNo.text = "YB${nextNumber.toString().padLeft(3, '0')}";
       } else {
-        print("⚠️ Format mismatch. Resetting sequence.");
         orderNo.text = "YB001";
       }
     } catch (e) {
-      print("❌ Serial Generation Error: $e");
       orderNo.text = "YB001";
     }
   }
 
   // ✅ LOAD DATA (Edit Mode)
   void loadOrderData(OrderModel order) {
+    // 🔒 SECURITY CHECK: Prevent editing shipped, delivered, or rejected orders
+    final lockedStatuses = ['shipping', 'shipped', 'delivered', 'rejected'];
+    if (lockedStatuses.contains(order.status.toLowerCase())) {
+      Get.snackbar(
+        "Edit Locked",
+        "Orders marked as '${order.status}' cannot be modified.",
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      Get.back(); // Kick them out instantly
+      return;
+    }
+
     isEditing.value = true;
     editingOrderId = order.id;
 
@@ -119,50 +145,59 @@ class MarketingUploadController extends GetxController {
     organization.text = order.organization ?? "";
     phone.text = order.clientPhone ?? "";
     address.text = order.clientAddress ?? "";
-
-    productCode.text = order.productCode ?? "";
-    productDetails.text = order.productDetails ?? "";
-    sizeDescription.text = order.sizeDescription ?? "";
-    quantity.text = order.quantity.toString();
     shippingCharge.text = order.shippingCharge.toString();
     advanceAmount.text = order.advanceAmount.toString();
 
-    // Reverse Engineering Unit Price
-    // Price = Total / Quantity
-    double qty = order.quantity > 0 ? order.quantity.toDouble() : 1.0;
-
-    // We calculate base value before tax to show correct unit price
-    double gstMultiplier = 1 + (order.gstPercentage / 100);
-    double baseVal = (gstMultiplier > 0)
-        ? (order.totalAmount / gstMultiplier)
-        : order.totalAmount;
-
-    orderValue.text = (baseVal / qty).toStringAsFixed(2);
-    gstInfo.text = order.gstPercentage.toString();
-
     _selectedDeadline = order.deliveryDate;
     if (_selectedDeadline != null) {
-      deadline.text =
-          "${_selectedDeadline!.day} ${_getMonthName(_selectedDeadline!.month)} ${_selectedDeadline!.year}";
+      deadline.text = "${_selectedDeadline!.day} ${_getMonthName(_selectedDeadline!.month)} ${_selectedDeadline!.year}";
     }
+
+    // Load Items into Form
+    items.clear();
+    for (var prod in order.products) {
+      final itemForm = OrderItemForm();
+      itemForm.productCode.text = prod['productCode'] ?? "";
+      itemForm.productDetails.text = prod['productName'] ?? "";
+      itemForm.sizeDescription.text = prod['sizeDescription'] ?? "";
+      itemForm.quantity.text = (prod['qty'] ?? 0).toString();
+      itemForm.orderValue.text = (prod['price'] ?? 0.0).toStringAsFixed(2);
+      itemForm.gstInfo.text = (prod['gstPercentage'] ?? 0.0).toString();
+
+      itemForm.quantity.addListener(_calculateTotal);
+      itemForm.orderValue.addListener(_calculateTotal);
+      itemForm.gstInfo.addListener(_calculateTotal);
+
+      items.add(itemForm);
+    }
+
+    if (items.isEmpty) addNewItem(); // Safety fallback
     _calculateTotal();
   }
 
-  // ✅ CLEAN CALCULATION (Standard Logic Only)
+  // ✅ MASTER CALCULATION ALGORITHM
   void _calculateTotal() {
-    double qty = double.tryParse(quantity.text.trim()) ?? 0.0;
-    double unitPrice = double.tryParse(orderValue.text.trim()) ?? 0.0;
-    double gstPercent = double.tryParse(gstInfo.text.trim()) ?? 0.0;
+    double tempSubTotal = 0.0;
+    double tempTaxAmount = 0.0;
+
+    for (var item in items) {
+      double qty = double.tryParse(item.quantity.text.trim()) ?? 0.0;
+      double unitPrice = double.tryParse(item.orderValue.text.trim()) ?? 0.0;
+      double gstPercent = double.tryParse(item.gstInfo.text.trim()) ?? 0.0;
+
+      double base = qty * unitPrice;
+      double tax = base * (gstPercent / 100);
+
+      tempSubTotal += base;
+      tempTaxAmount += tax;
+    }
+
     double shipping = double.tryParse(shippingCharge.text.trim()) ?? 0.0;
     double advance = double.tryParse(advanceAmount.text.trim()) ?? 0.0;
 
-    // Simple Math: Total = Qty * Price
-    double base = qty * unitPrice;
-    double tax = base * (gstPercent / 100);
-
-    subTotal.value = base;
-    taxAmount.value = tax;
-    grandTotal.value = base + tax + shipping;
+    subTotal.value = tempSubTotal;
+    taxAmount.value = tempTaxAmount;
+    grandTotal.value = tempSubTotal + tempTaxAmount + shipping;
     balanceDue.value = grandTotal.value - advance;
   }
 
@@ -175,16 +210,12 @@ class MarketingUploadController extends GetxController {
     );
     if (pickedDate != null) {
       _selectedDeadline = pickedDate;
-      deadline.text =
-          "${pickedDate.day} ${_getMonthName(pickedDate.month)} ${pickedDate.year}";
+      deadline.text = "${pickedDate.day} ${_getMonthName(pickedDate.month)} ${pickedDate.year}";
     }
   }
 
   String _getMonthName(int month) {
-    const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     return months[month - 1];
   }
 
@@ -202,7 +233,6 @@ class MarketingUploadController extends GetxController {
 
     try {
       isLoading.value = true;
-
       final user = _auth.currentUser;
       String agentName = "Agent";
       String userId = user?.uid ?? "";
@@ -214,72 +244,79 @@ class MarketingUploadController extends GetxController {
             final data = userDoc.data()!;
             agentName = data['FullName'] ?? data['Name'] ?? user?.displayName ?? "Agent";
           }
-        } catch (e) {
-          print("Error fetching user profile: $e");
-        }
+        } catch (e) {}
       }
 
-      double finalTotal = grandTotal.value;
-      double finalBalance = balanceDue.value;
-      double finalAdvance = double.tryParse(advanceAmount.text.trim()) ?? 0.0;
+      // 1. Process List of Items
+      List<Map<String, dynamic>> productsList = [];
+      int totalQty = 0;
+      String firstProductName = "";
+      double avgGst = 0.0;
 
-      int qty = int.tryParse(quantity.text.trim()) ?? 0;
-      double price = double.tryParse(orderValue.text.trim()) ?? 0.0;
-      double shipping = double.tryParse(shippingCharge.text.trim()) ?? 0.0;
-      double gst = double.tryParse(gstInfo.text.trim()) ?? 0.0;
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        int qty = int.tryParse(item.quantity.text.trim()) ?? 0;
+        double price = double.tryParse(item.orderValue.text.trim()) ?? 0.0;
+        double gst = double.tryParse(item.gstInfo.text.trim()) ?? 0.0;
+        double itemBase = qty * price;
+        double itemTotal = itemBase + (itemBase * (gst / 100));
 
-      final singleProductMap = {
-        "productName": productDetails.text.trim(),
-        "sizeDescription": sizeDescription.text.trim(),
-        "qty": qty,
-        "price": price,
-        "total": finalTotal,
-      };
+        totalQty += qty;
+        avgGst = gst;
+        if (i == 0) firstProductName = item.productDetails.text.trim();
+
+        productsList.add({
+          "productCode": item.productCode.text.trim(),
+          "productName": item.productDetails.text.trim(),
+          "sizeDescription": item.sizeDescription.text.trim(),
+          "qty": qty,
+          "price": price,
+          "gstPercentage": gst,
+          "total": itemTotal,
+        });
+      }
+
+      String rootProductName = items.length > 1 ? "$firstProductName + ${items.length - 1} more" : firstProductName;
 
       final orderMap = {
         "clientName": clientName.text.trim(),
         "clientPhone": phone.text.trim(),
         "organization": organization.text.trim(),
         "clientAddress": address.text.trim(),
-        "productCode": productCode.text.trim(),
-        "productDetails": productDetails.text.trim(),
-        "productName": productDetails.text.trim(),
-        "sizeDescription": sizeDescription.text.trim(),
-        "quantity": qty,
+
+        // Legacy Root Fields
+        "productCode": items.first.productCode.text.trim(),
+        "productDetails": rootProductName,
+        "productName": rootProductName,
+        "quantity": totalQty,
+        "gstPercentage": avgGst,
+
         "priority": "Medium",
         "deliveryDate": Timestamp.fromDate(_selectedDeadline!),
-        "gstPercentage": gst,
-        "shippingCharge": shipping,
-
-        // ✅ Standard Total Calculation
-        "totalAmount": finalTotal,
-
-        "advanceAmount": finalAdvance,
-        "balanceDue": finalBalance,
+        "shippingCharge": double.tryParse(shippingCharge.text.trim()) ?? 0.0,
+        "totalAmount": grandTotal.value,
+        "advanceAmount": double.tryParse(advanceAmount.text.trim()) ?? 0.0,
+        "balanceDue": balanceDue.value,
         "marketingPersonName": agentName,
         "marketingPersonId": userId,
-        "products": [singleProductMap],
         "status": "Pending",
+
+        // ✅ NEW DYNAMIC ARRAY
+        "products": productsList,
       };
 
-      if (selectedImagePath.value.isNotEmpty) {
-        orderMap['localImagePath'] = selectedImagePath.value;
-      }
+      if (selectedImagePath.value.isNotEmpty) orderMap['localImagePath'] = selectedImagePath.value;
 
       if (isEditing.value && editingOrderId != null) {
         orderMap['manualOrderNo'] = orderNo.text.trim();
         await _db.collection('orders').doc(editingOrderId).update(orderMap);
         Get.snackbar("Success", "Order updated successfully!", backgroundColor: Colors.green, colorText: Colors.white);
       } else {
-        // --- NEW ORDER (Transaction Mode) ---
         await _db.runTransaction((transaction) async {
           DocumentReference counterRef = _db.collection('counters').doc('order_counter');
           DocumentSnapshot counterSnapshot = await transaction.get(counterRef);
-
           int nextSerialInt = 1;
-          if (counterSnapshot.exists) {
-            nextSerialInt = (counterSnapshot.get('current_serial') ?? 0) + 1;
-          }
+          if (counterSnapshot.exists) nextSerialInt = (counterSnapshot.get('current_serial') ?? 0) + 1;
 
           String newOrderId = "YB${nextSerialInt.toString().padLeft(3, '0')}";
           transaction.set(counterRef, {'current_serial': nextSerialInt});
@@ -291,35 +328,39 @@ class MarketingUploadController extends GetxController {
           DocumentReference newOrderRef = _db.collection('orders').doc();
           transaction.set(newOrderRef, orderMap);
         });
-
         Get.snackbar("Success", "Order saved securely!", backgroundColor: Colors.green, colorText: Colors.white);
       }
 
-      _clearForm();
+      // ✅ Renamed logic
+      clearForm();
+
     } catch (e) {
       Get.snackbar("Error", "Action failed: $e", backgroundColor: Colors.red, colorText: Colors.white);
-      print("Transaction Error: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
-  void _clearForm() {
-    for (var c in [
-      orderNo, productCode, clientName, organization, phone, address,
-      productDetails, sizeDescription, orderValue, quantity, gstInfo,
-      deadline, shippingCharge, advanceAmount,
-    ]) {
-      c.clear();
-    }
+  // ✅ Removed underscore to make it public
+  void clearForm() {
+    orderNo.clear();
+    clientName.clear();
+    organization.clear();
+    phone.clear();
+    address.clear();
+    deadline.clear();
+    shippingCharge.clear();
+    advanceAmount.clear();
+
+    items.clear();
+    addNewItem(); // Start fresh
+
     _selectedDeadline = null;
     selectedImagePath.value = '';
-
     subTotal.value = 0.0;
     taxAmount.value = 0.0;
     grandTotal.value = 0.0;
     balanceDue.value = 0.0;
-
     isEditing.value = false;
     editingOrderId = null;
 

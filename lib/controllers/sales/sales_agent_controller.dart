@@ -229,11 +229,11 @@ class SalesAgentController extends GetxController {
       await fetchAgentStats();
 
       Get.snackbar("Success", "Order updated successfully!",
-          backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green);
+          backgroundColor: Colors.green.withValues(alpha:0.1), colorText: Colors.green);
       
     } catch (e) {
       Get.snackbar("Error", "Failed to update order: $e",
-          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+          backgroundColor: Colors.red.withValues(alpha:0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }

@@ -82,12 +82,12 @@ class SalesManagerHome extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDark
-                          ? TColors.textWhite.withOpacity(0.1)
-                          : TColors.primary.withOpacity(0.1),
+                          ? TColors.textWhite.withValues(alpha:0.1)
+                          : TColors.primary.withValues(alpha:0.1),
                       border: Border.all(
                         color: isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : TColors.primary.withOpacity(0.2),
+                            ? Colors.white.withValues(alpha:0.1)
+                            : TColors.primary.withValues(alpha:0.2),
                         width: 1,
                       ),
                     ),
@@ -214,7 +214,7 @@ class SalesManagerHome extends StatelessWidget {
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.orange.withOpacity(0.3),
+                        color: Colors.orange.withValues(alpha:0.3),
                         blurRadius: 15,
                         offset: const Offset(0, 6),
                       ),
@@ -226,14 +226,14 @@ class SalesManagerHome extends StatelessWidget {
                       children: [
                         Positioned(
                           top: -15, right: -15,
-                          child: CircleAvatar(radius: 50, backgroundColor: Colors.white.withOpacity(0.05)),
+                          child: CircleAvatar(radius: 50, backgroundColor: Colors.white.withValues(alpha:0.05)),
                         ),
                         Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Colors.white.withOpacity(0.15), Colors.white.withOpacity(0.01)],
+                              colors: [Colors.white.withValues(alpha:0.15), Colors.white.withValues(alpha:0.01)],
                             ),
                           ),
                         ),
@@ -248,7 +248,7 @@ class SalesManagerHome extends StatelessWidget {
                                   Text(
                                     "Production Pipeline",
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
+                                      color: Colors.white.withValues(alpha:0.9),
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
@@ -375,7 +375,7 @@ class SalesManagerHome extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w500),
+          style: TextStyle(color: Colors.white.withValues(alpha:0.5), fontSize: 10, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -395,8 +395,8 @@ class SalesManagerHome extends StatelessWidget {
           width: 40, height: 40,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isDark ? TColors.textWhite.withOpacity(0.08) : TColors.textSecondary.withOpacity(0.12),
-            border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03), width: 0.5),
+            color: isDark ? TColors.textWhite.withValues(alpha:0.08) : TColors.textSecondary.withValues(alpha:0.12),
+            border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03), width: 0.5),
           ),
           child: Material(
             color: Colors.transparent,
@@ -421,7 +421,7 @@ class SalesManagerHome extends StatelessWidget {
                   color: Colors.red,
                   shape: BoxShape.circle,
                   border: Border.all(color: isDark ? TColors.dark : Colors.white, width: 1.5),
-                  boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 6, spreadRadius: 1)],
+                  boxShadow: [BoxShadow(color: Colors.red.withValues(alpha:0.4), blurRadius: 6, spreadRadius: 1)],
                 ),
                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Center(
@@ -447,7 +447,7 @@ class SalesManagerHome extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           if (!isDark)
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.black.withValues(alpha:0.04), blurRadius: 8, offset: const Offset(0, 4)),
         ],
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1),
       ),
@@ -493,7 +493,7 @@ class SalesManagerHome extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
+                        color: Colors.orange.withValues(alpha:0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text("NEW", style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -521,7 +521,7 @@ class SalesManagerHome extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
+                        color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.04),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.arrow_forward_rounded, size: 16, color: isDark ? Colors.white : Colors.black),
@@ -594,9 +594,9 @@ class SalesManagerHome extends StatelessWidget {
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+                if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.03), blurRadius: 8, offset: const Offset(0, 3)),
               ],
-              border: rank <= 3 ? Border.all(color: rankBorder.withOpacity(0.5), width: 1.5) : null,
+              border: rank <= 3 ? Border.all(color: rankBorder.withValues(alpha:0.5), width: 1.5) : null,
             ),
             child: Row(
               children: [
@@ -609,7 +609,7 @@ class SalesManagerHome extends StatelessWidget {
                     gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: rankGradient),
                     boxShadow: [
                       BoxShadow(
-                        color: rankGradient.last.withOpacity(0.3),
+                        color: rankGradient.last.withValues(alpha:0.3),
                         blurRadius: 6,
                         offset: const Offset(0, 3),
                       ),
@@ -625,7 +625,7 @@ class SalesManagerHome extends StatelessWidget {
                         // ✅ Shadow ensures text stands out from the gradient background
                         shadows: [
                           Shadow(
-                            color: Colors.black.withOpacity(0.25),
+                            color: Colors.black.withValues(alpha:0.25),
                             offset: const Offset(0, 1),
                             blurRadius: 2,
                           ),
@@ -646,7 +646,7 @@ class SalesManagerHome extends StatelessWidget {
                           Text(agent['name'] ?? "Unknown", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: nameColor)),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: progressColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: progressColor.withOpacity(0.2))),
+                            decoration: BoxDecoration(color: progressColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: progressColor.withValues(alpha:0.2))),
                             child: Text(percentText, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: progressColor)),
                           ),
                         ],
@@ -812,7 +812,7 @@ class SalesManagerHome extends StatelessWidget {
                         child: Text(
                           months[index],
                           style: TextStyle(
-                            color: isFuture ? Colors.grey.withOpacity(0.5) : isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            color: isFuture ? Colors.grey.withValues(alpha:0.5) : isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                           ),
                         ),

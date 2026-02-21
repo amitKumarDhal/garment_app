@@ -52,7 +52,7 @@ class TColors {
   // Helper for adaptive borders/dividers
   static Color getBorderColor(BuildContext context) {
     return Theme.of(context).brightness == Brightness.dark
-        ? Colors.white.withOpacity(0.05)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha:0.05)
+        : Colors.black.withValues(alpha:0.05);
   }
 }

@@ -41,50 +41,41 @@ class LoginController extends GetxController {
 
     try {
       isLoading.value = true;
-
-      // 1. Authenticate with Firebase
-      // ⚡ This triggers the AuthenticationRepository stream listener!
       UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
-            email: email.text.trim(),
-            password: password.text.trim(),
-          );
+          .signInWithEmailAndPassword(email: email.text.trim(), password: password.text.trim());
 
-      // 2. Fetch Data for "Dropdown vs Database" Validation
-      // We do this check to prevent users from logging in as the wrong role type
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('id_requests')
-          .doc(userCredential.user!.uid)
-          .get();
+      Map<String, dynamic>? userData;
 
+      // Check 'users' first
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).get();
       if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>;
-        
-        // Normalize Data
-        final String dbRole = (userData['role'] ?? 'Worker').toString().trim();
+        userData = userDoc.data() as Map<String, dynamic>;
+      } else {
+        // Fallback to 'id_requests'
+        DocumentSnapshot requestDoc = await FirebaseFirestore.instance.collection('id_requests').doc(userCredential.user!.uid).get();
+        if (requestDoc.exists) userData = requestDoc.data() as Map<String, dynamic>;
+      }
+
+      if (userData != null) {
+        final String dbRole = (userData['role'] ?? userData['Role'] ?? 'Worker').toString().trim();
         final String selectedDropdownRole = selectedRole.value.trim();
 
-        // --- 🛑 SECURITY CHECK: BLOCK MISMATCHED ROLES ---
-        bool isRoleMismatch = dbRole != selectedDropdownRole;
+        bool isRoleMismatch = dbRole.toLowerCase() != selectedDropdownRole.toLowerCase();
 
-        // ✅ EXCEPTION: Allow "Sales Agent" (DB) -> "Sales Associate" (App)
-        if (dbRole == 'Sales Agent' && selectedDropdownRole == 'Sales Associate') {
-          isRoleMismatch = false; 
+        if (dbRole.toLowerCase() == 'sales agent' && selectedDropdownRole.toLowerCase() == 'sales associate') {
+          isRoleMismatch = false;
         }
 
         if (isRoleMismatch) {
-          // ⛔ Mismatch detected: Kick them out immediately
-          await FirebaseAuth.instance.signOut(); 
+          await FirebaseAuth.instance.signOut();
           _showError("Access Denied!\nYou are registered as a '$dbRole', but selected '$selectedDropdownRole'.");
           return;
         }
+      } else {
+        await FirebaseAuth.instance.signOut();
+        _showError("Access Denied!\nNo profile found in the system.");
+        return;
       }
-      
-      // 3. SUCCESS!
-      // We do NOT redirect here. 
-      // The AuthenticationRepository has detected the login and is currently fetching the role
-      // to redirect the user securely. We just stop the loading spinner.
-      
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? "Login failed");
     } catch (e) {
@@ -93,7 +84,6 @@ class LoginController extends GetxController {
       isLoading.value = false;
     }
   }
-
   void _showError(String message) {
     Get.snackbar(
       "Access Denied",

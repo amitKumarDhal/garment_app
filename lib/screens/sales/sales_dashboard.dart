@@ -103,12 +103,12 @@ class SalesDashboard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDark
-                          ? TColors.textWhite.withOpacity(0.1)
-                          : TColors.primary.withOpacity(0.1),
+                          ? TColors.textWhite.withValues(alpha:0.1)
+                          : TColors.primary.withValues(alpha:0.1),
                       border: Border.all(
                         color: isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : TColors.primary.withOpacity(0.2),
+                            ? Colors.white.withValues(alpha:0.1)
+                            : TColors.primary.withValues(alpha:0.2),
                         width: 1,
                       ),
                     ),
@@ -168,7 +168,7 @@ class SalesDashboard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: (iconColor ?? TColors.primary).withOpacity(0.15),
+              color: (iconColor ?? TColors.primary).withValues(alpha:0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 16, color: iconColor ?? TColors.primary),
@@ -222,7 +222,7 @@ class SalesDashboard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20), // ✅ Tighter radius
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF3949AB).withOpacity(0.4),
+              color: const Color(0xFF3949AB).withValues(alpha:0.4),
               blurRadius: 15,
               offset: const Offset(0, 6),
             ),
@@ -240,7 +240,7 @@ class SalesDashboard extends StatelessWidget {
                   CircularProgressIndicator(
                     value: 1.0,
                     strokeWidth: 6, // ✅ Thinner stroke
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.1)),
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha:0.1)),
                   ),
                   CircularProgressIndicator(
                     value: percentage,
@@ -271,7 +271,7 @@ class SalesDashboard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha:0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
@@ -298,7 +298,7 @@ class SalesDashboard extends StatelessWidget {
                   Container(
                     height: 1,
                     width: double.infinity,
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha:0.2),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -308,7 +308,7 @@ class SalesDashboard extends StatelessWidget {
                       Text(
                         "Target: ₹${formatCurrency.format(target)}",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha:0.9),
                           fontSize: 12, // ✅ Smaller target text
                           fontWeight: FontWeight.w600,
                         ),
@@ -344,7 +344,7 @@ class SalesDashboard extends StatelessWidget {
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+              color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03),
             ),
           ),
           child: Column(
@@ -415,12 +415,12 @@ class SalesDashboard extends StatelessWidget {
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: rank <= 3
-                  ? Border.all(color: rankBorder.withOpacity(0.5), width: 1.5)
-                  : Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03)),
+                  ? Border.all(color: rankBorder.withValues(alpha:0.5), width: 1.5)
+                  : Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha:0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -440,7 +440,7 @@ class SalesDashboard extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: rankGradient.last.withOpacity(0.3),
+                        color: rankGradient.last.withValues(alpha:0.3),
                         blurRadius: 6,
                         offset: const Offset(0, 3),
                       ),
@@ -455,7 +455,7 @@ class SalesDashboard extends StatelessWidget {
                         color: textColor,
                         shadows: [
                           Shadow(
-                            color: Colors.black.withOpacity(0.25),
+                            color: Colors.black.withValues(alpha:0.25),
                             offset: const Offset(0, 1),
                             blurRadius: 2,
                           ),
@@ -484,9 +484,9 @@ class SalesDashboard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: progressColor.withOpacity(0.1),
+                              color: progressColor.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: progressColor.withOpacity(0.2)),
+                              border: Border.all(color: progressColor.withValues(alpha:0.2)),
                             ),
                             child: Text(
                               "${(progress * 100).toStringAsFixed(0)}%",
@@ -605,12 +605,12 @@ class SalesDashboard extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: themeColor.withOpacity(isDark ? 0.3 : 0.1),
+          color: themeColor.withValues(alpha:isDark ? 0.3 : 0.1),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: themeColor.withOpacity(isDark ? 0.1 : 0.08),
+            color: themeColor.withValues(alpha:isDark ? 0.1 : 0.08),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -630,7 +630,7 @@ class SalesDashboard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: themeColor.withOpacity(0.15),
+                  color: themeColor.withValues(alpha:0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: themeColor, size: 20),
@@ -663,9 +663,9 @@ class SalesDashboard extends StatelessWidget {
           height: 40,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isDark ? TColors.textWhite.withOpacity(0.08) : TColors.textSecondary.withOpacity(0.12),
+            color: isDark ? TColors.textWhite.withValues(alpha:0.08) : TColors.textSecondary.withValues(alpha:0.12),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+              color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03),
               width: 0.5,
             ),
           ),

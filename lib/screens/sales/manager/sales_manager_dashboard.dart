@@ -61,7 +61,7 @@ class SalesManagerDashboard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.08),
+              color: isDark ? Colors.black.withValues(alpha:0.4) : Colors.black.withValues(alpha:0.08),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -87,7 +87,6 @@ class SalesManagerDashboard extends StatelessWidget {
                     _buildNavItem(0, Icons.dashboard_rounded, "Overview", isDark, controller),
                     _buildNavItem(1, Icons.add_circle_rounded, "New", isDark, controller),
                     _buildNavItem(2, Icons.receipt_long_rounded, "Orders", isDark, controller),
-                    // Index 3 acts purely as a redirect button
                     _buildNavItem(3, Icons.swap_horiz_rounded, "Sales View", isDark, controller),
                   ],
                 ),
@@ -101,18 +100,13 @@ class SalesManagerDashboard extends StatelessWidget {
 
   // --- ANIMATED NAV ITEM ---
   Widget _buildNavItem(int index, IconData icon, String label, bool isDark, SalesManagerNavController controller) {
-    // Note: Index 3 will never actually be 'selected' because it redirects
     final isSelected = controller.selectedIndex.value == index;
 
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact(); // Premium tactile feel on tap
 
-        // ✅ CUSTOM NAVIGATION LOGIC MAINTAINED
-        if (index == 3) {
-          Get.to(() => const SalesDashboard());
-          return;
-        }
+        // ✅ FIXED: Now it acts as a normal tab instead of pushing a new screen
         controller.selectedIndex.value = index;
       },
       // Container animates its width/padding when selected
@@ -120,13 +114,12 @@ class SalesManagerDashboard extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutQuint,
         padding: EdgeInsets.symmetric(
-          // ✅ INCREASED PADDING: More horizontal breathing room since there are only 4 items now
           horizontal: isSelected ? 16 : 12,
           vertical: 10,
         ),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isDark ? Colors.white10 : TColors.primary.withOpacity(0.1))
+              ? (isDark ? Colors.white10 : TColors.primary.withValues(alpha:0.1))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -193,12 +186,13 @@ class SalesManagerNavController extends GetxController {
   final RxInt selectedIndex = 0.obs;
   DateTime? lastBackPressTime;
 
-  // ✅ REMOVED PROFILE SCREEN FROM CONTROLLER ARRAY
   final screens = [
     const SalesManagerHome(), // Index 0
     const MarketingUploadScreen(), // Index 1
     const SalesOrderHistoryScreen(), // Index 2
-    const SizedBox(), // Index 3 (Placeholder for Agent View)
+
+    // ✅ FIXED: Replaced the SizedBox placeholder with the actual SalesDashboard widget
+    const SalesDashboard(), // Index 3
   ];
 
   void handleBackPress() {

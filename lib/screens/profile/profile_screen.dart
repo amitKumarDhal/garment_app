@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth/profile_controller.dart';
-import '../../utils/constants/colors.dart';
-import '../../utils/constants/sizes.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -114,7 +112,7 @@ class ProfileScreen extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04),
+        color: isDark ? Colors.white.withValues(alpha:0.08) : Colors.black.withValues(alpha:0.04),
       ),
       child: IconButton(
         icon: Icon(icon, size: 20, color: isDark ? Colors.white : Colors.black87),
@@ -136,7 +134,7 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6A1B9A).withOpacity(0.25),
+            color: const Color(0xFF6A1B9A).withValues(alpha:0.25),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -183,7 +181,7 @@ class ProfileScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha:0.2),
                             borderRadius: BorderRadius.circular(6)
                         ),
                         child: Obx(() => Text(
@@ -201,7 +199,7 @@ class ProfileScreen extends StatelessWidget {
                         "E-ID: ${controller.employeeId.value}",
                         style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha:0.7),
                             fontWeight: FontWeight.w600
                         ),
                       )),
@@ -218,7 +216,7 @@ class ProfileScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha:0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 24),
@@ -247,8 +245,8 @@ class ProfileScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03)),
-          boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
+          boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(
           children: [
@@ -275,13 +273,13 @@ class ProfileScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.purple.withOpacity(0.2)),
+        border: Border.all(color: Colors.purple.withValues(alpha:0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: Colors.purple.withValues(alpha:0.1), borderRadius: BorderRadius.circular(12)),
             child: const Icon(Icons.access_time_filled_rounded, color: Colors.purple),
           ),
           const SizedBox(width: 16),
@@ -323,7 +321,7 @@ class ProfileScreen extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: isDark ? Colors.white : Colors.black87, size: 22),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
@@ -344,7 +342,7 @@ class ProfileScreen extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
           child: Icon(Icons.dark_mode_rounded, color: isDark ? Colors.amber : Colors.indigo, size: 22),
         ),
         title: const Text("Dark Mode", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
@@ -377,7 +375,7 @@ class ProfileScreen extends StatelessWidget {
         },
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 18),
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha:0.1),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
         child: const Text("Log Out", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 16)),

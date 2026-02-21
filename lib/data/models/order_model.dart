@@ -6,41 +6,40 @@ class OrderModel {
   final String clientName;
   final String? clientPhone;
   final String? organization;
-
-  // ✅ 1. ADDED: New Fields for Sorting & filtering
+  final String? clientAddress;
   final DateTime? createdAt;
-  final DateTime? updatedAt; // <--- ✅ ADDED THIS TO TRACK EDITS
+  final DateTime? updatedAt;
   final String? marketingPersonId;
 
-  // ✅ ADDED: Address Field
-  final String? clientAddress;
-
-  // Single Product Fields (Keep these for backward compatibility)
+  // Single Product Fields (Maintained for Legacy backward compatibility)
   final String? productCode;
   final String productName;
   final String? productDetails;
-
   final int quantity;
   final String priority;
   final DateTime orderDate;
   final DateTime deliveryDate;
   final String marketingPersonName;
   final String status;
-
   final String? sizeDescription;
-
   final double totalAmount;
   final double gstPercentage;
 
-  // ✅ ADDED: Financial Fields
+  // Financial Fields
   final double shippingCharge;
   final double advanceAmount;
   final double balanceDue;
 
+  // Image Paths
   final String? imageUrl;
+  final String? localImagePath;
 
-  // The List of Products (Required for the new UI)
+  // ✅ THE DYNAMIC MULTI-ITEM LIST
   final List<Map<String, dynamic>> products;
+
+  // ✅ NEW INTERNAL MARGIN FIELDS
+  final int marginNumber;
+  final double effectiveRevenue;
 
   OrderModel({
     this.id,
@@ -61,35 +60,31 @@ class OrderModel {
     required this.totalAmount,
     this.gstPercentage = 0.0,
     this.sizeDescription,
-
     this.createdAt,
-    this.updatedAt, // <--- ✅ ADDED TO CONSTRUCTOR
+    this.updatedAt,
     this.marketingPersonId,
-
     this.shippingCharge = 0.0,
     this.advanceAmount = 0.0,
     this.balanceDue = 0.0,
-
     this.imageUrl,
+    this.localImagePath,
     this.products = const [],
+    this.marginNumber = 0, // Default to 0
+    this.effectiveRevenue = 0.0, // Default to 0.0
   });
 
-  /// --- Convert Model to JSON Map for Firestore Storage ---
   Map<String, dynamic> toJson() {
     return {
       "manualOrderNo": manualOrderNo,
       "clientName": clientName,
       "clientPhone": clientPhone,
       "organization": organization,
-
-      // ✅ Save Address
       "clientAddress": clientAddress,
-
-      // ✅ Save to Firestore
       "createdAt": createdAt ?? FieldValue.serverTimestamp(),
-      "updatedAt": updatedAt, // <--- ✅ SAVE THIS (Controller handles value)
+      "updatedAt": updatedAt,
       "marketingPersonId": marketingPersonId,
 
+      // Root legacy fields
       "productCode": productCode,
       "productName": productName,
       "productDetails": productDetails,
@@ -101,49 +96,47 @@ class OrderModel {
       "status": status,
       "totalAmount": totalAmount,
       "gstPercentage": gstPercentage,
-
       "sizeDescription": sizeDescription,
 
-      // ✅ Save Financials
       "shippingCharge": shippingCharge,
       "advanceAmount": advanceAmount,
       "balanceDue": balanceDue,
-
       "imageUrl": imageUrl,
+      "localImagePath": localImagePath,
+
+      // Save the dynamic array
       "products": products,
+
+      // ✅ SAVE MARGIN DATA
+      "marginNumber": marginNumber,
+      "effectiveRevenue": effectiveRevenue,
     };
   }
 
-  /// --- Create Model from Firestore Document Snapshot ---
-  factory OrderModel.fromSnapshot(
-    DocumentSnapshot<Map<String, dynamic>> document,
-  ) {
+  factory OrderModel.fromSnapshot(DocumentSnapshot<Map<String, dynamic>> document) {
     final data = document.data();
+    if (data == null) throw Exception("Document ${document.id} is empty!");
 
-    if (data == null) {
-      throw Exception("Document ${document.id} is empty!");
-    }
-
-    // SMART PARSING: Handle both Old (Single) and New (List) Data
+    // SMART PARSING
     List<Map<String, dynamic>> parsedProducts = [];
-
-    // Safe integers and doubles for calculation
     int qty = _parseInt(data['quantity']);
     double total = _parseDouble(data['totalAmount']);
 
-    if (data['products'] is List) {
-      parsedProducts = List<Map<String, dynamic>>.from(data['products']);
+    if (data['products'] != null && data['products'] is List && (data['products'] as List).isNotEmpty) {
+      // Ultra-safe mapping prevents Map<dynamic, dynamic> cast crashes
+      parsedProducts = (data['products'] as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
     } else {
-      // ✅ FIXED LOGIC HERE:
-      // If converting old data, calculate Unit Price correctly.
-      // Old way: Price = Total. (Wrong if Qty > 1)
-      // New way: Price = Total / Qty.
+      // Legacy conversion
       double unitPrice = (qty > 0) ? (total / qty) : 0.0;
-
       parsedProducts.add({
+        'productCode': data['productCode'] ?? '',
         'productName': data['productName'] ?? '',
+        'sizeDescription': data['sizeDescription'] ?? '',
         'qty': qty,
-        'price': unitPrice, // <--- Corrected
+        'price': unitPrice,
+        'gstPercentage': _parseDouble(data['gstPercentage']),
         'total': total,
       });
     }
@@ -154,66 +147,44 @@ class OrderModel {
       clientName: data['clientName'] ?? 'Unknown Client',
       clientPhone: data['clientPhone'] ?? '',
       organization: data['organization'] ?? '',
-
-      // ✅ Parse Address
       clientAddress: data['clientAddress'] ?? '',
-
       productCode: data['productCode'] ?? '',
       productName: data['productName'] ?? '',
       productDetails: data['productDetails'] ?? '',
-
       quantity: qty,
       priority: data['priority'] ?? 'Medium',
-
-      // ✅ Read from Firestore (Nullable timestamps)
       createdAt: _parseTimestampNullable(data['createdAt']),
-      updatedAt: _parseTimestampNullable(
-        data['updatedAt'],
-      ), // <--- ✅ PARSE THIS
-
+      updatedAt: _parseTimestampNullable(data['updatedAt']),
       marketingPersonId: data['marketingPersonId'],
-
-      // ✅ Required Dates (Non-nullable, fallback to now())
       orderDate: _parseTimestamp(data['orderDate']),
       deliveryDate: _parseTimestamp(data['deliveryDate']),
-
       marketingPersonName: data['marketingPersonName'] ?? 'Unknown Agent',
       status: data['status'] ?? 'Pending',
-
       totalAmount: total,
       gstPercentage: _parseDouble(data['gstPercentage']),
-
       sizeDescription: data['sizeDescription'] ?? '',
-
-      // ✅ Parse Financials Safely
       shippingCharge: _parseDouble(data['shippingCharge']),
       advanceAmount: _parseDouble(data['advanceAmount']),
       balanceDue: _parseDouble(data['balanceDue']),
-
       imageUrl: data['imageUrl'] ?? '',
+      localImagePath: data['localImagePath'] ?? '',
       products: parsedProducts,
+
+      // ✅ FETCH MARGIN DATA SAFELY
+      marginNumber: _parseInt(data['marginNumber']),
+      effectiveRevenue: _parseDouble(data['effectiveRevenue']),
     );
   }
 
-  /// --- HELPER FUNCTIONS ---
-
-  // 1. For REQUIRED Dates (Never returns null)
   static DateTime _parseTimestamp(dynamic value) {
-    if (value is Timestamp) {
-      return value.toDate();
-    } else if (value is String) {
-      return DateTime.tryParse(value) ?? DateTime.now();
-    }
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
     return DateTime.now();
   }
 
-  // 2. ✅ For OPTIONAL Dates (Can return null)
   static DateTime? _parseTimestampNullable(dynamic value) {
-    if (value is Timestamp) {
-      return value.toDate();
-    } else if (value is String) {
-      return DateTime.tryParse(value);
-    }
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
     return null;
   }
 

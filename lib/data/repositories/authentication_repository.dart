@@ -30,50 +30,52 @@ class AuthenticationRepository extends GetxController {
   /// 🔄 CENTRAL NAVIGATION LOGIC
   /// ❌ No GetStorage: Always fetches from Database for maximum security.
   Future<void> _setInitialScreen(User? user) async {
-    // 1. Logged Out? -> Login Screen
     if (user == null) {
       Get.offAllNamed(AppRouteNames.login);
       return;
     }
 
     try {
-      print("⏳ Auth Repo: Verifying user permissions from Database...");
-      
-      // 2. Always fetch fresh data from Firestore
-      DocumentSnapshot doc = await _db.collection('id_requests').doc(user.uid).get();
+      // 1. Check 'users' collection first (Approved users)
+      DocumentSnapshot userDoc = await _db.collection('users').doc(user.uid).get();
 
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        String role = data['role'] ?? "Worker";
-        String status = data['status'] ?? "Pending";
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        String role = (data['role'] ?? data['Role'] ?? "Worker").toString();
+        String status = (data['status'] ?? data['Status'] ?? "Pending").toString();
 
-        // 🛑 SECURITY CHECK: Kick out Pending/Rejected users instantly
-        if (status == 'Pending' || status == 'Rejected') {
-          print("⛔ Access Revoked: Status is $status");
+        if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'rejected') {
           await _auth.signOut();
           Get.offAll(() => const StatusCheckScreen());
           return;
         }
-
-        // ✅ VALID USER: Redirect based on DB Role
-        print("✅ Access Granted: User is $role");
         _navigateToDashboard(role);
+        return;
+      }
 
+      // 2. Fallback check in 'id_requests'
+      DocumentSnapshot requestDoc = await _db.collection('id_requests').doc(user.uid).get();
+
+      if (requestDoc.exists) {
+        final data = requestDoc.data() as Map<String, dynamic>;
+        String role = (data['role'] ?? data['Role'] ?? "Worker").toString();
+        String status = (data['status'] ?? data['Status'] ?? "Pending").toString();
+
+        if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'rejected') {
+          await _auth.signOut();
+          Get.offAll(() => const StatusCheckScreen());
+          return;
+        }
+        _navigateToDashboard(role);
       } else {
-        // User exists in Auth but has no Profile in Database
-        print("❌ Error: No user profile found.");
         await _auth.signOut();
         Get.offAllNamed(AppRouteNames.login);
       }
     } catch (e) {
-      print("🔥 Auth Error: $e");
-      // Safety: Stay on Login if verification fails (e.g., no internet)
-      Get.snackbar("Connection Error", "Could not verify account permissions.");
       await _auth.signOut();
       Get.offAllNamed(AppRouteNames.login);
     }
   }
-
   // ... imports ...
 
   // Helper to handle routing

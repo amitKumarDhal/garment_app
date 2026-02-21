@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../utils/constants/colors.dart';
 import '../../controllers/floor_management/marketing_controller.dart';
@@ -13,82 +15,108 @@ class AgentDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<MarketingController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
 
-    // ✅ DYNAMIC: Sync the filtered list with the agent's actual list of orders/clients
-    // Note: 'clients' in our dynamic map is actually the list of Order objects
+    // Sync the filtered list with the agent's actual list of orders
     controller.initClients(agent['clients'] ?? []);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+
+      // ✅ 1. SLEEK TRANSPARENT APP BAR
       appBar: AppBar(
-        title: const Text("Agent Portfolio"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
-        backgroundColor: TColors.marketing,
-        foregroundColor: Colors.white,
+        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
+        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        title: Text(
+          "Agent Portfolio",
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: isDark ? Colors.white : Colors.black87,
+            letterSpacing: -0.5,
+          ),
+        ),
       ),
       body: Column(
         children: [
-          // --- STATS HEADER ---
+          // --- 2. EXECUTIVE PROFILE HEADER ---
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: TColors.marketing.withValues(alpha:0.3), width: 1.5),
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+                    color: TColors.marketing.withValues(alpha:0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
               ],
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: TColors.marketing.withValues(alpha: 0.1),
-                  child: Text(
-                    _getInitials(agent['name'] ?? "??"),
-                    style: const TextStyle(
-                      color: TColors.marketing,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
+                // Profile Avatar
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: TColors.marketing.withValues(alpha:0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: TColors.marketing.withValues(alpha:0.5), width: 2),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _getInitials(agent['name'] ?? "??"),
+                      style: const TextStyle(
+                        color: TColors.marketing,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 20),
+
+                // Agent Info & Stats
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         agent['name'] ?? "Unknown Agent",
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : Colors.black87,
+                          letterSpacing: -0.5,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+
+                      // Data Row
                       Row(
                         children: [
-                          _buildMetricBox(
-                            "REVENUE",
-                            agent['revenue'] ?? "₹0",
-                            isDark,
+                          Expanded(
+                            flex: 4,
+                            child: _buildMetricBox("REVENUE", agent['revenue'] ?? "₹0", isDark, isHighlight: true),
                           ),
                           const SizedBox(width: 8),
-                          // ✅ DYNAMIC: Show Unique Clients count from our Aggregator
-                          _buildMetricBox(
-                            "CLIENTS",
-                            "${agent['uniqueClientsCount'] ?? 0}",
-                            isDark,
+                          Expanded(
+                            flex: 3,
+                            child: _buildMetricBox("CLIENTS", "${agent['uniqueClientsCount'] ?? 0}", isDark),
                           ),
                           const SizedBox(width: 8),
-                          _buildMetricBox(
-                            "ORDERS",
-                            "${agent['orders'] ?? 0}",
-                            isDark,
+                          Expanded(
+                            flex: 3,
+                            child: _buildMetricBox("ORDERS", "${agent['orders'] ?? 0}", isDark),
                           ),
                         ],
                       ),
@@ -99,111 +127,166 @@ class AgentDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // Search Section
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          // --- 3. PREMIUM SEARCH BAR ---
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
+            ),
             child: TextField(
-              onChanged: (value) =>
-                  controller.searchClient(agent['clients'] ?? [], value),
+              onChanged: (value) => controller.searchClient(agent['clients'] ?? [], value),
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
               decoration: InputDecoration(
                 hintText: "Search Client or Organization...",
-                prefixIcon: const Icon(Icons.search, color: TColors.marketing),
-                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded, color: TColors.marketing, size: 20),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
           ),
 
-          // Result Indicator
-          Obx(
-            () => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Showing ${controller.filteredClients.length} Recent Transactions",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold,
-                  ),
+          // Meta Text
+          Obx(() => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "TRANSACTION HISTORY (${controller.filteredClients.length})",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
                 ),
               ),
             ),
-          ),
+          )),
 
-          // --- DYNAMIC CLIENT/ORDER LIST ---
+          // --- 4. FLOATING TRANSACTION LEDGER ---
           Expanded(
             child: Obx(() {
               if (controller.filteredClients.isEmpty) {
-                return const Center(
-                  child: Text("No data available for this agent."),
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.receipt_long_rounded, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 16),
+                      Text("No transactions found.", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 );
               }
 
               return ListView.separated(
                 physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(left: 20, right: 20, bottom: 40, top: 8),
                 itemCount: controller.filteredClients.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final order = controller.filteredClients[index];
+                  final status = order['status'] ?? "Pending";
+                  final statusColor = _getStatusColor(status);
 
-                  return ListTile(
-                    leading: Icon(
-                      _getStatusIcon(order['status'] ?? ""),
-                      color: _getStatusColor(order['status'] ?? ""),
-                    ),
-                    title: Text(
-                      order['clientName'] ?? "Unknown Client",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(order['organization'] ?? "No Organization"),
-                        Text(
-                          "Total: ₹${order['totalAmount']?.toStringAsFixed(0) ?? '0'}",
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 14,
-                          color: TColors.marketing,
-                        ),
-                        const SizedBox(width: 12),
-                        GestureDetector(
-                          onTap: () =>
-                              _makePhoneCall(order['clientPhone'] ?? ""),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Get.to(() => ClientDetailScreen(client: order));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
+                        boxShadow: [
+                          if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          // Left Status Indicator Strip
+                          Container(
+                            width: 4,
+                            height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.phone,
-                              color: Colors.green,
-                              size: 18,
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 16),
+
+                          // Order Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  order['clientName'] ?? "Unknown Client",
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: isDark ? Colors.white : Colors.black87),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.business_rounded, size: 12, color: Colors.grey.shade500),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        order['organization'] ?? "No Organization",
+                                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Financials & Actions
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "₹${formatCurrency.format(order['totalAmount'] ?? 0)}",
+                                style: const TextStyle(fontSize: 15, color: Colors.green, fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(color: statusColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(6)),
+                                    child: Text(
+                                      status.toUpperCase(),
+                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor, letterSpacing: 0.5),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      _makePhoneCall(order['clientPhone'] ?? "");
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(color: Colors.blue.withValues(alpha:0.1), shape: BoxShape.circle),
+                                      child: const Icon(Icons.phone_rounded, color: Colors.blue, size: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    onTap: () =>
-                        Get.to(() => ClientDetailScreen(client: order)),
                   );
                 },
               );
@@ -214,21 +297,16 @@ class AgentDetailScreen extends StatelessWidget {
     );
   }
 
-  // ✅ ADD THIS METHOD AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
+  // ===================== HELPERS =====================
+
   String _getInitials(String name) {
     if (name.isEmpty) return "??";
     List<String> names = name.trim().split(" ");
     if (names.length > 1) {
-      // Takes the first letter of the first and last name
       return (names[0][0] + names[names.length - 1][0]).toUpperCase();
     }
-    // If only one name, take the first two letters
-    return name.length >= 2
-        ? name.substring(0, 2).toUpperCase()
-        : name[0].toUpperCase();
+    return name.length >= 2 ? name.substring(0, 2).toUpperCase() : name[0].toUpperCase();
   }
-
-  // ✅ ADD THIS METHOD AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
@@ -236,75 +314,42 @@ class AgentDetailScreen extends StatelessWidget {
       if (await canLaunchUrl(launchUri)) {
         await launchUrl(launchUri);
       } else {
-        Get.snackbar(
-          "Error",
-          "Could not open dialer for $phoneNumber",
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.withValues(alpha: 0.1),
-          colorText: Colors.red,
-        );
+        Get.snackbar("Error", "Could not open dialer for $phoneNumber", snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
       }
     } catch (e) {
-      Get.snackbar("Error", "An unexpected error occurred: $e");
+      Get.snackbar("Error", "An unexpected error occurred: $e", snackPosition: SnackPosition.BOTTOM);
     }
   }
 
-  // ✅ ADD THIS METHOD AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
-  Widget _buildMetricBox(
-    String label,
-    String value,
-    bool isDark, {
-    Color? color,
-  }) {
+  Widget _buildMetricBox(String label, String value, bool isDark, {bool isHighlight = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? Colors.black26 : Colors.grey[100],
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+        color: isHighlight ? TColors.marketing.withValues(alpha:0.1) : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isHighlight ? TColors.marketing.withValues(alpha:0.2) : (isDark ? Colors.white10 : Colors.grey.shade200)),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: isHighlight ? TColors.marketing.withValues(alpha:0.8) : Colors.grey.shade500, letterSpacing: 0.5),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: color ?? TColors.marketing,
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isHighlight ? TColors.marketing : (isDark ? Colors.white : Colors.black87)),
             ),
           ),
         ],
       ),
     );
-  }
-
-  // ✅ ADD THESE METHODS AT THE BOTTOM OF YOUR AgentDetailScreen CLASS
-
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case "delivered":
-      case "approved":
-        return Icons.check_circle;
-      case "processing":
-      case "pending":
-        return Icons.sync;
-      case "cancelled":
-      case "rejected":
-        return Icons.cancel;
-      case "dispatched":
-        return Icons.local_shipping;
-      default:
-        return Icons.info;
-    }
   }
 
   Color _getStatusColor(String status) {
@@ -314,17 +359,16 @@ class AgentDetailScreen extends StatelessWidget {
         return Colors.green;
       case "processing":
       case "pending":
+      case "placed":
         return Colors.orange;
       case "cancelled":
       case "rejected":
-        return Colors.red;
+        return Colors.redAccent;
       case "dispatched":
+      case "shipping":
         return Colors.blue;
       default:
         return Colors.grey;
     }
   }
-
-  // Helper UI methods (Keep your existing _buildMetricBox, _getInitials, _makePhoneCall, etc.)
-  // ...
 }

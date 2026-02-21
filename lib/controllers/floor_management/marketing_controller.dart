@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart'; // ✅ Added for premium Indian Rupee formatting
 import '../../data/models/order_model.dart';
 
 class MarketingController extends GetxController {
@@ -8,10 +9,7 @@ class MarketingController extends GetxController {
   // --- Observables ---
   var allAgents = <Map<String, dynamic>>[].obs;
   var filteredAgents = <Map<String, dynamic>>[].obs;
-
-  // ✅ ADD THIS LINE: It was missing and causing the "undefined" error
   var filteredClients = <Map<String, dynamic>>[].obs;
-
   var isLoading = true.obs;
 
   @override
@@ -35,12 +33,8 @@ class MarketingController extends GetxController {
       String lowerQuery = query.toLowerCase();
       filteredClients.assignAll(
         clients.where((c) {
-          final name = (c['clientName'] ?? c['name'] ?? "")
-              .toString()
-              .toLowerCase();
-          final org = (c['organization'] ?? c['org'] ?? "")
-              .toString()
-              .toLowerCase();
+          final name = (c['clientName'] ?? c['name'] ?? "").toString().toLowerCase();
+          final org = (c['organization'] ?? c['org'] ?? "").toString().toLowerCase();
           return name.contains(lowerQuery) || org.contains(lowerQuery);
         }).toList(),
       );
@@ -50,11 +44,16 @@ class MarketingController extends GetxController {
   // --- 3. The Real-Time Aggregator ---
   void fetchDynamicAgentStats() {
     isLoading.value = true;
+    final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
+
+    // ✅ Match the valid statuses from the SalesAgentController so numbers align perfectly
+    final List<String> validRevenueStatuses = [
+      'approved', 'cutting', 'stitching', 'printing',
+      'packing', 'shipping', 'delivered', 'completed'
+    ];
 
     _db.collection('orders').snapshots().listen((snapshot) {
-      final allOrders = snapshot.docs
-          .map((doc) => OrderModel.fromSnapshot(doc))
-          .toList();
+      final allOrders = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
 
       Map<String, Map<String, dynamic>> agentMap = {};
 
@@ -64,9 +63,7 @@ class MarketingController extends GetxController {
         if (!agentMap.containsKey(agentName)) {
           agentMap[agentName] = {
             "name": agentName,
-            "avatar": agentName.length >= 2
-                ? agentName.substring(0, 2).toUpperCase()
-                : "A",
+            "avatar": agentName.length >= 2 ? agentName.substring(0, 2).toUpperCase() : "A",
             "revenue": 0.0,
             "orders": 0,
             "clients": <Map<String, dynamic>>[],
@@ -79,28 +76,28 @@ class MarketingController extends GetxController {
         agent["uniqueClientNames"].add(order.clientName.toLowerCase().trim());
         agent["orders"] += 1;
 
-        if (order.status.toLowerCase() == 'approved') {
+        // ✅ Count revenue across ALL active production stages
+        if (validRevenueStatuses.contains(order.status.toLowerCase())) {
           agent["revenue"] += order.totalAmount;
         }
       }
 
-      // ✅ Syntax Fixed here (removed extra comma/parameter in .map)
-      final List<Map<String, dynamic>> dynamicList = agentMap.values.map((
-        agent,
-      ) {
-        double rev = agent["revenue"];
+      final List<Map<String, dynamic>> dynamicList = agentMap.values.map((agent) {
+        double rawRev = agent["revenue"];
 
         return {
           "name": agent["name"],
           "avatar": agent["avatar"],
-          "revenue": "₹${(rev / 100000).toStringAsFixed(1)}L",
+          "rawRevenue": rawRev, // ✅ Keep raw number strictly for accurate mathematical sorting
+          "revenue": "₹${formatCurrency.format(rawRev)}", // ✅ Format to ₹1,50,000 for the UI
           "orders": agent["orders"],
           "clients": agent["clients"],
           "uniqueClientsCount": agent["uniqueClientNames"].length,
         };
       }).toList();
 
-      dynamicList.sort((a, b) => b["revenue"].compareTo(a["revenue"]));
+      // ✅ Fix: Sort by the raw Double, not the formatted String!
+      dynamicList.sort((a, b) => (b["rawRevenue"] as double).compareTo(a["rawRevenue"] as double));
 
       allAgents.assignAll(dynamicList);
       filteredAgents.assignAll(dynamicList);
@@ -114,13 +111,7 @@ class MarketingController extends GetxController {
       filteredAgents.assignAll(allAgents);
     } else {
       filteredAgents.assignAll(
-        allAgents
-            .where(
-              (a) => a['name'].toString().toLowerCase().contains(
-                query.toLowerCase(),
-              ),
-            )
-            .toList(),
+        allAgents.where((a) => a['name'].toString().toLowerCase().contains(query.toLowerCase())).toList(),
       );
     }
   }

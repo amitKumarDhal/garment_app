@@ -1,7 +1,10 @@
 import 'package:get/get.dart';
 
 class SplashController extends GetxController {
-  // Empty class:
-  // We don't need onInit() because the AuthenticationRepository
-  // handles all the navigation logic automatically.
+  // 🚀 The SplashController remains hyper-lightweight.
+  //
+  // All core routing logic is intercepted and automatically managed
+  // by the AuthenticationRepository's auth state streams.
+  // This ensures a secure, tamper-proof boot sequence that
+  // routes the user to their specific clearance-level dashboard.
 }

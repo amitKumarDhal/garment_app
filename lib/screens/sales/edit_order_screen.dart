@@ -15,8 +15,7 @@ class EditOrderScreen extends StatefulWidget {
 
 class _EditOrderScreenState extends State<EditOrderScreen> {
   final controller = Get.find<SalesAgentController>();
-  final _formKey = GlobalKey<FormState>();
-
+  late final GlobalKey<FormState> _formKey;
   late TextEditingController quantityController;
   late TextEditingController priceController;
   late TextEditingController detailsController;
@@ -76,9 +75,9 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Colors.orange.withValues(alpha:0.3)),
                 ),
                 child: Row(
                   children: [
@@ -118,7 +117,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha:0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -185,7 +184,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       elevation: 4,
-                      shadowColor: Colors.purple.withOpacity(0.4),
+                      shadowColor: Colors.purple.withValues(alpha:0.4),
                     ),
                     child: controller.isLoading.value
                         ? const SizedBox(
@@ -240,9 +239,9 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: Colors.grey[600]),
-        prefixIcon: Icon(icon, color: Colors.purple.withOpacity(0.7)),
+        prefixIcon: Icon(icon, color: Colors.purple.withValues(alpha:0.7)),
         filled: true,
-        fillColor: isDark ? Colors.black.withOpacity(0.2) : Colors.grey[50],
+        fillColor: isDark ? Colors.black.withValues(alpha:0.2) : Colors.grey[50],
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: borderColor),
