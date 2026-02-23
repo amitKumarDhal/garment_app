@@ -27,24 +27,33 @@ class SalesManagerController extends GetxController {
   // Defaults to the current month
   var selectedMonth = DateTime.now().obs;
 
-  /// ✅ Master Fetch Function (Dashboard)
   void fetchAllData() async {
+    // ✅ 1. EXIT early if the UI is still building
+    await Future.delayed(const Duration(milliseconds: 800));
+
     if (FirebaseAuth.instance.currentUser == null) return;
 
     try {
       isLoading.value = true;
+
+      // ✅ 2. Use Future.wait to run independent fetches in parallel
+      // instead of one after another. This is MUCH faster.
+      await Future.wait([
+        fetchManagerProfile(),
+        fetchMonthlyStats(),
+      ]);
+
+      // ✅ 3. Start listeners without 'awaiting' them so they don't block the UI
       fetchPendingOrders();
       fetchApprovedOrders();
-      await fetchMonthlyStats();
-      await fetchManagerProfile(); // ✅ Fetch name first
-      fetchOrderHistory(); // ✅ Also fetch history data
+      fetchOrderHistory();
+
     } catch (e) {
-      debugPrint("Error fetching dashboard data: $e");
+      debugPrint("Error: $e");
     } finally {
       isLoading.value = false;
     }
   }
-
   void changeMonth(DateTime newMonth) {
     selectedMonth.value = newMonth;
     fetchMonthlyStats();

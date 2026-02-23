@@ -48,7 +48,8 @@ class SalesManagerDashboard extends StatelessWidget {
       child: Container(
         height: 64, // Sleek, compact height
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
+          // ✅ REDUCED FROM 32 TO 16 FOR A "SLIGHTLY SQUARE" LOOK
+          borderRadius: BorderRadius.circular(16),
           // The Gradient for the border
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
@@ -76,10 +77,11 @@ class SalesManagerDashboard extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: isDark ? TColors.dark : Colors.white,
-              borderRadius: BorderRadius.circular(30.5), // Inner radius (32 - 1.5 padding)
+              // ✅ REDUCED TO 14.5 (16 minus the 1.5 padding for a perfect fit)
+              borderRadius: BorderRadius.circular(14.5),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(30.5),
+              borderRadius: BorderRadius.circular(14.5), // ✅ MATCHES INNER CONTAINER
               child: Obx(
                     () => Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -105,8 +107,6 @@ class SalesManagerDashboard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact(); // Premium tactile feel on tap
-
-        // ✅ FIXED: Now it acts as a normal tab instead of pushing a new screen
         controller.selectedIndex.value = index;
       },
       // Container animates its width/padding when selected
@@ -121,7 +121,8 @@ class SalesManagerDashboard extends StatelessWidget {
           color: isSelected
               ? (isDark ? Colors.white10 : TColors.primary.withValues(alpha:0.1))
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          // ✅ REDUCED FROM 20 TO 12 SO THE HIGHLIGHT MATCHES THE SQUARE THEME
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -158,13 +159,13 @@ class SalesManagerDashboard extends StatelessWidget {
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOutQuint,
               child: SizedBox(
-                width: isSelected ? null : 0, // Collapses text to 0 width when not selected
+                width: isSelected ? null : 0,
                 child: Padding(
                   padding: const EdgeInsets.only(left: 6, top: 4),
                   child: Text(
                     label,
                     style: TextStyle(
-                      fontSize: 12, // Slightly larger font since we have 4 items
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : TColors.primary,
                     ),

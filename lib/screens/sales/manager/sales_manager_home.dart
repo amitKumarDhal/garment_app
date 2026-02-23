@@ -8,8 +8,8 @@ import '../../../data/models/order_model.dart';
 import 'order_approval_screen.dart';
 import 'sales_manager_history_screen.dart';
 import 'sales_manager_approvals.dart';
-
-// ✅ IMPORT THE PROFILE SCREEN
+import '../../notifications/notification_screen.dart';// ✅ IMPORT THE PROFILE SCREEN
+import '../../../controllers/notifications/notification_controller.dart';
 import '../../profile/profile_screen.dart';
 
 class SalesManagerHome extends StatelessWidget {
@@ -56,26 +56,32 @@ class SalesManagerHome extends StatelessWidget {
                 Text(
                   controller.managerName.value,
                   style: TextStyle(
-                    color: TColors.textSecondary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    // ✅ UPDATED COLOR TO MATCH THE SALES ASSOCIATE DASHBOARD
+                    color: isDark ? Colors.blue.shade200 : TColors.primary,
+                    fontSize: 15, // Bumped up slightly to match the agent dashboard
+                    fontWeight: FontWeight.w700, // Made it bolder
                   ),
-                ),
-              ],
+                ),              ],
             )),
             centerTitle: false,
             actions: [
-              _buildCircularAction(
-                Icons.notifications_none_rounded,
-                isDark,
-                    () {},
-                notificationCount: 5,
-              ),
+              // ✅ WRAPPED IN OBX TO LISTEN FOR LIVE UNREAD COUNT
+              Obx(() {
+                final notifController = Get.put(NotificationController());
+                int unread = notifController.unreadCount.value;
+
+                return _buildCircularAction(
+                  Icons.notifications_none_rounded,
+                  isDark,
+                      () => Get.to(() => const NotificationScreen()), // ✅ Navigates to the screen
+                  notificationCount: unread, // ✅ Feeds the live number!
+                );
+              }),
+
               Padding(
                 padding: const EdgeInsets.only(right: 20, left: 8),
                 child: GestureDetector(
                   onTap: () => Get.to(() => const ProfileScreen()),
-                  // ✅ REPLACED: Using a stylized Profile Icon instead of text or network image
                   child: Container(
                     width: 40,
                     height: 40,
@@ -99,8 +105,7 @@ class SalesManagerHome extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
+            ],          ),
         ),
       ),
       body: RefreshIndicator(
@@ -245,10 +250,10 @@ class SalesManagerHome extends StatelessWidget {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
+                                  const Text(
                                     "Production Pipeline",
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha:0.9),
+                                      color: Colors.black87, // ✅ BLACK
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
@@ -257,7 +262,7 @@ class SalesManagerHome extends StatelessWidget {
                                   Obx(() => Text(
                                     "${controller.approvedOrders.length} Approved",
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: Colors.black, // ✅ BLACK
                                       fontSize: 14,
                                       fontWeight: FontWeight.w900,
                                     ),
@@ -265,7 +270,7 @@ class SalesManagerHome extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              Container(height: 1, color: Colors.white12),
+                              Container(height: 1, color: Colors.black12), // ✅ BLACK DIVIDER
                               const SizedBox(height: 16),
                               Obx(() {
                                 int cutting = controller.activeOrders.where((o) => o.status == 'Cutting').length;
@@ -282,8 +287,11 @@ class SalesManagerHome extends StatelessWidget {
                                     const Spacer(),
                                     Container(
                                       padding: const EdgeInsets.all(8),
-                                      decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                                      child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                                      decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.1), // ✅ DARK CIRCLE
+                                          shape: BoxShape.circle
+                                      ),
+                                      child: const Icon(Icons.arrow_forward_rounded, color: Colors.black, size: 16), // ✅ BLACK ARROW
                                     ),
                                   ],
                                 );
@@ -364,25 +372,38 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
-  // --- COMPACT STAGES ---
+/// --- COMPACT STAGES ---
   Widget _buildCompactStage(String label, int count) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           count.toString(),
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              color: Colors.black, // ✅ CHANGED TO BLACK
+              fontSize: 16,
+              fontWeight: FontWeight.w900
+          ),
         ),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withValues(alpha:0.5), fontSize: 10, fontWeight: FontWeight.w500),
+          style: TextStyle(
+              color: Colors.black.withValues(alpha:0.6), // ✅ CHANGED TO DARK GREY
+              fontSize: 11,
+              fontWeight: FontWeight.w700 // Bumped up weight slightly for readability
+          ),
         ),
       ],
     );
   }
 
   Widget _buildDivider() {
-    return Container(margin: const EdgeInsets.symmetric(horizontal: 15), height: 20, width: 1, color: Colors.white10);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 15),
+      height: 20,
+      width: 1.5, // Made it slightly thicker so it stands out better
+      color: Colors.black12, // ✅ CHANGED TO BLACK
+    );
   }
 
   // --- APP BAR ICON ---

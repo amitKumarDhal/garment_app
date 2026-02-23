@@ -10,6 +10,10 @@ import 'package:yoobbel/screens/sales/order_tracking_screen.dart';
 import 'package:yoobbel/screens/sales/sales_catalog_screen.dart';
 import '../../controllers/sales/sales_agent_controller.dart';
 import '../../utils/constants/colors.dart';
+import 'package:yoobbel/controllers/notifications/notification_controller.dart';
+import 'package:yoobbel/screens/notifications/notification_screen.dart';
+
+import '../profile/profile_screen.dart';
 
 class SalesDashboard extends StatelessWidget {
   const SalesDashboard({super.key});
@@ -73,7 +77,7 @@ class SalesDashboard extends StatelessWidget {
                   Text(
                     name,
                     style: TextStyle(
-                      color: isDark ? Colors.blue.shade200 : TColors.primary, // Gives the name a nice premium accent color
+                      color: isDark ? Colors.blue.shade200 : TColors.primary,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -83,20 +87,28 @@ class SalesDashboard extends StatelessWidget {
             }),
             centerTitle: false,
             actions: [
-              // ✅ REPLACED REFRESH WITH NOTIFICATION BELL
-              _buildCircularAction(
-                Icons.notifications_none_rounded,
-                isDark,
-                    () {
-                  HapticFeedback.lightImpact();
-                  // TODO: Navigate to Notifications Screen
-                },
-                notificationCount: 3, // Adds a nice red notification badge!
-              ),
+              // ✅ LIVE NOTIFICATION BELL
+              Obx(() {
+                final notifController = Get.put(NotificationController());
+                int unread = notifController.unreadCount.value;
+
+                return _buildCircularAction(
+                  Icons.notifications_none_rounded,
+                  isDark,
+                      () {
+                    HapticFeedback.lightImpact();
+                    Get.to(() => const NotificationScreen()); // ✅ Routes to screen
+                  },
+                  notificationCount: unread, // ✅ Feeds the live number!
+                );
+              }),
               Padding(
                 padding: const EdgeInsets.only(right: 20, left: 8),
                 child: GestureDetector(
-                  onTap: () {},
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Get.to(() => const ProfileScreen()); // ✅ Routes to Profile Screen
+                  },
                   child: Container(
                     width: 40,
                     height: 40,
@@ -120,7 +132,8 @@ class SalesDashboard extends StatelessWidget {
                   ),
                 ),
               ),
-            ],          ),
+            ],
+          ),
         ),
       ),      body: RefreshIndicator(
         color: TColors.primary,

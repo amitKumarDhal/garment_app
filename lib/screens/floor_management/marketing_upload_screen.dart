@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -121,8 +120,10 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   ),
 
                 // --- SECTION 1: DESIGN ---
+                // --- SECTION 1: DESIGN ---
                 _buildSectionHeader("Design Mockup", Icons.palette_outlined, isDark),
-                _buildImagePicker(isDark, controller),
+                _buildImagePicker(isDark), // ✅ CONTROLLER REMOVED
+                const SizedBox(height: 28),
                 const SizedBox(height: 28),
 
                 // --- SECTION 2: CLIENT INFO ---
@@ -350,72 +351,64 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     );
   }
 
-  Widget _buildImagePicker(bool isDark, MarketingUploadController controller) {
-    return Obx(() {
-      // Determine if we have an image to show
-      bool hasImage = controller.selectedImagePath.value.isNotEmpty || controller.existingImageUrl.value.isNotEmpty;
-
-      return Container(
-        width: double.infinity,
-        height: 180, // Slightly taller to accommodate images better
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2C2C2E).withValues(alpha:0.5) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.5),
+// ✅ REPLACED WITH "COMING SOON" PLACEHOLDER
+  Widget _buildImagePicker(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2C2E).withValues(alpha:0.5) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade300,
+          width: 1.5,
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(24),
-            onTap: () => controller.pickImage(), // Tapping anywhere triggers the picker
-            child: !hasImage
-                ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.1), shape: BoxShape.circle),
-                    child: const Icon(Icons.cloud_upload_outlined, size: 28, color: TColors.primary)
-                ),
-                const SizedBox(height: 12),
-                Text("Tap to upload mockup", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
-              ],
-            )
-                : Stack(
-              children: [
-                // The Image (Network or Local File)
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22),
-                    child: controller.selectedImagePath.value.isNotEmpty
-                        ? Image.file(File(controller.selectedImagePath.value), fit: BoxFit.cover)
-                        : Image.network(controller.existingImageUrl.value, fit: BoxFit.cover),
-                  ),
-                ),
-                // Remove Button
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      controller.removeImage();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.7), shape: BoxShape.circle),
-                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
-                    ),
-                  ),
-                ),
-              ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, size: 28, color: Colors.amber),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Mockup Uploads",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
-        ),
-      );
-    });
-  }
-  Widget _buildCalculationSummary(bool isDark, MarketingUploadController controller) {
+          const SizedBox(height: 8),
+          Text(
+            "We are currently upgrading our cloud storage. This feature is coming soon!",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              "COMING SOON",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }  Widget _buildCalculationSummary(bool isDark, MarketingUploadController controller) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
