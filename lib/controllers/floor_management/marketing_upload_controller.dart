@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // ✅ NEW
+import 'package:image_picker/image_picker.dart'; // ✅ NEW
 import '../../data/models/order_model.dart';
 
 // ✅ Helper Class for Dynamic Items
@@ -10,8 +13,8 @@ class OrderItemForm {
   final productDetails = TextEditingController();
   final sizeDescription = TextEditingController();
   final quantity = TextEditingController();
-  final orderValue = TextEditingController(); // Unit Price
-  final gstInfo = TextEditingController(); // GST %
+  final orderValue = TextEditingController();
+  final gstInfo = TextEditingController();
 
   void dispose() {
     productCode.dispose();
@@ -50,7 +53,10 @@ class MarketingUploadController extends GetxController {
 
   final isEditing = false.obs;
   String? editingOrderId;
-  final RxString selectedImagePath = ''.obs;
+
+  // ✅ IMAGE OBSERVABLES
+  final RxString selectedImagePath = ''.obs; // Local file path
+  final RxString existingImageUrl = ''.obs;  // Cloud URL if editing
 
   // Observables for Financials
   final RxDouble subTotal = 0.0.obs;
@@ -63,7 +69,7 @@ class MarketingUploadController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    addNewItem(); // Add first item by default
+    addNewItem();
     shippingCharge.addListener(_calculateTotal);
     advanceAmount.addListener(_calculateTotal);
   }
@@ -123,7 +129,6 @@ class MarketingUploadController extends GetxController {
 
   // ✅ LOAD DATA (Edit Mode)
   void loadOrderData(OrderModel order) {
-    // 🔒 SECURITY CHECK: Prevent editing shipped, delivered, or rejected orders
     final lockedStatuses = ['shipping', 'shipped', 'delivered', 'rejected'];
     if (lockedStatuses.contains(order.status.toLowerCase())) {
       Get.snackbar(
@@ -133,7 +138,7 @@ class MarketingUploadController extends GetxController {
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
-      Get.back(); // Kick them out instantly
+      Get.back();
       return;
     }
 
@@ -147,6 +152,10 @@ class MarketingUploadController extends GetxController {
     address.text = order.clientAddress ?? "";
     shippingCharge.text = order.shippingCharge.toString();
     advanceAmount.text = order.advanceAmount.toString();
+
+    // ✅ Load existing image URL if present
+    // Note: Add 'designMockupUrl' to your OrderModel if you haven't already.
+    existingImageUrl.value = order.toJson()['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
     if (_selectedDeadline != null) {
@@ -171,11 +180,10 @@ class MarketingUploadController extends GetxController {
       items.add(itemForm);
     }
 
-    if (items.isEmpty) addNewItem(); // Safety fallback
+    if (items.isEmpty) addNewItem();
     _calculateTotal();
   }
 
-  // ✅ MASTER CALCULATION ALGORITHM
   void _calculateTotal() {
     double tempSubTotal = 0.0;
     double tempTaxAmount = 0.0;
@@ -219,11 +227,46 @@ class MarketingUploadController extends GetxController {
     return months[month - 1];
   }
 
-  void pickImage() {
-    Get.snackbar("Coming Soon", "Image upload disabled.");
+  // ✅ NEW: IMAGE PICKER LOGIC
+  Future<void> pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      // Compresses image to save cloud storage space and upload speed
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+
+      if (image != null) {
+        selectedImagePath.value = image.path;
+        existingImageUrl.value = ''; // Clear existing network URL if they pick a new local one
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Could not pick image: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
+    }
   }
 
-  // ✅ Safe Submit Order
+  // ✅ NEW: Clear selected image
+  void removeImage() {
+    selectedImagePath.value = '';
+    existingImageUrl.value = '';
+  }
+
+  // ✅ NEW: FIREBASE STORAGE UPLOAD FUNCTION
+  Future<String?> _uploadImageToStorage() async {
+    if (selectedImagePath.value.isEmpty) return null; // No new image picked
+
+    try {
+      File file = File(selectedImagePath.value);
+      // Create a unique file name
+      String fileName = 'mockups/${DateTime.now().millisecondsSinceEpoch}_${orderNo.text}.jpg';
+      Reference ref = FirebaseStorage.instance.ref().child(fileName);
+
+      await ref.putFile(file);
+      String downloadUrl = await ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      throw Exception("Image upload failed: $e");
+    }
+  }
+
   void submitOrder() async {
     if (!uploadFormKey.currentState!.validate()) return;
     if (_selectedDeadline == null) {
@@ -247,7 +290,12 @@ class MarketingUploadController extends GetxController {
         } catch (e) {}
       }
 
-      // 1. Process List of Items
+      // ✅ UPLOAD IMAGE BEFORE SAVING ORDER
+      String? finalImageUrl = existingImageUrl.value; // Keep existing if not changed
+      if (selectedImagePath.value.isNotEmpty) {
+        finalImageUrl = await _uploadImageToStorage(); // Upload new image
+      }
+
       List<Map<String, dynamic>> productsList = [];
       int totalQty = 0;
       String firstProductName = "";
@@ -284,7 +332,6 @@ class MarketingUploadController extends GetxController {
         "organization": organization.text.trim(),
         "clientAddress": address.text.trim(),
 
-        // Legacy Root Fields
         "productCode": items.first.productCode.text.trim(),
         "productDetails": rootProductName,
         "productName": rootProductName,
@@ -300,12 +347,11 @@ class MarketingUploadController extends GetxController {
         "marketingPersonName": agentName,
         "marketingPersonId": userId,
         "status": "Pending",
-
-        // ✅ NEW DYNAMIC ARRAY
         "products": productsList,
-      };
 
-      if (selectedImagePath.value.isNotEmpty) orderMap['localImagePath'] = selectedImagePath.value;
+        // ✅ SAVE THE CLOUD URL IN FIRESTORE
+        if (finalImageUrl != null && finalImageUrl.isNotEmpty) "designMockupUrl": finalImageUrl,
+      };
 
       if (isEditing.value && editingOrderId != null) {
         orderMap['manualOrderNo'] = orderNo.text.trim();
@@ -331,7 +377,6 @@ class MarketingUploadController extends GetxController {
         Get.snackbar("Success", "Order saved securely!", backgroundColor: Colors.green, colorText: Colors.white);
       }
 
-      // ✅ Renamed logic
       clearForm();
 
     } catch (e) {
@@ -341,7 +386,6 @@ class MarketingUploadController extends GetxController {
     }
   }
 
-  // ✅ Removed underscore to make it public
   void clearForm() {
     orderNo.clear();
     clientName.clear();
@@ -353,10 +397,11 @@ class MarketingUploadController extends GetxController {
     advanceAmount.clear();
 
     items.clear();
-    addNewItem(); // Start fresh
+    addNewItem();
 
     _selectedDeadline = null;
     selectedImagePath.value = '';
+    existingImageUrl.value = ''; // ✅ Clear
     subTotal.value = 0.0;
     taxAmount.value = 0.0;
     grandTotal.value = 0.0;

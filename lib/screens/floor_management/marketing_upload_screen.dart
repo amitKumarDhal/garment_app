@@ -351,35 +351,70 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   }
 
   Widget _buildImagePicker(bool isDark, MarketingUploadController controller) {
-    return Container(
-      width: double.infinity, height: 140,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E).withValues(alpha:0.5) : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.5),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Obx(() {
+      // Determine if we have an image to show
+      bool hasImage = controller.selectedImagePath.value.isNotEmpty || controller.existingImageUrl.value.isNotEmpty;
+
+      return Container(
+        width: double.infinity,
+        height: 180, // Slightly taller to accommodate images better
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2E).withValues(alpha:0.5) : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(24),
-          onTap: () => controller.pickImage(),
-          child: Obx(
-                () => controller.selectedImagePath.value.isEmpty
+          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.5),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () => controller.pickImage(), // Tapping anywhere triggers the picker
+            child: !hasImage
                 ? Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.1), shape: BoxShape.circle), child: const Icon(Icons.cloud_upload_outlined, size: 28, color: TColors.primary)),
+                Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.cloud_upload_outlined, size: 28, color: TColors.primary)
+                ),
                 const SizedBox(height: 12),
                 Text("Tap to upload mockup", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
               ],
             )
-                : ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.file(File(controller.selectedImagePath.value), fit: BoxFit.cover, width: double.infinity)),
+                : Stack(
+              children: [
+                // The Image (Network or Local File)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: controller.selectedImagePath.value.isNotEmpty
+                        ? Image.file(File(controller.selectedImagePath.value), fit: BoxFit.cover)
+                        : Image.network(controller.existingImageUrl.value, fit: BoxFit.cover),
+                  ),
+                ),
+                // Remove Button
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      controller.removeImage();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.7), shape: BoxShape.circle),
+                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
-
   Widget _buildCalculationSummary(bool isDark, MarketingUploadController controller) {
     return Container(
       padding: const EdgeInsets.all(20),

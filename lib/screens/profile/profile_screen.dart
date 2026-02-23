@@ -23,19 +23,12 @@ class ProfileScreen extends StatelessWidget {
             color: isDark ? Colors.white : Colors.black87,
           ),
         ),
-        centerTitle: false,
+        centerTitle: true,
         titleSpacing: 24,
         backgroundColor: Colors.transparent,
         elevation: 0,
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-        actions: [
-          _buildAppBarAction(Icons.qr_code_scanner_rounded, isDark, () {
-            Get.snackbar("Digital ID", "Show this QR code at the gate.");
-          }),
-          const SizedBox(width: 8),
-          _buildAppBarAction(Icons.refresh_rounded, isDark, () => controller.fetchUserProfile()),
-          const SizedBox(width: 20),
-        ],
+        // ✅ ACTIONS ARRAY REMOVED FROM HERE
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -105,21 +98,7 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // ===================== MODERN WIDGETS =====================
-
-  Widget _buildAppBarAction(IconData icon, bool isDark, VoidCallback onTap) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isDark ? Colors.white.withValues(alpha:0.08) : Colors.black.withValues(alpha:0.04),
-      ),
-      child: IconButton(
-        icon: Icon(icon, size: 20, color: isDark ? Colors.white : Colors.black87),
-        onPressed: onTap,
-      ),
-    );
-  }
+  // ✅ _buildAppBarAction helper removed to keep code clean
 
   Widget _buildDigitalIdCard(BuildContext context, ProfileController controller) {
     return Container(
@@ -146,10 +125,10 @@ class ProfileScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(2),
             decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
-            child: CircleAvatar(
+            child: const CircleAvatar(
               radius: 30,
               backgroundColor: Colors.white,
-              child: Icon(Icons.person_rounded, size: 32, color: const Color(0xFF6A1B9A)),
+              child: Icon(Icons.person_rounded, size: 32, color: Color(0xFF6A1B9A)),
             ),
           ),
           const SizedBox(width: 16),
@@ -168,14 +147,13 @@ class ProfileScreen extends StatelessWidget {
                       color: Colors.white,
                       letterSpacing: -0.5
                   ),
-                  maxLines: 1, // ✅ Prevents name from breaking layout
-                  overflow: TextOverflow.ellipsis, // ✅ Adds "..." if too long
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 )),
                 const SizedBox(height: 4),
 
-                // ✅ THE FIX: Wrap the sub-row to prevent overflow on small screens
                 FittedBox(
-                  fit: BoxFit.scaleDown, // ✅ Automatically shrinks the text if it overflows
+                  fit: BoxFit.scaleDown,
                   child: Row(
                     children: [
                       Container(
@@ -210,21 +188,11 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(width: 10),
-
-          // 3. QR Code Icon (Fixed size)
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha:0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 24),
-          ),
         ],
       ),
     );
   }
+
   Widget _buildPerformanceStats(BuildContext context) {
     return Row(
       children: [
@@ -241,7 +209,7 @@ class ProfileScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8), // ✅ Added slight horizontal padding
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -250,13 +218,11 @@ class ProfileScreen extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // ✅ Wrapped in FittedBox to automatically shrink if the value (e.g. "100%") is too wide
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color)),
             ),
             const SizedBox(height: 4),
-            // ✅ Wrapped in FittedBox to prevent long words like "Efficiency" from breaking
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
@@ -266,6 +232,7 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildShiftInfo(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -349,7 +316,9 @@ class ProfileScreen extends StatelessWidget {
         subtitle: Text(isDark ? "Easy on the eyes" : "Classic light theme", style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
         trailing: Switch.adaptive(
           value: isDark,
-          activeColor: Colors.purple,
+          // ✅ REPLACED DEPRECATED 'activeColor' WITH THESE TWO:
+          activeTrackColor: Colors.purple.withValues(alpha: 0.4), // The background track
+          activeThumbColor: Colors.purple, // The circle you drag
           onChanged: (value) => Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light),
         ),
       ),

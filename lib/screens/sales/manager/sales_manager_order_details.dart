@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
+import '../../../services/pdf_invoice_service.dart';
 
 class SalesManagerOrderDetails extends StatefulWidget {
   final OrderModel order;
@@ -302,12 +303,16 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
               // ✅ NEW POSITION: EFFECTIVE REVENUE CALCULATOR (Compacted)
               EffectiveRevenueSection(order: currentOrder),
 
-              // Print Invoice Button
+              /// Print Invoice Button
               if (displayStatus != 'Rejected')
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () { HapticFeedback.lightImpact(); },
+                    // ✅ CALL THE PDF GENERATOR HERE!
+                    onPressed: () async {
+                      HapticFeedback.lightImpact();
+                      await PdfInvoiceService.generateAndPrintInvoice(currentOrder);
+                    },
                     icon: Icon(Icons.print_rounded, color: isDark ? Colors.white70 : Colors.black54, size: 20),
                     label: Text("PRINT INVOICE", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 1)),
                     style: OutlinedButton.styleFrom(
@@ -512,6 +517,7 @@ class EffectiveRevenueController extends GetxController {
   }
 }
 
+
 // =========================================================================
 // ✅ 2. THE EXECUTIVE UI SECTION FOR MARGIN CALCULATION (COMPACT)
 // =========================================================================
@@ -526,11 +532,11 @@ class EffectiveRevenueSection extends StatelessWidget {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 24), // Reduced margin
-      padding: const EdgeInsets.all(16), // Reduced padding
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1A24) : const Color(0xFFF8F4FF),
-        borderRadius: BorderRadius.circular(20), // Tighter radius
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.purple.withValues(alpha:isDark ? 0.3 : 0.5), width: 1.5),
         boxShadow: [
           if (!isDark) BoxShadow(color: Colors.purple.withValues(alpha:0.05), blurRadius: 10, offset: const Offset(0, 4))
@@ -539,35 +545,32 @@ class EffectiveRevenueSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header (Subtitle removed)
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6), // Smaller icon box
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(color: Colors.purple.withValues(alpha:0.2), borderRadius: BorderRadius.circular(8)),
                 child: const Icon(Icons.insights_rounded, color: Colors.purple, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Internal Margin Calculator", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
-                    Text("Hidden from Associate & Client", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
-                  ],
+                child: Text(
+                  "Internal Margin Calculator",
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16), // Tighter spacing
+          const SizedBox(height: 16),
 
-          // The Math Row
+          // The Math Row ("/ 30 =" removed)
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // 1. Margin Input Field (X)
               SizedBox(
-                width: 75, // Slimmer input field
+                width: 75,
                 child: TextField(
                   controller: controller.marginInput,
                   keyboardType: TextInputType.number,
@@ -579,23 +582,21 @@ class EffectiveRevenueSection extends StatelessWidget {
                     labelText: "Margin (x)",
                     labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple),
                     filled: true,
-                    isDense: true, // Condenses the field height
+                    isDense: true,
                     fillColor: isDark ? Colors.black26 : Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8), // Tighter padding
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.purple.withValues(alpha:0.3), width: 1.5)),
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.purple, width: 2)),
                   ),
                 ),
               ),
 
-              const SizedBox(width: 10),
-              Text(" / 30 =", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.grey.shade500)),
-              const SizedBox(width: 10),
+              const SizedBox(width: 16), // Adjusted spacing between input and result
 
               // 2. Live Result Display
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12), // Slimmer container
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   decoration: BoxDecoration(
                     color: Colors.purple,
                     borderRadius: BorderRadius.circular(12),
@@ -618,12 +619,12 @@ class EffectiveRevenueSection extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 16), // Tighter spacing
+          const SizedBox(height: 16),
 
           // Save Button
           SizedBox(
             width: double.infinity,
-            height: 42, // Shorter button
+            height: 42,
             child: Obx(
                   () => OutlinedButton.icon(
                 onPressed: controller.isSaving.value ? null : controller.saveEffectiveRevenue,

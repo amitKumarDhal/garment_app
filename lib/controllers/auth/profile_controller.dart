@@ -26,22 +26,23 @@ class ProfileController extends GetxController {
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null) {
+        // ✅ FIX 1: Query the permanent 'users' collection, not 'id_requests'
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('id_requests')
+            .collection('users')
             .doc(currentUser.uid)
             .get();
 
         if (userDoc.exists) {
           final data = userDoc.data() as Map<String, dynamic>;
-          // Update UI with Real Data
-          name.value = data['name'] ?? "User";
-          email.value = data['email'] ?? "";
-          role.value = data['role'] ?? "Worker";
-          employeeId.value = data['employeeId'] ?? "N/A";
+
+          // ✅ FIX 2: Dual-case safety (handles both old and new data structures)
+          name.value = data['name'] ?? data['FullName'] ?? "Unknown User";
+          email.value = data['email'] ?? data['Email'] ?? "";
+          role.value = data['role'] ?? data['Role'] ?? "Worker";
+          employeeId.value = data['employeeId'] ?? data['EmployeeID'] ?? "N/A";
         }
       }
     } catch (e) {
-      // Silent error or retry logic
       print("Error loading profile: $e");
     } finally {
       isLoading.value = false;
@@ -50,8 +51,6 @@ class ProfileController extends GetxController {
 
   /// ✅ CALL THE REPO FOR SAFE LOGOUT
   Future<void> logout() async {
-    // This delegates the logic to AuthenticationRepository
-    // which handles the correct "Navigation First, SignOut Second" order.
     await AuthenticationRepository.instance.logout();
   }
 }
