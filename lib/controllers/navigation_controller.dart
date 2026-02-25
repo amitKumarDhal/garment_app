@@ -9,6 +9,7 @@ import '../screens/admin/inventory_screen.dart';
 import '../screens/admin/production_reports_screen.dart';
 import '../screens/admin/daily_work_log_screen.dart';
 
+
 // --- IMPORTS: Floor Management ---
 import '../screens/floor_management/supervisor_menu_screen.dart';
 import '../screens/floor_management/factory_stock_summary_screen.dart';
@@ -22,6 +23,7 @@ import '../screens/sales/manager/sales_manager_approvals.dart';
 
 // --- IMPORTS: Common ---
 import '../screens/profile/profile_screen.dart';
+import '../utils/constants/colors.dart';
 
 class NavigationController extends GetxController {
   static NavigationController get instance => Get.find();
@@ -85,20 +87,21 @@ class NavigationController extends GetxController {
     // 👑 ADMIN
     // ============================================================
     if (cleanRole == 'Admin') {
-        screens.addAll([
-          const AdminDashboard(),
-          const InventoryScreen(),
-          const ProductionReportsScreen(),
-          const ProfileScreen(),
-        ]);
-        navItems.addAll([
-          const NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Admin'),
-          const NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Stock'),
-          const NavigationDestination(icon: Icon(Icons.analytics_outlined), label: 'Reports'),
-          const NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-        ]);
+      screens.addAll([
+        const AdminDashboard(),
+        // const WorkerListScreen(),       // ✅ Tab 2: Team Management
+        const InventoryScreen(),        // ✅ Tab 3: Stock
+        const ProductionReportsScreen(),// ✅ Tab 4: Reports
+        // const AdminProfileScreen(),     // ✅ Tab 5: Dedicated Admin Profile
+      ]);
+      navItems.addAll([
+        const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded, color: TColors.primary), label: 'Home'),
+        // const NavigationDestination(icon: Icon(Icons.manage_accounts_outlined), selectedIcon: Icon(Icons.manage_accounts_rounded, color: TColors.primary), label: 'Team'),
+        const NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2_rounded, color: TColors.primary), label: 'Stock'),
+        const NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics_rounded, color: TColors.primary), label: 'Reports'),
+        // const NavigationDestination(icon: Icon(Icons.admin_panel_settings_outlined), selectedIcon: Icon(Icons.admin_panel_settings_rounded, color: TColors.primary), label: 'Profile'),
+      ]);
     }
-
     // ============================================================
     // 📊 SALES MANAGER
     // ============================================================

@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ Added Auth
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:yoobbel/data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
 import '../../data/models/activity_item_model.dart';
@@ -9,7 +10,7 @@ import '../../data/models/activity_item_model.dart';
 class AdminController extends GetxController {
   static AdminController get instance => Get.find();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance; // ✅ Auth Instance
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // --- Observables ---
   var totalDailyProduction = 0.0.obs;
@@ -18,9 +19,13 @@ class AdminController extends GetxController {
   var totalDamages = 0.obs;
   var adminName = "".obs;
 
+  // --- Monthly Revenue Observables ---
+  var totalMonthlyRevenue = 0.0.obs;
+  var selectedMonth = DateTime.now().obs;
+
   // --- REPORTING VARIABLES ---
   var reportDate = DateTime.now().obs;
-  var reportSection = 'All'.obs; 
+  var reportSection = 'All'.obs;
   RxList<ActivityItem> reportList = <ActivityItem>[].obs;
   var isReportLoading = false.obs;
 
@@ -38,19 +43,191 @@ class AdminController extends GetxController {
   var pendingApprovalsCount = 0.obs;
   var isLoading = false.obs;
 
+  @override
+  void onInit() {
+    super.onInit();
+    // ✅ Automatically fetch the admin's name when the controller boots up
+    fetchAdminIdentity();
+    startAdminListeners();
+  }
 
-  // ✅ MASTER START FUNCTION (Call this from UI)
+  // ✅ Fetch the exact name set during ID Creation
+  Future<void> fetchAdminIdentity() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // 1. First, check the 'users' collection
+        final userDoc = await _db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          String dbName = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? userDoc.data()?['name'] ?? '';
+          if (dbName.isNotEmpty) {
+            adminName.value = dbName;
+            return;
+          }
+        }
+
+        // 2. If not in 'users', check the 'id_requests' collection
+        final idDoc = await _db.collection('id_requests').doc(user.uid).get();
+        if (idDoc.exists) {
+          String reqName = idDoc.data()?['name'] ?? idDoc.data()?['FullName'] ?? '';
+          if (reqName.isNotEmpty) {
+            adminName.value = reqName;
+            return;
+          }
+        }
+
+        // 3. Fallback to Google Auth name or default
+        adminName.value = user.displayName ?? "Super Admin";
+      }
+    } catch (e) {
+      debugPrint("Error fetching admin name: $e");
+      adminName.value = "Super Admin"; // Safe fallback
+    }
+  }
+
+  // ✅ MASTER START FUNCTION
   void startAdminListeners() {
-    if (_auth.currentUser == null) return; // Safety Check
+    if (_auth.currentUser == null) return;
 
     _bindPendingRequests();
     _bindApprovedWorkers();
-    _bindTodaysOrders();
+    _bindTodayOrders();
     _bindCuttingStream();
     _bindPrintingStream();
     _bindStitchingStream();
     _bindPackingStream();
     fetchRecentActivities();
+    _bindMonthlyRevenue();
+  }
+
+  // --- MONTH SELECTION & REVENUE LOGIC ---
+// ✅ Function to open a Custom Month/Year Picker
+  Future<void> selectMonthYear(BuildContext context) async {
+    int tempYear = selectedMonth.value.year;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              contentPadding: const EdgeInsets.all(20),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.chevron_left_rounded, color: isDark ? Colors.white : Colors.black87),
+                    onPressed: () => setState(() => tempYear--), // Go to previous year
+                  ),
+                  Text(
+                      tempYear.toString(),
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: isDark ? Colors.white : Colors.black87)
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white : Colors.black87),
+                    // Prevent going to future years (optional, remove if you want future forecasting)
+                    onPressed: tempYear < DateTime.now().year
+                        ? () => setState(() => tempYear++)
+                        : null,
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.5,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: 12,
+                  itemBuilder: (context, index) {
+                    DateTime monthDate = DateTime(tempYear, index + 1, 1);
+                    // Use intl package to get month names (Jan, Feb, etc.)
+                    String monthName = DateFormat('MMM').format(monthDate);
+
+                    bool isSelected = selectedMonth.value.year == tempYear && selectedMonth.value.month == index + 1;
+
+                    // Disable future months in the current year
+                    bool isFuture = monthDate.isAfter(DateTime.now());
+
+                    return GestureDetector(
+                      onTap: isFuture ? null : () {
+                        selectedMonth.value = monthDate; // ✅ Update the observable
+                        Get.back(); // ✅ Close the dialog
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? TColors.primary
+                              : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isSelected ? TColors.primary : Colors.transparent),
+                        ),
+                        child: Text(
+                          monthName,
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : (isFuture
+                                ? Colors.grey // Grey out future months
+                                : (isDark ? Colors.white70 : Colors.black87)),
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _bindMonthlyRevenue() {
+    if (_auth.currentUser == null) return;
+
+    // ✅ Listen to changes in selectedMonth. When it changes, update the stream!
+    ever(selectedMonth, (_) => _updateMonthlyStream());
+
+    // Call it once immediately for the current month
+    _updateMonthlyStream();
+  }
+
+  void _updateMonthlyStream() {
+    // Determine the start and end of the currently selected month
+    DateTime startOfMonth = DateTime(selectedMonth.value.year, selectedMonth.value.month, 1);
+    DateTime endOfMonth = DateTime(selectedMonth.value.year, selectedMonth.value.month + 1, 0, 23, 59, 59);
+
+    _db.collection('orders')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+        .snapshots()
+        .listen((snapshot) {
+
+      // ✅ Sum up all non-deleted orders for the selected month
+      double monthlySum = snapshot.docs.fold(0.0, (acc, doc) {
+        final data = doc.data();
+        // Skip soft-deleted orders
+        if (data['isDeleted'] == true) return acc;
+
+        // Use effectiveRevenue if available, else use totalAmount
+        double amount = (data['effectiveRevenue'] as num? ?? data['totalAmount'] as num? ?? 0).toDouble();
+        return acc + amount;
+      });
+
+      totalMonthlyRevenue.value = monthlySum;
+    });
   }
 
   // --- 1. WORKFORCE STREAMS ---
@@ -86,7 +263,7 @@ class AdminController extends GetxController {
 
   // --- 2. DEPARTMENT STREAMS (Dashboard) ---
 
-  void _bindTodaysOrders() {
+  void _bindTodayOrders() {
     if (_auth.currentUser == null) return;
     DateTime now = DateTime.now();
     DateTime startOfDay = DateTime(now.year, now.month, now.day);
@@ -96,9 +273,14 @@ class AdminController extends GetxController {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
-      recentOrders.assignAll(
-        snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList(),
-      );
+
+      // ✅ SOFT DELETE PROTECTION: Filter out deleted orders locally
+      final validOrders = snapshot.docs
+          .map((doc) => OrderModel.fromSnapshot(doc))
+          .where((order) => order.toJson()['isDeleted'] != true)
+          .toList();
+
+      recentOrders.assignAll(validOrders);
       _calculateProductionTotal();
     });
   }
@@ -210,16 +392,16 @@ class AdminController extends GetxController {
 
     // Damages
     int pDamages = recentPrintingEntries.fold(
-      0, (sum, item) => sum + (item['totalDamaged'] as int? ?? 0),
+      0, (acc, item) => acc + (item['totalDamaged'] as int? ?? 0),
     );
     int sDamages = recentStitchingEntries.fold(
-      0, (sum, item) => sum + (item['rejectedQty'] as int? ?? 0),
+      0, (acc, item) => acc + (item['rejectedQty'] as int? ?? 0),
     );
     totalDamages.value = pDamages + sDamages;
   }
 
   void _calculateProductionTotal() {
-    double total = recentOrders.fold(0, (sum, item) => sum + item.totalAmount);
+    double total = recentOrders.fold(0, (acc, item) => acc + item.totalAmount);
     totalDailyProduction.value = total;
   }
 
@@ -231,10 +413,19 @@ class AdminController extends GetxController {
     try {
       var orders = await _db.collection('orders')
           .orderBy('createdAt', descending: true)
-          .limit(3)
+          .limit(10) // Fetch extra to account for filtering deleted ones
           .get();
+
+      int orderCount = 0;
       for (var doc in orders.docs) {
         final data = doc.data();
+
+        // Skip soft-deleted orders in the activity feed
+        if (data['isDeleted'] == true) continue;
+
+        if (orderCount >= 3) break; // Only show 3 valid orders
+        orderCount++;
+
         Timestamp? ts = data['createdAt'] as Timestamp?;
         allActivities.add(
           ActivityItem(
@@ -246,6 +437,7 @@ class AdminController extends GetxController {
           ),
         );
       }
+
       await _fetchDeptLogs(allActivities, 'cutting_entries', "Cutting", Icons.content_cut, TColors.cutting);
       await _fetchDeptLogs(allActivities, 'printing_entries', "Printing", Icons.print, TColors.printing);
       await _fetchDeptLogs(allActivities, 'stitching_entries', "Stitching", Icons.handyman, TColors.stitching);
@@ -254,15 +446,15 @@ class AdminController extends GetxController {
       allActivities.sort((a, b) => b.time.compareTo(a.time));
       recentActivities.assignAll(allActivities);
     } catch (e) {
-      print("Error fetching activities: $e");
+      debugPrint("Error fetching activities: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> _fetchDeptLogs(
-    List<ActivityItem> list, String collection, String deptName, IconData icon, Color color,
-  ) async {
+      List<ActivityItem> list, String collection, String deptName, IconData icon, Color color,
+      ) async {
     try {
       var snap = await _db.collection(collection)
           .orderBy('timestamp', descending: true)
@@ -283,16 +475,7 @@ class AdminController extends GetxController {
         );
       }
     } catch (e) {
-      print("Skipping $collection: $e");
-    }
-  }
-
-  // In your initialization or fetch logic
-  Future<void> fetchAdminName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      // You can fetch from 'users' collection similar to SalesAgentController
-      adminName.value = user.displayName ?? "Admin";
+      debugPrint("Skipping $collection: $e");
     }
   }
 
@@ -325,6 +508,9 @@ class AdminController extends GetxController {
 
         for (var doc in snap.docs) {
           var data = doc.data();
+          // Skip deleted orders from the official report
+          if (data['isDeleted'] == true) continue;
+
           tempResults.add(
             ActivityItem(
               title: "Order: ${data['clientName']}",
@@ -353,15 +539,15 @@ class AdminController extends GetxController {
       tempResults.sort((a, b) => b.time.compareTo(a.time));
       reportList.assignAll(tempResults);
     } catch (e) {
-      print("Report Error: $e");
+      debugPrint("Report Error: $e");
     } finally {
       isReportLoading.value = false;
     }
   }
 
   Future<void> _fetchReportDept(
-    List<ActivityItem> list, String collection, String title, IconData icon, Color color, DateTime start, DateTime end,
-  ) async {
+      List<ActivityItem> list, String collection, String title, IconData icon, Color color, DateTime start, DateTime end,
+      ) async {
     var snap = await _db.collection(collection)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('timestamp', isLessThan: Timestamp.fromDate(end))
@@ -413,6 +599,7 @@ class AdminController extends GetxController {
       Get.snackbar("Error", e.toString());
     }
   }
+
   Future<void> rejectRequest(String docId) async {
     try {
       await _db.collection('id_requests').doc(docId).delete();

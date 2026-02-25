@@ -2,7 +2,7 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added for SystemUiOverlayStyle
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:yoobbel/screens/sales/client_list_screen.dart';
@@ -37,7 +37,6 @@ class SalesDashboard extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
       // ✅ SLEEK TRANSPARENT APP BAR
-// ✅ SLEEK TRANSPARENT APP BAR
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(90),
         child: Padding(
@@ -47,9 +46,7 @@ class SalesDashboard extends StatelessWidget {
             elevation: 0,
             automaticallyImplyLeading: false,
             titleSpacing: 20,
-            systemOverlayStyle: isDark
-                ? SystemUiOverlayStyle.light
-                : SystemUiOverlayStyle.dark,
+            systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
             // ✅ WRAPPED IN OBX TO LISTEN FOR AGENT NAME
             title: Obx(() {
               String name = "Agent";
@@ -63,7 +60,6 @@ class SalesDashboard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 1. The Greeting (Top line)
                   Text(
                     _getGreeting(),
                     style: TextStyle(
@@ -73,7 +69,6 @@ class SalesDashboard extends StatelessWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  // 2. The Name (Bottom line)
                   Text(
                     name,
                     style: TextStyle(
@@ -97,9 +92,9 @@ class SalesDashboard extends StatelessWidget {
                   isDark,
                       () {
                     HapticFeedback.lightImpact();
-                    Get.to(() => const NotificationScreen()); // ✅ Routes to screen
+                    Get.to(() => const NotificationScreen());
                   },
-                  notificationCount: unread, // ✅ Feeds the live number!
+                  notificationCount: unread,
                 );
               }),
               Padding(
@@ -107,20 +102,16 @@ class SalesDashboard extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    Get.to(() => const ProfileScreen()); // ✅ Routes to Profile Screen
+                    Get.to(() => const ProfileScreen());
                   },
                   child: Container(
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark
-                          ? TColors.textWhite.withValues(alpha:0.1)
-                          : TColors.primary.withValues(alpha:0.1),
+                      color: isDark ? TColors.textWhite.withValues(alpha:0.1) : TColors.primary.withValues(alpha:0.1),
                       border: Border.all(
-                        color: isDark
-                            ? Colors.white.withValues(alpha:0.1)
-                            : TColors.primary.withValues(alpha:0.2),
+                        color: isDark ? Colors.white.withValues(alpha:0.1) : TColors.primary.withValues(alpha:0.2),
                         width: 1,
                       ),
                     ),
@@ -135,7 +126,8 @@ class SalesDashboard extends StatelessWidget {
             ],
           ),
         ),
-      ),      body: RefreshIndicator(
+      ),
+      body: RefreshIndicator(
         color: TColors.primary,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         onRefresh: () async {
@@ -211,28 +203,27 @@ class SalesDashboard extends StatelessWidget {
     );
   }
 
-  // --- WIDGET: Personal Performance Card ---
-// --- WIDGET: Personal Performance Card (COMPACT VERSION) ---
+  // --- WIDGET: Personal Performance Card (✅ FIXED TOTAL ORDERS) ---
   Widget _buildMyPerformanceCard(bool isDark, SalesAgentController controller) {
     return Obx(() {
-      final achievement = controller.monthlyAchievement.value;
-      final percentage = controller.achievementPercentage.clamp(0.0, 1.0);
-      final target = controller.monthlyTarget;
+      final gross = controller.grossSales.value;
+      final net = controller.netAchievement.value;
 
+      // Achievement percentage follows Gross Sales
+      final percentage = controller.achievementPercentage.clamp(0.0, 1.0);
+
+      final target = controller.monthlyTarget.value;
       final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
 
       return Container(
-        padding: const EdgeInsets.all(16), // ✅ Reduced from 24
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF5E35B1),
-              Color(0xFF3949AB),
-            ],
+            colors: [Color(0xFF5E35B1), Color(0xFF3949AB)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(20), // ✅ Tighter radius
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF3949AB).withValues(alpha:0.4),
@@ -241,103 +232,126 @@ class SalesDashboard extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           children: [
-            // --- Compact Progress Ring ---
-            SizedBox(
-              height: 65, // ✅ Shrunk from 85
-              width: 65,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CircularProgressIndicator(
-                    value: 1.0,
-                    strokeWidth: 6, // ✅ Thinner stroke
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha:0.1)),
-                  ),
-                  CircularProgressIndicator(
-                    value: percentage,
-                    strokeWidth: 6,
-                    backgroundColor: Colors.transparent,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeCap: StrokeCap.round,
-                  ),
-                  Center(
-                    child: Text(
-                      "${(percentage * 100).toStringAsFixed(0)}%",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14, // ✅ Smaller text
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16), // ✅ Reduced spacing
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha:0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      "THIS MONTH",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 9, // ✅ Smaller badge
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "₹${formatCurrency.format(achievement)}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22, // ✅ Scaled down from 28
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    height: 1,
-                    width: double.infinity,
-                    color: Colors.white.withValues(alpha:0.2),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
+            // --- TOP ROW: Progress Ring + Gross Sales ---
+            Row(
+              children: [
+                // Progress Ring (Based on Gross)
+                SizedBox(
+                  height: 75,
+                  width: 75,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      const Icon(Icons.flag_circle_rounded, color: Colors.amberAccent, size: 14),
-                      const SizedBox(width: 6),
-                      Text(
-                        "Target: ₹${formatCurrency.format(target)}",
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha:0.9),
-                          fontSize: 12, // ✅ Smaller target text
-                          fontWeight: FontWeight.w600,
+                      CircularProgressIndicator(
+                        value: 1.0,
+                        strokeWidth: 7,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha:0.1)),
+                      ),
+                      CircularProgressIndicator(
+                        value: percentage,
+                        strokeWidth: 7,
+                        backgroundColor: Colors.transparent,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        strokeCap: StrokeCap.round,
+                      ),
+                      Center(
+                        child: Text(
+                          "${(percentage * 100).toStringAsFixed(0)}%",
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white),
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 20),
+
+                // Gross Sales (The primary metric for the indicator)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha:0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          "GROSS SALES",
+                          style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "₹${formatCurrency.format(gross)}",
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 28, color: Colors.white, letterSpacing: -0.5),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Target: ₹${formatCurrency.format(target)}",
+                        style: TextStyle(color: Colors.white.withValues(alpha:0.8), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // --- BOTTOM ROW: Net Achievement vs Total Orders ---
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha:0.2),
+                  borderRadius: BorderRadius.circular(16)
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Net Achievement (Moved here)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          "Net Achievement",
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600)
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                          "₹${formatCurrency.format(net)}",
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)
+                      ),
+                    ],
+                  ),
+
+                  Container(height: 30, width: 1, color: Colors.white.withValues(alpha: 0.2)),
+
+                  // Total Orders
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                          "Total Orders",
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600)
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                          "${controller.totalOrders.value}",
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)
+                      )
+                    ],
+                  )
                 ],
               ),
-            ),
+            )
           ],
         ),
       );
     });
-  }
-  // --- WIDGET: Team Leaderboard ---
-  Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
+  }  Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       if (controller.isLoading.value && controller.leaderboardData.isEmpty) {
         return const Center(
@@ -393,6 +407,9 @@ class SalesDashboard extends StatelessWidget {
           ).format(rawAmount);
 
           double progress = agent['progress'] ?? 0.0;
+
+          // ✅ FETCH THE SM FLAG
+          bool isSM = agent['isSM'] == true;
 
           List<Color> rankGradient;
           Color rankBorder;
@@ -486,13 +503,30 @@ class SalesDashboard extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            agent['name'] ?? 'Unknown',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: nameColor,
-                            ),
+                          // ✅ UPDATED: Wrapped Name and SM Tag in a Row
+                          Row(
+                            children: [
+                              Text(
+                                agent['name'] ?? 'Unknown',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: nameColor,
+                                ),
+                              ),
+                              if (isSM) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueAccent.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Text("SM", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
+                                ),
+                              ],
+                            ],
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -562,7 +596,6 @@ class SalesDashboard extends StatelessWidget {
       );
     });
   }
-
   // --- WIDGET: PREMIUM QUICK LINKS GRID ---
   Widget _buildQuickLinksGrid(bool isDark) {
     return GridView.count(
@@ -571,33 +604,33 @@ class SalesDashboard extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 2.2, // Slightly taller for better shadow display
+      childAspectRatio: 2.2,
       children: [
         _buildPremiumActionCard(
           "Clients",
           Icons.group_rounded,
-          const Color(0xFF1E88E5), // Indigo Blue
+          const Color(0xFF1E88E5),
           isDark,
               () => Get.to(() => const ClientListScreen()),
         ),
         _buildPremiumActionCard(
           "Catalogue",
           Icons.menu_book_rounded,
-          const Color(0xFF00ACC1), // Deep Sky Blue
+          const Color(0xFF00ACC1),
           isDark,
               () => Get.to(() => const SalesCatalogScreen()),
         ),
         _buildPremiumActionCard(
           "Track Order",
           Icons.local_shipping_rounded,
-          const Color(0xFFF4511E), // Deep Orange
+          const Color(0xFFF4511E),
           isDark,
               () => Get.to(() => const OrderTrackingScreen()),
         ),
         _buildPremiumActionCard(
           "Support",
           Icons.support_agent_rounded,
-          const Color(0xFF43A047), // Green
+          const Color(0xFF43A047),
           isDark,
               () {},
         ),
@@ -665,7 +698,6 @@ class SalesDashboard extends StatelessWidget {
   }
 
   // --- HELPER: App Bar Circular Action Button ---
-// --- HELPER: App Bar Circular Action Button (With Notification Badge) ---
   Widget _buildCircularAction(IconData icon, bool isDark, VoidCallback onTap, {int notificationCount = 0}) {
     return Stack(
       clipBehavior: Clip.none,

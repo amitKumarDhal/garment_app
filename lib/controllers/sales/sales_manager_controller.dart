@@ -13,40 +13,37 @@ class SalesManagerController extends GetxController {
   // --- Observables ---
   var pendingOrders = <OrderModel>[].obs;
   var approvedOrders = <OrderModel>[].obs;
-  var managerName = 'Manager'.obs;
 
-  // ✅ ADDED THESE FOR HISTORY SCREEN
-  var activeOrders = <OrderModel>[].obs; // Cutting, Stitching, etc.
-  var completedOrders = <OrderModel>[].obs; // Delivered, Rejected
+  // ✅ NEW: Observable for Deletion Requests
+  var deletionRequests = <OrderModel>[].obs;
+
+  var managerName = 'Manager'.obs;
+  var activeOrders = <OrderModel>[].obs;
+  var completedOrders = <OrderModel>[].obs;
 
   var topAgents = <Map<String, dynamic>>[].obs;
   var totalRevenue = 0.0.obs;
   var isLoading = true.obs;
   var totalOrdersCount = 0.obs;
 
-  // Defaults to the current month
   var selectedMonth = DateTime.now().obs;
 
   void fetchAllData() async {
-    // ✅ 1. EXIT early if the UI is still building
     await Future.delayed(const Duration(milliseconds: 800));
-
     if (FirebaseAuth.instance.currentUser == null) return;
 
     try {
       isLoading.value = true;
-
-      // ✅ 2. Use Future.wait to run independent fetches in parallel
-      // instead of one after another. This is MUCH faster.
       await Future.wait([
         fetchManagerProfile(),
         fetchMonthlyStats(),
       ]);
 
-      // ✅ 3. Start listeners without 'awaiting' them so they don't block the UI
+      // Start listeners
       fetchPendingOrders();
       fetchApprovedOrders();
       fetchOrderHistory();
+      fetchDeletionRequests(); // ✅ Start listening for deletion requests
 
     } catch (e) {
       debugPrint("Error: $e");
@@ -54,141 +51,127 @@ class SalesManagerController extends GetxController {
       isLoading.value = false;
     }
   }
+
   void changeMonth(DateTime newMonth) {
     selectedMonth.value = newMonth;
     fetchMonthlyStats();
   }
 
-  /// --- 1. Fetch Pending Orders (Real-time) ---
+  /// --- 1. Fetch Pending Orders ---
   void fetchPendingOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
-      _db
-          .collection('orders')
-          // ✅ Fix: Look for BOTH 'Placed' and 'Pending'
+      _db.collection('orders')
+      // ✅ Filter: Only show orders that are NOT soft-deleted
+          .where('isDeleted', isNotEqualTo: true)
           .where('status', whereIn: ['Placed', 'Pending'])
+      // ✅ Firestore Rule: You must order by the field used in 'isNotEqualTo' first
+          .orderBy('isDeleted')
           .orderBy('orderDate', descending: true)
           .snapshots()
           .listen((snapshot) {
-            pendingOrders.value = snapshot.docs
-                .map((doc) => OrderModel.fromSnapshot(doc))
-                .toList();
-          });
+        pendingOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+      });
     } catch (e) {
-      print("Error fetching pending: $e");
+      debugPrint("Error fetching pending: $e");
     }
   }
-
-  /// --- 2. Fetch Approved Orders (Real-time) ---
+  /// --- 2. Fetch Approved Orders ---
   void fetchApprovedOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
-      _db
-          .collection('orders')
+      _db.collection('orders')
           .where('status', isEqualTo: 'Approved')
           .orderBy('orderDate', descending: true)
           .snapshots()
           .listen((snapshot) {
-            approvedOrders.value = snapshot.docs
-                .map((doc) => OrderModel.fromSnapshot(doc))
-                .toList();
-          });
+        approvedOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+      });
     } catch (e) {
       print("Error fetching approved orders: $e");
     }
   }
 
-  /// ✅ 3. FETCH ORDERS FOR HISTORY SCREEN (Active vs Completed)
+  /// --- 3. FETCH ORDERS FOR HISTORY SCREEN ---
   void fetchOrderHistory() {
     if (FirebaseAuth.instance.currentUser == null) return;
 
-    // A. Fetch ACTIVE Orders (In Production)
-    // Note: 'Approved' is included here so it shows up immediately after approval
-    _db
-        .collection('orders')
-        .where(
-          'status',
-          whereIn: [
-            'Approved',
-            'Cutting',
-            'Stitching',
-            'Printing',
-            'Packing',
-            'Shipping',
-          ],
-        )
+    _db.collection('orders')
+        .where('status', whereIn: ['Approved', 'Cutting', 'Stitching', 'Printing', 'Packing', 'Shipping'])
         .orderBy('orderDate', descending: true)
         .snapshots()
         .listen((snapshot) {
-          activeOrders.value = snapshot.docs
-              .map((doc) => OrderModel.fromSnapshot(doc))
-              .toList();
-        });
+      activeOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+    });
 
-    // B. Fetch COMPLETED Orders (History)
-    _db
-        .collection('orders')
+    _db.collection('orders')
         .where('status', whereIn: ['Delivered', 'Rejected'])
         .orderBy('orderDate', descending: true)
         .limit(50)
         .snapshots()
         .listen((snapshot) {
-          completedOrders.value = snapshot.docs
-              .map((doc) => OrderModel.fromSnapshot(doc))
-              .toList();
-        });
+      completedOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+    });
   }
 
-
-// 2. Add this function to fetch the FullName from Firestore
-Future<void> fetchManagerProfile() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
+  /// ✅ NEW: FETCH DELETION REQUESTS (Real-time)
+  void fetchDeletionRequests() {
+    if (FirebaseAuth.instance.currentUser == null) return;
     try {
-      final doc = await _db.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        String fullName = doc.data()?['FullName'] ?? '';
-        if (fullName.isNotEmpty) {
-          // Takes "Sales" from "Sales Manager Dummy"
-          managerName.value = fullName.trim().split(' ').first;
-        }
-      }
+      _db.collection('orders')
+          .where('isDeleteRequested', isEqualTo: true)
+          .snapshots()
+          .listen((snapshot) {
+        deletionRequests.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+      });
     } catch (e) {
-      print("Error fetching profile: $e");
+      print("Error fetching deletion requests: $e");
     }
   }
-}
 
+  Future<void> fetchManagerProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await _db.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          String fullName = doc.data()?['FullName'] ?? '';
+          if (fullName.isNotEmpty) {
+            managerName.value = fullName.trim().split(' ').first;
+          }
+        }
+      } catch (e) {}
+    }
+  }
 
-
-  /// --- 4. Monthly Stats & Leaderboard ---
-  /// --- ✅ UPDATED: Monthly Stats & Leaderboard ---
-  /// --- ✅ UPDATED: Monthly Stats & Leaderboard ---
   Future<void> fetchMonthlyStats() async {
     if (FirebaseAuth.instance.currentUser == null) return;
-
     try {
       DateTime targetDate = selectedMonth.value;
       DateTime startOfMonth = DateTime(targetDate.year, targetDate.month, 1);
-      DateTime endOfMonth = DateTime(
-        targetDate.year,
-        targetDate.month + 1,
-        0,
-        23,
-        59,
-        59,
-      );
+      DateTime endOfMonth = DateTime(targetDate.year, targetDate.month + 1, 0, 23, 59, 59);
 
-      // 1. QUERY ALL ORDERS FOR THE MONTH
-      final snapshot = await _db
-          .collection('orders')
+      // 👇 ADD THIS NEW BLOCK HERE 👇
+      // 1. Fetch Users Collection to Identify Managers for the "SM" tag
+      final usersSnap = await _db.collection('users').get();
+      Map<String, bool> managerMap = {};
+      for (var doc in usersSnap.docs) {
+        final d = doc.data();
+        String n = d['FullName'] ?? d['Name'] ?? '';
+        String r = (d['Role'] ?? d['role'] ?? '').toString().toLowerCase();
+        // If role is manager, mark them in the map
+        if (n.isNotEmpty && (r.contains('manager') || r == 'sales manager')) {
+          managerMap[n] = true;
+        }
+      }
+      // 👆 END OF NEW BLOCK 👆
+
+      final snapshot = await _db.collection('orders')
           .where('orderDate', isGreaterThanOrEqualTo: startOfMonth)
           .where('orderDate', isLessThanOrEqualTo: endOfMonth)
           .get();
 
-      // Statuses that DO NOT count towards total volume or revenue
       List<String> excludedStatuses = ['rejected', 'cancelled'];
-
       int validOrderCount = 0;
       double total = 0.0;
       Map<String, double> agentSales = {};
@@ -198,28 +181,29 @@ Future<void> fetchManagerProfile() async {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        // ✅ FIX: Exclude Rejected/Cancelled from ALL stats
-        if (!excludedStatuses.contains(status)) {
+        // ✅ 1. Check if the order has a pending deletion request
+        bool isDeleteRequested = data['isDeleteRequested'] == true;
 
-          // 1. Increment valid order count
-          validOrderCount++;
+        // ✅ 2. Skip the order if it is rejected, cancelled, OR pending deletion
+        if (!excludedStatuses.contains(status) && !isDeleteRequested) {
 
-          // 2. Calculate Revenue (Only for revenue generating statuses)
-          List<String> revenueStatuses = [
-            'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered'
-          ];
+          validOrderCount++; // Count this as a valid order!
+
+          List<String> revenueStatuses = ['approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered'];
 
           if (revenueStatuses.contains(status)) {
+            // ✅ 3. Use Effective Revenue if available, otherwise fallback to Total Amount
             double amount = 0.0;
-            var rawAmount = data['totalAmount'];
-            if (rawAmount is num) {
-              amount = rawAmount.toDouble();
-            } else if (rawAmount is String) {
-              amount = double.tryParse(rawAmount) ?? 0.0;
+            var rawEffRevenue = data['effectiveRevenue'];
+
+            if (rawEffRevenue != null && (rawEffRevenue as num) > 0) {
+              amount = (rawEffRevenue).toDouble();
+            } else {
+              var rawTotal = data['totalAmount'];
+              amount = (rawTotal is num) ? rawTotal.toDouble() : (double.tryParse(rawTotal?.toString() ?? '0') ?? 0.0);
             }
 
             String agent = data['marketingPersonName'] ?? 'Unknown';
-
             total += amount;
             agentSales[agent] = (agentSales[agent] ?? 0) + amount;
             countMap[agent] = (countMap[agent] ?? 0) + 1;
@@ -227,25 +211,27 @@ Future<void> fetchManagerProfile() async {
         }
       }
 
-      // ✅ SET TOTAL VOLUME (Only valid orders)
+      // Update the UI observables with the clean numbers
       totalOrdersCount.value = validOrderCount;
       totalRevenue.value = total;
 
-      // --- SORT AGENTS ---
-      var sortedAgents = agentSales.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-
+      var sortedAgents = agentSales.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       double targetAmount = 100000.0;
 
+// 👇 REPLACE YOUR EXISTING topAgents MAPPING WITH THIS 👇
       topAgents.value = sortedAgents.take(10).map((e) {
         String agentName = e.key;
         double currentSales = e.value;
-        double progress = currentSales / targetAmount;
 
+        // ✅ DYNAMIC TARGET: 150k for SM, 100k for normal agents
+        bool isSM = managerMap[agentName] == true;
+        double targetAmount = isSM ? 150000.0 : 100000.0;
+
+        double progress = currentSales / targetAmount;
         String greeting = "";
-        if (progress >= 1.5) {
-          greeting = "Unstoppable! 🚀";
-        } else if (progress >= 1.0) greeting = "Target Smashed! 🏆";
+
+        if (progress >= 1.5) greeting = "Unstoppable! 🚀";
+        else if (progress >= 1.0) greeting = "Target Smashed! 🏆";
         else if (progress >= 0.8) greeting = "Almost there! 🔥";
         else if (progress >= 0.5) greeting = "Halfway point 💪";
         else greeting = "Keep Pushing 📉";
@@ -253,22 +239,17 @@ Future<void> fetchManagerProfile() async {
         return {
           'name': agentName,
           'amount': currentSales,
-          'formatted': NumberFormat.compactCurrency(
-              symbol: '₹',
-              locale: 'en_IN',
-              decimalDigits: 1
-          ).format(currentSales),
+          'formatted': NumberFormat.compactCurrency(symbol: '₹', locale: 'en_IN', decimalDigits: 1).format(currentSales),
           'progress': progress,
           'greeting': greeting,
           'count': countMap[agentName] ?? 0,
+          'isSM': isSM, // ✅ Pass the SM flag to the UI
         };
-      }).toList();
-    } catch (e) {
+      }).toList();    } catch (e) {
       print("❌ STATS ERROR: $e");
     }
   }
-
-  /// --- 5. Actions ---
+  /// --- ACTIONS ---
   Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
   }
@@ -278,45 +259,107 @@ Future<void> fetchManagerProfile() async {
   }
 
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
-    try {
-      await _db.collection('orders').doc(orderId).update({
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      Get.snackbar(
-        "Status Updated",
-        "Order moved to: $newStatus",
-        backgroundColor: Colors.blue.withValues(alpha:0.1),
-        colorText: Colors.blue,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    } catch (e) {
-      Get.snackbar("Error", "Failed to update status: $e");
-    }
+    await _updateStatus(orderId, newStatus, Colors.blue);
   }
 
-  Future<void> _updateStatus(
-    String orderId,
-    String newStatus,
-    Color color,
-  ) async {
+  Future<void> _updateStatus(String orderId, String newStatus, Color color) async {
     try {
+      final orderDoc = await _db.collection('orders').doc(orderId).get();
+      final associateId = orderDoc.data()?['marketingPersonId'] ?? '';
+      final orderNo = orderDoc.data()?['manualOrderNo'] ?? orderId;
+
       await _db.collection('orders').doc(orderId).update({
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      if (associateId.isNotEmpty) {
+        String emoji = "🔄";
+        if (newStatus == 'Approved') emoji = "✅";
+        if (newStatus == 'Rejected') emoji = "❌";
+        if (newStatus == 'Cutting' || newStatus == 'Stitching') emoji = "✂️";
+        if (newStatus == 'Printing' || newStatus == 'Packing') emoji = "📦";
+        if (newStatus == 'Shipping') emoji = "🚚";
+        if (newStatus == 'Delivered') emoji = "🎉";
+
+        await _db.collection('notifications').add({
+          'targetUserId': associateId,
+          'title': 'Order Update $emoji',
+          'message': 'Order $orderNo has been moved to $newStatus.',
+          'timestamp': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+      }
 
       if (newStatus == 'Approved') fetchMonthlyStats();
 
       Get.snackbar(
         "Order $newStatus",
-        "Successfully updated status.",
-        backgroundColor: color.withValues(alpha:0.1),
+        "Successfully updated status & notified associate.",
+        backgroundColor: color.withValues(alpha: 0.1),
         colorText: color,
+        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
       Get.snackbar("Update Failed", e.toString());
+    }
+  }
+
+  // ✅ NEW: APPROVE DELETION
+// ✅ UPDATED: Soft Delete instead of hard delete
+  Future<void> approveDeletionRequest(OrderModel order) async {
+    try {
+      await _db.collection('orders').doc(order.id).update({
+        'status': 'Deleted',       // Change status
+        'isDeleted': true,         // Add a hidden flag
+        'isDeleteRequested': false, // Close the request
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (order.marketingPersonId != null && order.marketingPersonId!.isNotEmpty) {
+        await _db.collection('notifications').add({
+          'targetUserId': order.marketingPersonId,
+          'title': 'Deletion Approved 🗑️',
+          'message': 'Order ${order.manualOrderNo} was approved for removal.',
+          'timestamp': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+      }
+
+      fetchMonthlyStats(); // Refresh stats to remove this order's revenue
+
+      Get.snackbar("Success", "Order moved to trash.",
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
+    } catch (e) {
+      Get.snackbar("Error", "Could not soft delete: $e");
+    }
+  }
+  // ✅ NEW: DENY DELETION
+  Future<void> denyDeletionRequest(OrderModel order) async {
+    try {
+      await _db.collection('orders').doc(order.id).update({
+        'isDeleteRequested': false,
+        'deleteRequestedAt': FieldValue.delete(),
+      });
+
+      if (order.marketingPersonId != null && order.marketingPersonId!.isNotEmpty) {
+        await _db.collection('notifications').add({
+          'targetUserId': order.marketingPersonId,
+          'title': 'Deletion Denied ❌',
+          'message': 'Your request to delete Order ${order.manualOrderNo} was denied. It remains active.',
+          'timestamp': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+      }
+
+      Get.snackbar(
+          "Denied",
+          "Deletion request denied. The order is active.",
+          backgroundColor: Colors.orange.withValues(alpha: 0.1),
+          colorText: Colors.orange
+      );
+    } catch (e) {
+      Get.snackbar("Error", "Could not deny request: $e");
     }
   }
 }

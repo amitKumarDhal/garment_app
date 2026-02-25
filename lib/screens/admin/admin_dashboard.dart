@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../controllers/admin/admin_notification_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../controllers/admin/admin_controller.dart';
 import '../../routes/route_names.dart';
 
+import 'admin_notification_screen.dart';
+import 'admin_profile_screen.dart';
 import 'worker_list_screen.dart';
 import 'inventory_screen.dart';
 import '../floor_management/agent_list_screen.dart';
@@ -71,22 +74,26 @@ class AdminDashboard extends StatelessWidget {
               );
             }),
             actions: [
-              // ✅ STATIC Notification Bell with number dot
-              _buildAppBarAction(
-                Icons.notifications_none_rounded,
-                isDark,
-                    () {
-                  HapticFeedback.lightImpact();
-                  // Get.toNamed(AppRouteNames.pendingApprovals);
-                },
-                badgeCount: 3, // Static number for now as requested
-              ),
+              // ✅ DYNAMIC Notification Bell
+              Obx(() {
+                final notifController = Get.put(AdminNotificationController());
+                return _buildAppBarAction(
+                  Icons.notifications_none_rounded,
+                  isDark,
+                      () {
+                    HapticFeedback.lightImpact();
+                    Get.to(() => const AdminNotificationScreen());
+                  },
+                  badgeCount: notifController.unreadCount.value,
+                );
+              }),
               const SizedBox(width: 12),
 
-              // Premium Profile Avatar Placeholder
+              // ✅ FUNCTIONAL Premium Profile Avatar
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
+                  Get.to(() => const AdminProfileScreen());
                 },
                 child: Container(
                   margin: const EdgeInsets.only(right: 20),
@@ -116,38 +123,76 @@ class AdminDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. PRIMARY METRICS (HIGHLIGHT CARDS) ---
+              // --- 1. PRIMARY METRICS (DAILY & MONTHLY) ---
               Row(
                 children: [
                   Expanded(
                     child: Obx(() => _buildPrimaryHighlightCard(
-                      title: "Daily Revenue",
+                      title: "Daily Production",
                       value: "₹${formatCurrency.format(controller.totalDailyProduction.value)}",
-                      icon: Icons.trending_up_rounded,
+                      icon: Icons.today_rounded,
                       gradientColors: [const Color(0xFF6A1B9A), const Color(0xFF9C27B0)],
                       isDark: isDark,
                     )),
                   ),
                   const SizedBox(width: 16),
+
+                  // ✅ NEW: Tappable Monthly Revenue Card triggers Month Picker
                   Expanded(
-                    child: Obx(() {
-                      double eff = controller.averageEfficiency.value;
-                      Color effColor = eff >= 80 ? const Color(0xFF43A047) : (eff >= 50 ? Colors.orange : Colors.redAccent);
-                      return _buildPrimaryHighlightCard(
-                        title: "Factory Health",
-                        value: "${eff.toStringAsFixed(1)}%",
-                        icon: Icons.speed_rounded,
-                        gradientColors: [effColor.withValues(alpha:0.8), effColor],
+                    child: GestureDetector(
+                      onTap: () => controller.selectMonthYear(context),
+                      child: Obx(() => _buildPrimaryHighlightCard(
+                        title: "${DateFormat('MMM yyyy').format(controller.selectedMonth.value)} Revenue",
+                        value: "₹${formatCurrency.format(controller.totalMonthlyRevenue.value)}",
+                        icon: Icons.calendar_month_rounded,
+                        gradientColors: [const Color(0xFF00796B), const Color(0xFF009688)],
                         isDark: isDark,
-                      );
-                    }),
+                      )),
+                    ),
                   ),
                 ],
               ),
+
+              const SizedBox(height: 16),
+
+              // --- FACTORY HEALTH CARD ---
+              Obx(() {
+                double eff = controller.averageEfficiency.value;
+                Color effColor = eff >= 80 ? const Color(0xFF43A047) : (eff >= 50 ? Colors.orange : Colors.redAccent);
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: effColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.speed_rounded, color: effColor),
+                      const SizedBox(width: 12),
+                      Text("Factory Efficiency", style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black54)),
+                      const Spacer(),
+                      Text("${eff.toStringAsFixed(1)}%", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: effColor)),
+                    ],
+                  ),
+                );
+              }),
+
               const SizedBox(height: 24),
 
               // --- 2. SECONDARY KPI GRID ---
-              _buildSectionHeader("Operational KPIs", Icons.analytics_outlined, isDark),
+              // ✅ UPDATED: Section Header with Calendar Action
+              Padding(
+                padding: const EdgeInsets.only(right: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSectionHeader("Operational KPIs", Icons.analytics_outlined, isDark),
+                  ],
+                ),
+              ),
+
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
@@ -164,14 +209,14 @@ class AdminDashboard extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // --- 3. QUICK ACTIONS (PERMANENT PENDING APPROVALS BUTTON) ---
+              // --- 3. QUICK ACTIONS ---
               _buildSectionHeader("Quick Actions", Icons.bolt_rounded, isDark, iconColor: Colors.orange),
               Obx(() => _buildActionCard(
                 context: context,
                 title: "Pending Approvals",
                 subtitle: "${controller.pendingApprovalsCount.value} requests waiting for verification",
                 icon: Icons.verified_user_rounded,
-                color: Colors.orange, // Changed to Orange so it looks like a normal action
+                color: Colors.orange,
                 isDark: isDark,
                 onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
               )),
@@ -402,13 +447,13 @@ class AdminDashboard extends StatelessWidget {
                 children: [
                   // --- LEFT: DATE & TIMESTAMP ---
                   SizedBox(
-                    width: 65, // ✅ Increased width to fit the date cleanly
+                    width: 65,
                     child: Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Column(
                         children: [
                           Text(
-                            DateFormat('MMM d').format(activity.time), // e.g., "Feb 17"
+                            DateFormat('MMM d').format(activity.time),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: isDark ? Colors.white70 : Colors.black87,
@@ -419,7 +464,7 @@ class AdminDashboard extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            DateFormat('hh:mm a').format(activity.time), // e.g., "10:30 AM"
+                            DateFormat('hh:mm a').format(activity.time),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.grey.shade500,

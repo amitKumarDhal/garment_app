@@ -154,7 +154,6 @@ class MarketingUploadController extends GetxController {
     advanceAmount.text = order.advanceAmount.toString();
 
     // ✅ Load existing image URL if present
-    // Note: Add 'designMockupUrl' to your OrderModel if you haven't already.
     existingImageUrl.value = order.toJson()['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
@@ -231,12 +230,11 @@ class MarketingUploadController extends GetxController {
   Future<void> pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
-      // Compresses image to save cloud storage space and upload speed
       final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
 
       if (image != null) {
         selectedImagePath.value = image.path;
-        existingImageUrl.value = ''; // Clear existing network URL if they pick a new local one
+        existingImageUrl.value = '';
       }
     } catch (e) {
       Get.snackbar("Error", "Could not pick image: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
@@ -251,11 +249,10 @@ class MarketingUploadController extends GetxController {
 
   // ✅ NEW: FIREBASE STORAGE UPLOAD FUNCTION
   Future<String?> _uploadImageToStorage() async {
-    if (selectedImagePath.value.isEmpty) return null; // No new image picked
+    if (selectedImagePath.value.isEmpty) return null;
 
     try {
       File file = File(selectedImagePath.value);
-      // Create a unique file name
       String fileName = 'mockups/${DateTime.now().millisecondsSinceEpoch}_${orderNo.text}.jpg';
       Reference ref = FirebaseStorage.instance.ref().child(fileName);
 
@@ -291,9 +288,9 @@ class MarketingUploadController extends GetxController {
       }
 
       // ✅ UPLOAD IMAGE BEFORE SAVING ORDER
-      String? finalImageUrl = existingImageUrl.value; // Keep existing if not changed
+      String? finalImageUrl = existingImageUrl.value;
       if (selectedImagePath.value.isNotEmpty) {
-        finalImageUrl = await _uploadImageToStorage(); // Upload new image
+        finalImageUrl = await _uploadImageToStorage();
       }
 
       List<Map<String, dynamic>> productsList = [];
@@ -357,14 +354,18 @@ class MarketingUploadController extends GetxController {
         orderMap['manualOrderNo'] = orderNo.text.trim();
         await _db.collection('orders').doc(editingOrderId).update(orderMap);
         Get.snackbar("Success", "Order updated successfully!", backgroundColor: Colors.green, colorText: Colors.white);
-      } else {
+      }
+      else {
+        // ✅ 1. Declare this outside so the notification can access it
+        String newOrderId = "";
+
         await _db.runTransaction((transaction) async {
           DocumentReference counterRef = _db.collection('counters').doc('order_counter');
           DocumentSnapshot counterSnapshot = await transaction.get(counterRef);
           int nextSerialInt = 1;
           if (counterSnapshot.exists) nextSerialInt = (counterSnapshot.get('current_serial') ?? 0) + 1;
 
-          String newOrderId = "YB${nextSerialInt.toString().padLeft(3, '0')}";
+          newOrderId = "YB${nextSerialInt.toString().padLeft(3, '0')}";
           transaction.set(counterRef, {'current_serial': nextSerialInt});
 
           orderMap['manualOrderNo'] = newOrderId;
@@ -374,9 +375,36 @@ class MarketingUploadController extends GetxController {
           DocumentReference newOrderRef = _db.collection('orders').doc();
           transaction.set(newOrderRef, orderMap);
         });
+
+        // ✅ 2. NOTIFY MANAGERS
+        try {
+          // Finds all users marked as "Sales Manager"
+          final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+
+          for (var managerDoc in managerSnapshot.docs) {
+            await _db.collection('notifications').add({
+              'targetUserId': managerDoc.id,
+              'title': 'New Order Alert 🚨',
+              'message': '$agentName just placed Order $newOrderId.',
+              'timestamp': FieldValue.serverTimestamp(),
+              'isRead': false,
+            });
+          }
+        } catch (e) {
+          debugPrint("Could not notify manager: $e");
+        }
+
+        // ✅ 3. NOTIFY THE ASSOCIATE (Confirmation)
+        await _db.collection('notifications').add({
+          'targetUserId': userId,
+          'title': 'Order Placed ✅',
+          'message': 'Your order $newOrderId has been sent to the Manager for approval.',
+          'timestamp': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+
         Get.snackbar("Success", "Order saved securely!", backgroundColor: Colors.green, colorText: Colors.white);
       }
-
       clearForm();
 
     } catch (e) {

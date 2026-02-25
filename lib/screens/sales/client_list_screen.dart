@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../controllers/sales/client_controller.dart';
+import '../../data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
 import 'sales_client_detail_screen.dart';
 
@@ -15,6 +16,13 @@ class ClientListScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+    // ✅ Make sure data is fetched when screen opens (if controller doesn't do it automatically)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.clients.isEmpty) {
+        controller.fetchClients(); // Assuming you have a fetch function
+      }
+    });
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
@@ -89,28 +97,54 @@ class ClientListScreen extends StatelessWidget {
                 );
               }
 
+              // ✅ NEW: Sort the clients by Revenue so #1 is actually the top spender!
+              List<Map<String, dynamic>> rankedClients = [];
+
+              for (String clientName in controller.filteredClientNames) {
+                final orders = controller.clients[clientName] ?? <OrderModel>[];                double totalRevenue = 0.0;
+                int validOrderCount = 0;
+
+                for (var order in orders) {
+                  // Safely exclude cancelled/rejected orders from revenue calculation
+                  String status = (order.status).toString().toLowerCase();
+                  if (status != 'rejected' && status != 'cancelled') {
+                    validOrderCount++;
+                    totalRevenue += order.totalAmount;
+                  }
+                }
+
+                rankedClients.add({
+                  'name': clientName,
+                  'orders': orders,
+                  'validCount': validOrderCount, // Only count active orders
+                  'revenue': totalRevenue,
+                });
+              }
+
+              // ✅ Sort the list from Highest Revenue to Lowest
+              rankedClients.sort((a, b) => b['revenue'].compareTo(a['revenue']));
+
               return ListView.separated(
                 padding: const EdgeInsets.only(left: 20, right: 20, bottom: 40, top: 4),
                 physics: const BouncingScrollPhysics(),
-                itemCount: controller.filteredClientNames.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemCount: rankedClients.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
-                  final clientName = controller.filteredClientNames[index];
-                  final orders = controller.clients[clientName] ?? [];
-                  final int rank = index + 1;
+                  // Read the pre-sorted data
+                  final clientData = rankedClients[index];
+                  final String clientName = clientData['name'];
+                  final List<OrderModel> orders = clientData['orders'] as List<OrderModel>;
+                  final int orderCount = clientData['validCount'];
+                  final double totalRevenue = clientData['revenue'];
 
-                  // Calculate Total Revenue
-                  double totalRevenue = 0.0;
-                  for (var order in orders) {
-                    totalRevenue += order.totalAmount;
-                  }
+                  final int rank = index + 1; // 1, 2, 3...
 
                   return GestureDetector(
                     onTap: () {
                       HapticFeedback.lightImpact();
                       Get.to(() => SalesClientDetailScreen(clientName: clientName, orders: orders));
                     },
-                    child: _buildClientCard(rank, clientName, orders.length, totalRevenue, currencyFormat, isDark),
+                    child: _buildClientCard(rank, clientName, orderCount, totalRevenue, currencyFormat, isDark),
                   );
                 },
               );

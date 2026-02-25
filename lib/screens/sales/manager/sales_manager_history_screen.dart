@@ -129,6 +129,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                               _buildFilterChip(controller, "Shipping", isDark),
                               _buildFilterChip(controller, "Delivered", isDark),
                               _buildFilterChip(controller, "Rejected", isDark),
+                              _buildFilterChip(controller, "Trash", isDark), // ✅ ADD THIS LINE
                             ],
                           ),
                         ),
@@ -168,7 +169,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 40, top: 0),
                 physics: const BouncingScrollPhysics(),
                 itemCount: controller.displayedOrders.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10), // ✅ Tighter gap between cards
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final order = controller.displayedOrders[index];
                   return GestureDetector(
@@ -219,12 +220,13 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW COMPACT CARD LAYOUT
-// ✅ UPGRADED COMPACT CARD WITH PRODUCT SUMMARY
-// ✅ UPGRADED COMPACT CARD WITH SMART QTY/PRICE SUMMARY
-// ✅ UPGRADED COMPACT CARD (Price Top-Right, Status Bottom-Right, Date Bottom-Left)
+  // ✅ UPGRADED COMPACT CARD
   Widget _buildCompactOrderCard(OrderModel order, bool isDark) {
     Color statusColor = _getStatusColor(order.status);
+
+    // ✅ CHECK FOR SOFT DELETE FLAG
+    // Note: Adjust 'order.toJson()' to 'order.isDeleted' if you added the field to your Model
+    bool isDeleted = order.toJson()['isDeleted'] == true;
 
     // ✅ SMART SUMMARY LOGIC
     String productSummary = "No Items";
@@ -251,10 +253,14 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
+        // ✅ Fade the card slightly if it is deleted
+        border: Border.all(
+            color: isDeleted
+                ? Colors.redAccent.withValues(alpha: 0.2)
+                : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03))
+        ),
         boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      // ✅ IntrinsicHeight forces the right column to stretch to the exact height of the left column
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -265,13 +271,43 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  // ID (Moved Date away from here)
+                  // ✅ 1. SOFT DELETED INDICATOR
+                  if (isDeleted) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          "SOFT DELETED",
+                          style: TextStyle(
+                            color: Colors.redAccent.withValues(alpha: 0.8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+
+                  // ✅ 2. BOLDER ID
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.1), borderRadius: BorderRadius.circular(6)),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: isDeleted
+                            ? Colors.grey.withValues(alpha: 0.1)
+                            : (isDark ? Colors.cyanAccent : Colors.blueAccent).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6)
+                    ),
                     child: Text(
                       order.manualOrderNo ?? "NO ID",
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: TColors.primary, letterSpacing: 0.5),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: isDeleted ? Colors.grey : (isDark ? Colors.cyanAccent : Colors.blueAccent),
+                          letterSpacing: 0.5
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -281,7 +317,11 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                     order.clientName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)
+                    ),
                   ),
 
                   // Product Name Summary
@@ -293,17 +333,28 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                     style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600),
                   ),
 
-                  // Smart Qty/Price Summary
-                  const SizedBox(height: 2),
-                  Text(
-                    qtyPriceSummary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: TColors.primary, fontSize: 11, fontWeight: FontWeight.w800),
+                  // QTY/PRICE SUMMARY
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (isDark ? Colors.deepOrangeAccent : Colors.deepOrange).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      qtyPriceSummary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: isDark ? Colors.orangeAccent : Colors.deepOrange,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
 
-                  // Agent
+                  // Agent & Date
                   Row(
                     children: [
                       Icon(Icons.support_agent_rounded, size: 12, color: Colors.grey.shade500),
@@ -318,10 +369,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 4),
-
-                  // ✅ NEW POSITION: Date & Time
                   Row(
                     children: [
                       Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade400),
@@ -341,26 +389,32 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             // --- RIGHT SIDE: Price & Status ---
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
-              // ✅ SpaceBetween locks Price to Top and Status to Bottom
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // ✅ Top Right: Price
                 Text(
                   "₹${order.totalAmount.toStringAsFixed(0)}",
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: isDeleted ? Colors.grey : Colors.green
+                  ),
                 ),
 
-                // ✅ Bottom Right: Status
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha:0.15),
+                    color: isDeleted ? Colors.grey.withValues(alpha: 0.1) : statusColor.withValues(alpha:0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: statusColor.withValues(alpha:0.3)),
+                    border: Border.all(color: isDeleted ? Colors.grey.withValues(alpha: 0.3) : statusColor.withValues(alpha:0.3)),
                   ),
                   child: Text(
-                    order.status.toUpperCase(),
-                    style: TextStyle(fontWeight: FontWeight.w900, color: statusColor, fontSize: 9, letterSpacing: 0.5),
+                    isDeleted ? "DELETED" : order.status.toUpperCase(),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: isDeleted ? Colors.grey : statusColor,
+                        fontSize: 9,
+                        letterSpacing: 0.5
+                    ),
                   ),
                 ),
               ],
@@ -377,7 +431,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       case 'printing': return const Color(0xFF9C27B0);
       case 'packing': return const Color(0xFFFF9800);
       case 'shipping': return const Color(0xFF009688);
-      case 'delivered': return const Color(0xFF1B5E20);
+      case 'delivered': return const Color(0xFF13D421); // ✅ Made much lighter/brighter green
       case 'rejected': return const Color(0xFFF44336);
       case 'pending': return const Color(0xFFFFC107);
       default: return Colors.blueGrey;

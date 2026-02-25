@@ -80,6 +80,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       _buildFilterChip(controller, "Shipping", isDark),
                       _buildFilterChip(controller, "Delivered", isDark),
                       _buildFilterChip(controller, "Rejected", isDark),
+                      _buildFilterChip(controller, "Trash", isDark), // ✅ Added Trash Tab
                     ],
                   ),
                 ),
@@ -112,7 +113,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               }
 
               return ListView.separated(
-                // ✅ 120px padding ensures bottom cards clear the Floating Glass Dock!
+                // padding ensures bottom cards clear the Floating Glass Dock!
                 padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 120),
                 physics: const BouncingScrollPhysics(),
                 itemCount: controller.displayedOrders.length,
@@ -165,9 +166,12 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     });
   }
 
-  // ✅ UPGRADED EXECUTIVE CARD (Matches Manager Ledger)
+  // ✅ UPGRADED CARD DESIGN (Perfectly matches Sales Manager Ledger)
   Widget _buildHistoryCard(BuildContext context, OrderModel order, bool isDark) {
     Color statusColor = _getStatusColor(order.status);
+
+    // ✅ Check if order was soft-deleted
+    bool isDeleted = order.toJson()['isDeleted'] == true;
 
     // Smart Summary Logic
     String productSummary = "No Items";
@@ -199,7 +203,11 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
+          border: Border.all(
+              color: isDeleted
+                  ? Colors.redAccent.withValues(alpha: 0.2)
+                  : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03))
+          ),
           boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: IntrinsicHeight(
@@ -212,39 +220,135 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
+                    // ✅ 1. SOFT DELETED BADGE
+                    if (isDeleted) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            "SOFT DELETED",
+                            style: TextStyle(
+                              color: Colors.redAccent.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+
+                    // ✅ 2. VIBRANT CYAN/BLUE ID
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.1), borderRadius: BorderRadius.circular(6)),
-                      child: Text(order.manualOrderNo ?? "NO ID", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: TColors.primary, letterSpacing: 0.5)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: isDeleted
+                              ? Colors.grey.withValues(alpha: 0.1)
+                              : (isDark ? Colors.cyanAccent : Colors.blueAccent).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6)
+                      ),
+                      child: Text(
+                        order.manualOrderNo ?? "NO ID",
+                        style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                            color: isDeleted ? Colors.grey : (isDark ? Colors.cyanAccent : Colors.blueAccent),
+                            letterSpacing: 0.5
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Text(order.clientName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+
+                    // Client Name
+                    Text(
+                      order.clientName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)
+                      ),
+                    ),
+
+                    // Product Name Summary
                     const SizedBox(height: 2),
-                    Text(productSummary, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(qtyPriceSummary, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: TColors.primary, fontSize: 11, fontWeight: FontWeight.w800)),
+                    Text(
+                      productSummary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+
+                    // ✅ 3. DEEP ORANGE QTY SUMMARY
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (isDark ? Colors.deepOrangeAccent : Colors.deepOrange).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        qtyPriceSummary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: isDark ? Colors.orangeAccent : Colors.deepOrange,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 8),
+
+                    // Date & Time
                     Row(
                       children: [
                         Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade400),
                         const SizedBox(width: 4),
-                        Text(DateFormat('MMM dd, yyyy').format(order.orderDate), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
+                        Text(
+                          DateFormat('MMM dd, yyyy • hh:mm a').format(order.orderDate),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade400),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
+
               // --- RIGHT SIDE: Price & Status ---
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("₹${order.totalAmount.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green)),
+                  Text(
+                    "₹${order.totalAmount.toStringAsFixed(0)}",
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: isDeleted ? Colors.grey : Colors.green
+                    ),
+                  ),
+
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: statusColor.withValues(alpha:0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: statusColor.withValues(alpha:0.3))),
-                    child: Text(order.status.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, color: statusColor, fontSize: 9, letterSpacing: 0.5)),
+                    decoration: BoxDecoration(
+                      color: isDeleted ? Colors.grey.withValues(alpha: 0.1) : statusColor.withValues(alpha:0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDeleted ? Colors.grey.withValues(alpha: 0.3) : statusColor.withValues(alpha:0.3)),
+                    ),
+                    child: Text(
+                      isDeleted ? "DELETED" : order.status.toUpperCase(),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: isDeleted ? Colors.grey : statusColor,
+                          fontSize: 9,
+                          letterSpacing: 0.5
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -256,16 +360,15 @@ class SalesOrderHistoryScreen extends StatelessWidget {
   }
 
   // ✅ PREMIUM BOTTOM SHEET (Itemized Details)
-// ✅ PREMIUM BOTTOM SHEET (Itemized Details)
   void _showOrderDetails(BuildContext context, OrderModel order, bool isDark) {
-    // 🔒 SECURITY FIX: Added 'shipping' to the locked list
+    bool isDeleted = order.toJson()['isDeleted'] == true;
+
+    // 🔒 SECURITY FIX: Added 'shipping', deleted, etc. to the locked list
     final lockedStatuses = ['shipping', 'shipped', 'delivered', 'rejected'];
+    final bool isLocked = lockedStatuses.contains(order.status.toLowerCase()) || isDeleted;
 
-    // Check if the current status is in the locked list
-    final bool isLocked = lockedStatuses.contains(order.status.toLowerCase());
-
-    // Safety lock for deleting (only allowed in early stages)
-    final bool canDelete = ['pending', 'placed'].contains(order.status.toLowerCase());
+    // Safety lock for deleting (Allow requests if NOT shipped/delivered/already deleted)
+    final bool canRequestDelete = !lockedStatuses.contains(order.status.toLowerCase()) && !isDeleted;
 
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
@@ -288,19 +391,41 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 24),
 
-              // HEADER
+              // ✅ HEADER WITH DYNAMIC DELETION UI
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text("Ledger Details", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5)),
-                  if (canDelete)
-                    IconButton(
-                      onPressed: () => _confirmDelete(context, order),
-                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                      tooltip: "Delete Order",
+
+                  if (isDeleted)
+                    Tooltip(
+                        message: "This order has been deleted.",
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                          child: const Text("Deleted", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                        )
                     )
-                  else
-                    Tooltip(message: "Cannot delete active/completed orders", child: Icon(Icons.lock_outline_rounded, color: Colors.grey.shade400, size: 20)),
+                  else if (order.isDeleteRequested)
+                    Tooltip(
+                        message: "Deletion Pending Manager Approval",
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                          child: const Text("Pending Deletion", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
+                        )
+                    )
+                  else if (canRequestDelete)
+                      IconButton(
+                        onPressed: () => _confirmDelete(context, order),
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                        tooltip: "Request Deletion",
+                      )
+                    else
+                      Tooltip(
+                          message: "Cannot edit/delete shipping or completed orders",
+                          child: Icon(Icons.lock_outline_rounded, color: Colors.grey.shade400, size: 20)
+                      ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -311,7 +436,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               _modalRow("Organization", order.organization ?? "N/A", isDark),
               _modalRow("Phone", order.clientPhone ?? "N/A", isDark),
               _modalRow("Deadline", DateFormat('MMM dd, yyyy').format(order.deliveryDate), isDark),
-              _modalRow("Status", order.status.toUpperCase(), isDark, isStatus: true),
+              _modalRow("Status", isDeleted ? "DELETED" : order.status.toUpperCase(), isDark, isStatus: true, overrideColor: isDeleted ? Colors.grey : null),
 
               const SizedBox(height: 24),
               Text("ITEMIZED PRODUCTS", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey.shade500, fontSize: 11, letterSpacing: 1)),
@@ -389,7 +514,8 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),                  Expanded(
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
                       style: ElevatedButton.styleFrom(
@@ -410,25 +536,30 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       ),
     );
   }
+
+  // ✅ UPDATED CONFIRM DELETE METHOD (Now sends a request)
   void _confirmDelete(BuildContext context, OrderModel order) {
     Get.defaultDialog(
-      title: "Delete Order?",
+      title: "Request Deletion?",
       titleStyle: const TextStyle(fontWeight: FontWeight.bold),
-      middleText: "This action cannot be undone.",
-      textConfirm: "Delete",
+      middleText: "This order is active. You must request approval from the Sales Manager to delete it.",
+      textConfirm: "Send Request",
       textCancel: "Cancel",
       confirmTextColor: Colors.white,
-      buttonColor: Colors.redAccent,
+      buttonColor: Colors.orange, // Changed to orange to indicate a request
       cancelTextColor: Colors.black87,
       onConfirm: () {
-        Get.find<SalesHistoryController>().deleteOrder(order);
-        Navigator.pop(context);
-        Navigator.pop(context);
+        // Trigger the request function
+        Get.find<SalesHistoryController>().requestDeleteOrder(order);
+
+        // Double pop: Closes the dialog, then closes the bottom sheet
+        Get.back();
+        Get.back();
       },
     );
   }
 
-  Widget _modalRow(String label, String value, bool isDark, {bool isStatus = false, bool isBold = false, Color? valueColor}) {
+  Widget _modalRow(String label, String value, bool isDark, {bool isStatus = false, bool isBold = false, Color? valueColor, Color? overrideColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -443,7 +574,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               style: TextStyle(
                 fontWeight: (isBold || isStatus) ? FontWeight.w900 : FontWeight.w700,
                 fontSize: 14,
-                color: isStatus ? _getStatusColor(value) : (valueColor ?? (isDark ? Colors.white : Colors.black87)),
+                color: overrideColor ?? (isStatus ? _getStatusColor(value) : (valueColor ?? (isDark ? Colors.white : Colors.black87))),
               ),
             ),
           ),
@@ -460,7 +591,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       case 'printing': return const Color(0xFF9C27B0);
       case 'packing': return const Color(0xFFFF9800);
       case 'shipping': return const Color(0xFF009688);
-      case 'delivered': return const Color(0xFF13D421);
+      case 'delivered': return const Color(0xFF13D421); // Bright green
       case 'rejected': return const Color(0xFFF44336);
       case 'pending': return const Color(0xFFFFC107);
       case 'placed': return const Color(0xFFFFC107);

@@ -41,6 +41,9 @@ class OrderModel {
   final int marginNumber;
   final double effectiveRevenue;
 
+  // ✅ NEW FLAG FOR DELETION WORKFLOW
+  final bool isDeleteRequested;
+
   OrderModel({
     this.id,
     this.manualOrderNo,
@@ -71,6 +74,7 @@ class OrderModel {
     this.products = const [],
     this.marginNumber = 0, // Default to 0
     this.effectiveRevenue = 0.0, // Default to 0.0
+    this.isDeleteRequested = false, // ✅ Default to false
   });
 
   Map<String, dynamic> toJson() {
@@ -107,9 +111,12 @@ class OrderModel {
       // Save the dynamic array
       "products": products,
 
-      // ✅ SAVE MARGIN DATA
+      // SAVE MARGIN DATA
       "marginNumber": marginNumber,
       "effectiveRevenue": effectiveRevenue,
+
+      // ✅ SAVE DELETION FLAG
+      "isDeleteRequested": isDeleteRequested,
     };
   }
 
@@ -170,9 +177,12 @@ class OrderModel {
       localImagePath: data['localImagePath'] ?? '',
       products: parsedProducts,
 
-      // ✅ FETCH MARGIN DATA SAFELY
+      // FETCH MARGIN DATA SAFELY
       marginNumber: _parseInt(data['marginNumber']),
       effectiveRevenue: _parseDouble(data['effectiveRevenue']),
+
+      // ✅ FETCH DELETION FLAG SAFELY
+      isDeleteRequested: data['isDeleteRequested'] ?? false,
     );
   }
 

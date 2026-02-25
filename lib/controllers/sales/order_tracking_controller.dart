@@ -9,38 +9,66 @@ class OrderTrackingController extends GetxController {
   var searchResults = <OrderModel>[].obs;
   var hasSearched = false.obs;
 
+  // ✅ NEW: Filter state for Active vs Trash
+  var currentFilter = "Active".obs;
+
+  // ✅ NEW: Change filter and automatically re-run search
+  void setFilter(String filter) {
+    currentFilter.value = filter;
+    if (searchController.text.trim().isNotEmpty) {
+      searchOrder(searchController.text);
+    } else {
+      searchResults.clear();
+    }
+  }
+
   // Search Logic
   Future<void> searchOrder(String query) async {
     if (query.isEmpty) return;
-    
+
     isLoading.value = true;
     hasSearched.value = true;
     searchResults.clear();
 
     try {
+      List<OrderModel> tempResults = [];
+
       // 1. Try Searching by Manual Order ID (Exact Match)
+      // Added .toUpperCase() assuming your IDs are like 'YB028'
       final idSnapshot = await FirebaseFirestore.instance
           .collection('orders')
-          .where('manualOrderNo', isEqualTo: query.trim())
+          .where('manualOrderNo', isEqualTo: query.trim().toUpperCase())
           .get();
 
       if (idSnapshot.docs.isNotEmpty) {
-        searchResults.value = idSnapshot.docs
+        tempResults = idSnapshot.docs
             .map((doc) => OrderModel.fromSnapshot(doc))
             .toList();
       } else {
         // 2. If ID fails, Try Searching by Client Name
-        // Note: This matches names starting with the query (Case sensitive in basic Firestore)
         final nameSnapshot = await FirebaseFirestore.instance
             .collection('orders')
             .where('clientName', isGreaterThanOrEqualTo: query)
             .where('clientName', isLessThan: '${query}z')
             .get();
-            
-        searchResults.value = nameSnapshot.docs
+
+        tempResults = nameSnapshot.docs
             .map((doc) => OrderModel.fromSnapshot(doc))
             .toList();
       }
+
+      // ✅ 3. LOCAL FILTERING FOR SOFT DELETE
+      // We filter locally because Firestore blocks multiple inequality filters in one query.
+      bool isLookingForTrash = currentFilter.value == "Trash";
+
+      searchResults.value = tempResults.where((order) {
+        // Check if the order has the isDeleted flag
+        bool isDeleted = order.toJson()['isDeleted'] == true;
+
+        // If we want Trash, keep deleted ones. If we want Active, keep non-deleted ones.
+        return isLookingForTrash ? isDeleted : !isDeleted;
+      }).toList();
+
     } catch (e) {
       Get.snackbar("Error", "Could not track order: $e");
     } finally {

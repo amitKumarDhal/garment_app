@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart'; // ✅ Needed for Colors
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../data/models/order_model.dart'; // ✅ Ensure this is imported
+import '../../data/models/order_model.dart';
 
 class SalesAgentController extends GetxController {
   static SalesAgentController get instance => Get.find();
@@ -14,10 +14,39 @@ class SalesAgentController extends GetxController {
   final leaderboardData = <Map<String, dynamic>>[].obs;
   final isLoading = true.obs;
   final agentName = "".obs;
-  final monthlyAchievement = 0.0.obs;
 
-  // Target Configuration
-  final double monthlyTarget = 100000.0;
+  // Observables for Gross vs Net
+  final grossSales = 0.0.obs;
+  final netAchievement = 0.0.obs;
+  final totalOrders = 0.obs;
+
+  // Observable Target that adapts based on the user role
+  final monthlyTarget = 100000.0.obs;
+
+  Future<void> fetchAgentIdentity() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        String name = user.displayName ?? "Unknown";
+
+        final userDoc = await _db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          name = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? name;
+
+          // CHECK ROLE to set the personal target dynamically
+          String role = (userDoc.data()?['Role'] ?? userDoc.data()?['role'] ?? '').toString().toLowerCase();
+          if (role.contains('manager') || role == 'sales manager') {
+            monthlyTarget.value = 150000.0;
+          } else {
+            monthlyTarget.value = 100000.0;
+          }
+        }
+        agentName.value = name;
+      }
+    } catch (e) {
+      debugPrint("Error fetching identity: $e");
+    }
+  }
 
   /// Master function to reload all data
   Future<void> loadDashboardData() async {
@@ -29,27 +58,7 @@ class SalesAgentController extends GetxController {
     isLoading.value = false;
   }
 
-  // --- 1. Get Agent Identity ---
-  Future<void> fetchAgentIdentity() async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        String name = user.displayName ?? "Unknown";
-
-        // Try to fetch specific profile name from 'users' collection
-        final userDoc = await _db.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
-          name = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? name;
-        }
-        agentName.value = name;
-      }
-    } catch (e) {
-      print("Error fetching identity: $e");
-    }
-  }
-
-  // --- 2. Calculate My Personal Stats (Approved Only) ---
-  // --- 2. Calculate My Personal Stats (Includes All Revenue Generating Statuses) ---
+  // --- 2. Calculate My Personal Stats (Gross vs Net) ---
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
     if (agentName.value.isEmpty) return;
@@ -62,72 +71,74 @@ class SalesAgentController extends GetxController {
       final snapshot = await _db
           .collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
-          .where('orderDate',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('orderDate',
-              isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('orderDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
           .orderBy('orderDate', descending: true)
           .get();
 
-      double total = 0.0;
+      double totalGross = 0.0;
+      double totalNet = 0.0;
+      int orderCount = 0;
 
-      // ✅ DEFINE VALID STATUSES (Money that counts)
-      // We exclude 'Pending', 'Placed', and 'Rejected'
       List<String> validStatuses = [
-        'approved',
-        'cutting',
-        'stitching',
-        'printing',
-        'packing',
-        'shipping',
-        'delivered', 
-        'completed'
+        'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered', 'completed'
       ];
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'pending').toString().toLowerCase();
 
-        // ✅ CHECK IF STATUS IS IN THE VALID LIST
-        if (validStatuses.contains(status)) {
-          double amount = _parseAmount(data['totalAmount']);
-          total += amount;
+        // ✅ NEW: Check for both Delete Requests AND Soft Deletes
+        bool isDeleteRequested = data['isDeleteRequested'] == true;
+        bool isDeleted = data['isDeleted'] == true;
+
+        if (validStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
+          orderCount++;
+          double totalAmt = _parseAmount(data['totalAmount']);
+          double effRev = _parseAmount(data['effectiveRevenue']);
+
+          totalGross += totalAmt;
+          totalNet += (effRev > 0) ? effRev : totalAmt;
         }
       }
 
-      monthlyAchievement.value = total;
-      print("💰 Total Achievement (All Stages): $total");
+      grossSales.value = totalGross;
+      netAchievement.value = totalNet;
+      totalOrders.value = orderCount;
+
     } catch (e) {
-      print("❌ Stats Error: $e");
+      debugPrint("❌ Stats Error: $e");
     }
   }
-  // --- 3. Calculate Team Leaderboard ---
-  // --- 3. Calculate Team Leaderboard (Includes All Active Revenue) ---
+
+  // --- 3. Calculate Team Leaderboard (Using Effective Revenue) ---
   Future<void> fetchLeaderboard() async {
     try {
-      isLoading.value = true; 
+      isLoading.value = true;
 
       DateTime now = DateTime.now();
       DateTime start = DateTime(now.year, now.month, 1);
       DateTime end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      // ✅ DEFINE VALID REVENUE STATUSES
-      // (Must match the list used in Manager Controller)
+      // FETCH USER ROLES to build the leaderboard targets & tags accurately
+      final usersSnap = await _db.collection('users').get();
+      Map<String, bool> managerMap = {};
+      for (var doc in usersSnap.docs) {
+        final d = doc.data();
+        String n = d['FullName'] ?? d['Name'] ?? '';
+        String r = (d['Role'] ?? d['role'] ?? '').toString().toLowerCase();
+        if (n.isNotEmpty && (r.contains('manager') || r == 'sales manager')) {
+          managerMap[n] = true;
+        }
+      }
+
       List<String> revenueStatuses = [
-        'Approved',
-        'Cutting',
-        'Stitching',
-        'Printing',
-        'Packing',
-        'Shipping',
-        'Delivered',
-        // Add lowercase versions if your database has mixed casing
+        'Approved', 'Cutting', 'Stitching', 'Printing', 'Packing', 'Shipping', 'Delivered',
         'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered'
       ];
 
       final snapshot = await _db
           .collection('orders')
-          // ✅ FIX: Use 'whereIn' to catch all stages of the sale
           .where('status', whereIn: revenueStatuses)
           .where('orderDate', isGreaterThanOrEqualTo: start)
           .where('orderDate', isLessThanOrEqualTo: end)
@@ -138,31 +149,39 @@ class SalesAgentController extends GetxController {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        String agent = data['marketingPersonName'] ?? 'Unknown';
+        String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        double amount = _parseAmount(data['totalAmount']);
+        // ✅ NEW: Check for Soft Deletes
+        bool isDeleteRequested = data['isDeleteRequested'] == true;
+        bool isDeleted = data['isDeleted'] == true;
 
-        salesMap[agent] = (salesMap[agent] ?? 0) + amount;
-        countMap[agent] = (countMap[agent] ?? 0) + 1;
+        if (revenueStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
+          String agent = data['marketingPersonName'] ?? 'Unknown';
+
+          double totalAmt = _parseAmount(data['totalAmount']);
+          double effRev = _parseAmount(data['effectiveRevenue']);
+          double amountToCount = (effRev > 0) ? effRev : totalAmt;
+
+          salesMap[agent] = (salesMap[agent] ?? 0) + amountToCount;
+          countMap[agent] = (countMap[agent] ?? 0) + 1;
+        }
       }
 
-      // Sort High to Low
-      var sortedEntries = salesMap.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-
-      double targetAmount = 100000.0;
+      var sortedEntries = salesMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
       leaderboardData.value = sortedEntries.map((e) {
         String name = e.key;
         double amount = e.value;
         int count = countMap[name] ?? 0;
 
+        bool isSM = managerMap[name] == true;
+        double targetAmount = isSM ? 150000.0 : 100000.0;
+
         double progress = amount / targetAmount;
 
         String greeting = "";
-        if (progress >= 1.5) {
-          greeting = "Unstoppable! 🚀";
-        } else if (progress >= 1.0) greeting = "Target Smashed! 🏆";
+        if (progress >= 1.5) greeting = "Unstoppable! 🚀";
+        else if (progress >= 1.0) greeting = "Target Smashed! 🏆";
         else if (progress >= 0.8) greeting = "Almost there! 🔥";
         else if (progress >= 0.5) greeting = "Halfway point 💪";
         else greeting = "Keep Pushing 📉";
@@ -171,35 +190,28 @@ class SalesAgentController extends GetxController {
           'name': name,
           'amount': amount,
           'count': count,
-          'progress': progress, 
+          'progress': progress,
           'greeting': greeting,
+          'isSM': isSM,
         };
       }).toList();
     } catch (e) {
-      print("Error fetching leaderboard: $e");
+      debugPrint("Error fetching leaderboard: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
-  // --- 4. ✅ UPDATE ORDER (Edit Logic) ---
+  // --- 4. UPDATE ORDER (Edit Logic) ---
   Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
     try {
       isLoading.value = true;
 
-      // 1. Calculate new totals
       double subTotal = newQty * newPrice;
-      
-      // Calculate GST Amount based on percentage
       double gstAmount = (subTotal * originalOrder.gstPercentage) / 100;
-      
-      // New Grand Total
       double newTotal = subTotal + gstAmount + originalOrder.shippingCharge;
-      
-      // New Balance Due (Total - Advance already paid)
       double newBalance = newTotal - originalOrder.advanceAmount;
 
-      // 2. Prepare Data for Firestore
       Map<String, dynamic> updateData = {
         'quantity': newQty,
         'totalAmount': newTotal,
@@ -208,32 +220,86 @@ class SalesAgentController extends GetxController {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Update product price inside the products list (assuming single product editing for now)
       if (originalOrder.products.isNotEmpty) {
         List<dynamic> updatedProducts = List.from(originalOrder.products);
         if (updatedProducts[0] is Map) {
-             Map<String, dynamic> firstProduct = Map<String, dynamic>.from(updatedProducts[0]);
-             firstProduct['price'] = newPrice;
-             updatedProducts[0] = firstProduct;
+          Map<String, dynamic> firstProduct = Map<String, dynamic>.from(updatedProducts[0]);
+          firstProduct['price'] = newPrice;
+          updatedProducts[0] = firstProduct;
         }
         updateData['products'] = updatedProducts;
       }
 
-      // 3. Update Firestore
-      await _db
-          .collection('orders')
-          .doc(originalOrder.id)
-          .update(updateData);
-      
-      // 4. Refresh stats to reflect new amounts
+      await _db.collection('orders').doc(originalOrder.id).update(updateData);
       await fetchAgentStats();
 
       Get.snackbar("Success", "Order updated successfully!",
           backgroundColor: Colors.green.withValues(alpha:0.1), colorText: Colors.green);
-      
+
     } catch (e) {
       Get.snackbar("Error", "Failed to update order: $e",
           backgroundColor: Colors.red.withValues(alpha:0.1), colorText: Colors.red);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // --- 5. ✅ REQUEST DELETE ORDER LOGIC ---
+  Future<void> deleteOrder(String orderId, String currentStatus) async {
+    final lockedStatuses = ['shipping', 'shipped', 'delivered'];
+
+    if (lockedStatuses.contains(currentStatus.toLowerCase())) {
+      Get.snackbar(
+        "Action Denied",
+        "Orders in '$currentStatus' phase cannot be deleted.",
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+        colorText: Colors.red,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      // ✅ CHANGE: Request deletion instead of hard deleting
+      await _db.collection('orders').doc(orderId).update({
+        'isDeleteRequested': true,
+        'deleteRequestedAt': FieldValue.serverTimestamp(),
+      });
+
+      // ✅ NOTIFY MANAGERS
+      try {
+        final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+        for (var managerDoc in managerSnapshot.docs) {
+          await _db.collection('notifications').add({
+            'targetUserId': managerDoc.id,
+            'title': 'Deletion Request 🗑️',
+            'message': '${agentName.value} requested to delete an order.',
+            'timestamp': FieldValue.serverTimestamp(),
+            'isRead': false,
+          });
+        }
+      } catch (e) {
+        debugPrint("Could not notify manager: $e");
+      }
+
+      await fetchAgentStats();
+
+      Get.snackbar(
+        "Request Sent",
+        "Deletion request sent to manager for approval.",
+        backgroundColor: Colors.orange.withValues(alpha: 0.1),
+        colorText: Colors.orange,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Could not send deletion request: $e",
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
+        colorText: Colors.red,
+      );
     } finally {
       isLoading.value = false;
     }
@@ -251,8 +317,9 @@ class SalesAgentController extends GetxController {
     return 0.0;
   }
 
+// ✅ UPDATED: Now shows progress according to Gross Sales
   double get achievementPercentage {
-    if (monthlyTarget <= 0) return 0.0;
-    return (monthlyAchievement.value / monthlyTarget).clamp(0.0, 1.0);
-  }
-}
+    if (monthlyTarget.value <= 0) return 0.0;
+    // Change netAchievement.value to grossSales.value
+    return (grossSales.value / monthlyTarget.value).clamp(0.0, 1.0);
+  }}

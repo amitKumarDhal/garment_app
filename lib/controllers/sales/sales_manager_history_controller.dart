@@ -103,16 +103,23 @@ class SalesManagerHistoryController extends GetxController {
     applyFilter();
   }
 
-  // --- Main Filter Engine ---
-// --- Main Filter Engine ---
+// --- Main Filter Engine (UPDATED FOR SOFT DELETE) ---
   void applyFilter() {
     List<OrderModel> temp = allOrders;
 
-    // 1. Filter by Status Tab
-    if (currentFilter.value != "All") {
+    // 1. Filter by Status Tab (Special logic for "Trash")
+    if (currentFilter.value == "Trash") {
+      // Show ONLY items marked as deleted
+      temp = temp.where((o) => o.toJson()['isDeleted'] == true).toList();
+    } else if (currentFilter.value == "All") {
+      // Show everything EXCEPT deleted items
+      temp = temp.where((o) => o.toJson()['isDeleted'] != true).toList();
+    } else {
+      // Show specific status but EXCLUDE deleted items
       temp = temp
-          .where(
-            (o) => o.status.toLowerCase() == currentFilter.value.toLowerCase(),
+          .where((o) =>
+      o.status.toLowerCase() == currentFilter.value.toLowerCase() &&
+          o.toJson()['isDeleted'] != true
       )
           .toList();
     }
@@ -129,16 +136,14 @@ class SalesManagerHistoryController extends GetxController {
       }).toList();
     }
 
-    // 3. Filter by Search Text (✅ UPGRADED TO SEARCH MULTI-ITEMS)
+    // 3. Filter by Search Text
     if (searchQuery.value.isNotEmpty) {
       String lowerQuery = searchQuery.value.toLowerCase();
       temp = temp.where((o) {
-        // Match Client, Agent, or Order ID
         bool matchBasic = o.clientName.toLowerCase().contains(lowerQuery) ||
             o.marketingPersonName.toLowerCase().contains(lowerQuery) ||
             (o.manualOrderNo?.toLowerCase().contains(lowerQuery) ?? false);
 
-        // ✅ NEW: Match Product Name or SKU inside the dynamic list
         bool matchProducts = o.products.any((prod) {
           String pName = (prod['productName'] ?? '').toString().toLowerCase();
           String pCode = (prod['productCode'] ?? '').toString().toLowerCase();
@@ -150,4 +155,5 @@ class SalesManagerHistoryController extends GetxController {
     }
 
     displayedOrders.assignAll(temp);
-  }}
+  }
+}
