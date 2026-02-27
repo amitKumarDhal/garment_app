@@ -44,6 +44,9 @@ class OrderModel {
   // ✅ NEW FLAG FOR DELETION WORKFLOW
   final bool isDeleteRequested;
 
+  // ✅ NEW PAYMENT HISTORY LOG
+  final List<dynamic> paymentHistory;
+
   OrderModel({
     this.id,
     this.manualOrderNo,
@@ -72,9 +75,10 @@ class OrderModel {
     this.imageUrl,
     this.localImagePath,
     this.products = const [],
-    this.marginNumber = 0, // Default to 0
-    this.effectiveRevenue = 0.0, // Default to 0.0
-    this.isDeleteRequested = false, // ✅ Default to false
+    this.marginNumber = 0,
+    this.effectiveRevenue = 0.0,
+    this.isDeleteRequested = false,
+    this.paymentHistory = const [], // Default to empty list
   });
 
   Map<String, dynamic> toJson() {
@@ -115,8 +119,11 @@ class OrderModel {
       "marginNumber": marginNumber,
       "effectiveRevenue": effectiveRevenue,
 
-      // ✅ SAVE DELETION FLAG
+      // SAVE DELETION FLAG
       "isDeleteRequested": isDeleteRequested,
+
+      // ✅ SAVE PAYMENT HISTORY
+      "paymentHistory": paymentHistory,
     };
   }
 
@@ -181,8 +188,11 @@ class OrderModel {
       marginNumber: _parseInt(data['marginNumber']),
       effectiveRevenue: _parseDouble(data['effectiveRevenue']),
 
-      // ✅ FETCH DELETION FLAG SAFELY
+      // FETCH DELETION FLAG SAFELY
       isDeleteRequested: data['isDeleteRequested'] ?? false,
+
+      // ✅ FETCH PAYMENT HISTORY SAFELY
+      paymentHistory: data['paymentHistory'] ?? [],
     );
   }
 

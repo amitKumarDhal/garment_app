@@ -170,6 +170,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 physics: const BouncingScrollPhysics(),
                 itemCount: controller.displayedOrders.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
+// Look for this part in your body:
                 itemBuilder: (context, index) {
                   final order = controller.displayedOrders[index];
                   return GestureDetector(
@@ -177,10 +178,10 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                       HapticFeedback.lightImpact();
                       Get.to(() => SalesManagerOrderDetails(order: order));
                     },
-                    child: _buildCompactOrderCard(order, isDark),
+                    // ✅ CHANGE THIS LINE FROM _buildCompactOrderCard to:
+                    child: _buildRedesignedOrderCard(context, order, isDark),
                   );
-                },
-              );
+                },              );
             }),
           ),
         ],
@@ -221,206 +222,105 @@ class SalesManagerHistoryScreen extends StatelessWidget {
   }
 
   // ✅ UPGRADED COMPACT CARD
-  Widget _buildCompactOrderCard(OrderModel order, bool isDark) {
-    Color statusColor = _getStatusColor(order.status);
+  Widget _buildRedesignedOrderCard(BuildContext context, OrderModel order, bool isDark) {
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final Color statusColor = _getStatusColor(order.status);
 
-    // ✅ CHECK FOR SOFT DELETE FLAG
-    // Note: Adjust 'order.toJson()' to 'order.isDeleted' if you added the field to your Model
-    bool isDeleted = order.toJson()['isDeleted'] == true;
-
-    // ✅ SMART SUMMARY LOGIC
-    String productSummary = "No Items";
-    String qtyPriceSummary = "";
-
-    if (order.products.isNotEmpty) {
-      String firstItem = order.products.first['productName'] ?? "Unknown Item";
-      int extraCount = order.products.length - 1;
-
-      if (extraCount > 0) {
-        int totalQty = order.products.fold(0, (sum, item) => sum + (int.tryParse(item['qty']?.toString() ?? '0') ?? 0));
-        productSummary = "$firstItem + $extraCount more";
-        qtyPriceSummary = "$totalQty Total Units";
-      } else {
-        productSummary = firstItem;
-        int qty = int.tryParse(order.products.first['qty']?.toString() ?? '0') ?? 0;
-        double price = double.tryParse(order.products.first['price']?.toString() ?? '0') ?? 0.0;
-        qtyPriceSummary = "$qty Units × ₹${price.toStringAsFixed(0)}";
-      }
-    }
+    // Compact Math
+    final int qty = order.quantity;
+    final double unitPrice = qty > 0 ? (order.totalAmount / qty) : 0.0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(12), // Compact padding
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        // ✅ Fade the card slightly if it is deleted
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: isDeleted
-                ? Colors.redAccent.withValues(alpha: 0.2)
-                : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03))
+            color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+            width: 1.2
         ),
-        boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // --- LEFT SIDE: Order Info ---
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  // ✅ 1. SOFT DELETED INDICATOR
-                  if (isDeleted) ...[
-                    Row(
-                      children: [
-                        const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          "SOFT DELETED",
-                          style: TextStyle(
-                            color: Colors.redAccent.withValues(alpha: 0.8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-
-                  // ✅ 2. BOLDER ID
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: isDeleted
-                            ? Colors.grey.withValues(alpha: 0.1)
-                            : (isDark ? Colors.cyanAccent : Colors.blueAccent).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6)
-                    ),
-                    child: Text(
-                      order.manualOrderNo ?? "NO ID",
-                      style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                          color: isDeleted ? Colors.grey : (isDark ? Colors.cyanAccent : Colors.blueAccent),
-                          letterSpacing: 0.5
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Client Name
-                  Text(
-                    order.clientName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                        color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)
-                    ),
-                  ),
-
-                  // Product Name Summary
-                  const SizedBox(height: 2),
-                  Text(
-                    productSummary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-
-                  // QTY/PRICE SUMMARY
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (isDark ? Colors.deepOrangeAccent : Colors.deepOrange).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      qtyPriceSummary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: isDark ? Colors.orangeAccent : Colors.deepOrange,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Agent & Date
-                  Row(
-                    children: [
-                      Icon(Icons.support_agent_rounded, size: 12, color: Colors.grey.shade500),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          order.marketingPersonName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade400),
-                      const SizedBox(width: 4),
-                      Text(
-                        DateFormat('MMM dd, yyyy • hh:mm a').format(order.orderDate),
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade400),
-                      ),
-                    ],
-                  ),
-                ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Header: ID & Status ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.orange, width: 1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  order.manualOrderNo ?? "---",
+                  style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 10),
+                ),
               ),
-            ),
+              Text(
+                order.status.toUpperCase(),
+                style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 0.5),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
 
-            const SizedBox(width: 12),
+          // --- Client & Product (Shortened) ---
+          Text(
+            order.clientName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
+          ),
+          Text(
+            order.productName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+          ),
+          const SizedBox(height: 6),
 
-            // --- RIGHT SIDE: Price & Status ---
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "₹${order.totalAmount.toStringAsFixed(0)}",
-                  style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                      color: isDeleted ? Colors.grey : Colors.green
-                  ),
+          // --- Meta: Associate & Date Time ---
+          Row(
+            children: [
+              Icon(Icons.person, size: 12, color: Colors.grey.shade500),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Text(
+                  order.marketingPersonName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                 ),
+              ),
+              // ✅ TIME ADDED BACK HERE
+              Icon(Icons.access_time_rounded, size: 10, color: Colors.grey.shade500),
+              const SizedBox(width: 3),
+              Text(
+                DateFormat('MMM dd • hh:mm a').format(order.orderDate),
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
 
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDeleted ? Colors.grey.withValues(alpha: 0.1) : statusColor.withValues(alpha:0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isDeleted ? Colors.grey.withValues(alpha: 0.3) : statusColor.withValues(alpha:0.3)),
-                  ),
-                  child: Text(
-                    isDeleted ? "DELETED" : order.status.toUpperCase(),
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: isDeleted ? Colors.grey : statusColor,
-                        fontSize: 9,
-                        letterSpacing: 0.5
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1, thickness: 0.5)),
+
+          // --- Bottom: Units & Total ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "$qty × ${currency.format(unitPrice)}",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54),
+              ),
+              Text(
+                currency.format(order.totalAmount),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }  Color _getStatusColor(String status) {

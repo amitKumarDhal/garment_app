@@ -58,25 +58,34 @@ class SalesManagerController extends GetxController {
   }
 
   /// --- 1. Fetch Pending Orders ---
+  /// --- 1. Fetch Pending Orders ---
   void fetchPendingOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
       _db.collection('orders')
-      // ✅ Filter: Only show orders that are NOT soft-deleted
-          .where('isDeleted', isNotEqualTo: true)
+      // 1. Just query by the status
           .where('status', whereIn: ['Placed', 'Pending'])
-      // ✅ Firestore Rule: You must order by the field used in 'isNotEqualTo' first
-          .orderBy('isDeleted')
           .orderBy('orderDate', descending: true)
           .snapshots()
           .listen((snapshot) {
-        pendingOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+        // 2. ✅ Filter out soft-deleted orders LOCALLY!
+        // This prevents Firebase Index errors and handles missing 'isDeleted' fields perfectly.
+        final validDocs = snapshot.docs.where((doc) {
+          final data = doc.data();
+          return data['isDeleted'] != true; // Keeps it if 'isDeleted' is false OR if it doesn't exist
+        });
+
+        // 3. Update the observable
+        pendingOrders.value = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+      }, onError: (e) {
+        debugPrint("Stream error fetching pending: $e");
       });
     } catch (e) {
       debugPrint("Error fetching pending: $e");
     }
-  }
-  /// --- 2. Fetch Approved Orders ---
+  }  /// --- 2. Fetch Approved Orders ---
   void fetchApprovedOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -216,7 +225,7 @@ class SalesManagerController extends GetxController {
       totalRevenue.value = total;
 
       var sortedAgents = agentSales.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-      double targetAmount = 100000.0;
+      double _ = 100000.0;
 
 // 👇 REPLACE YOUR EXISTING topAgents MAPPING WITH THIS 👇
       topAgents.value = sortedAgents.take(10).map((e) {
@@ -291,7 +300,10 @@ class SalesManagerController extends GetxController {
         });
       }
 
-      if (newStatus == 'Approved') fetchMonthlyStats();
+      // ✅ FIX: Now it updates the math for BOTH Approvals and Rejections!
+      if (newStatus == 'Approved' || newStatus == 'Rejected') {
+        fetchMonthlyStats();
+      }
 
       Get.snackbar(
         "Order $newStatus",
@@ -304,7 +316,6 @@ class SalesManagerController extends GetxController {
       Get.snackbar("Update Failed", e.toString());
     }
   }
-
   // ✅ NEW: APPROVE DELETION
 // ✅ UPDATED: Soft Delete instead of hard delete
   Future<void> approveDeletionRequest(OrderModel order) async {

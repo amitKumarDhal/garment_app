@@ -45,12 +45,11 @@ class SalesHistoryController extends GetxController {
         }
 
         // Step B: Query Firestore - STRICTLY FILTER BY AGENT NAME
-        // Note: We pull EVERYTHING here, including deleted items, so the local filter can sort them.
         final snapshot = await _db
             .collection('orders')
             .where('marketingPersonName', isEqualTo: myName)
             .orderBy('orderDate', descending: true)
-            .limit(100) // ✅ Bumped limit to ensure trash items are caught
+            .limit(100)
             .get();
 
         final orders = snapshot.docs
@@ -144,15 +143,11 @@ class SalesHistoryController extends GetxController {
   void applyFilter() {
     List<OrderModel> temp = allHistoryOrders;
 
-    // A. Apply Status & Trash Filter (The Gatekeeper)
     if (currentFilter.value == "Trash") {
-      // Show ONLY items marked as deleted
       temp = temp.where((o) => o.toJson()['isDeleted'] == true).toList();
     } else if (currentFilter.value == "All") {
-      // Show everything EXCEPT deleted items
       temp = temp.where((o) => o.toJson()['isDeleted'] != true).toList();
     } else {
-      // Show specific status but EXCLUDE deleted items
       temp = temp
           .where((o) =>
       o.status.toLowerCase() == currentFilter.value.toLowerCase() &&
@@ -161,16 +156,13 @@ class SalesHistoryController extends GetxController {
           .toList();
     }
 
-    // B. Apply Search Filter (✅ Upgraded to include product names)
     if (currentSearchQuery.value.isNotEmpty) {
       String lowerQuery = currentSearchQuery.value.toLowerCase();
       temp = temp.where((o) {
-        // Basic match
         bool matchBasic = o.clientName.toLowerCase().contains(lowerQuery) ||
             o.marketingPersonName.toLowerCase().contains(lowerQuery) ||
             (o.manualOrderNo?.toLowerCase().contains(lowerQuery) ?? false);
 
-        // Product match
         bool matchProducts = o.products.any((prod) {
           String pName = (prod['productName'] ?? '').toString().toLowerCase();
           String pCode = (prod['productCode'] ?? '').toString().toLowerCase();
@@ -182,5 +174,46 @@ class SalesHistoryController extends GetxController {
     }
 
     displayedOrders.assignAll(temp);
+  }
+
+  // ✅ 6. ASSOCIATE PAYMENT LOGIC (Allows Associate to collect/mark full payment)
+  Future<void> recordPayment(OrderModel order, double amount) async {
+    try {
+      double newAdvance = order.advanceAmount + amount;
+      double newBalance = order.totalAmount - newAdvance;
+
+      if (newBalance < 0) newBalance = 0;
+
+      // 1. Create the timestamped payment record
+      final user = _auth.currentUser;
+      String agentName = user?.displayName ?? 'Sales Associate';
+
+      final paymentRecord = {
+        'amount': amount,
+        'date': Timestamp.now(),
+        'recordedBy': agentName,
+      };
+
+      // 2. Update Firebase safely
+      await _db.collection('orders').doc(order.id).update({
+        'advanceAmount': newAdvance,
+        'balanceDue': newBalance,
+        'paymentStatus': newBalance <= 0 ? 'Fully Paid' : 'Partially Paid',
+        'paymentHistory': FieldValue.arrayUnion([paymentRecord]),
+      });
+
+      // 3. Show Success Message
+      Get.snackbar(
+        "Payment Successful",
+        newBalance <= 0 ? "Order marked as FULLY PAID." : "₹$amount recorded successfully.",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      fetchHistory(); // Refresh the associate's list
+    } catch (e) {
+      Get.snackbar("Error", "Failed to update payment: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
+    }
   }
 }

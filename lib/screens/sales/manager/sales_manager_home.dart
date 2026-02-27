@@ -347,7 +347,8 @@ class SalesManagerHome extends StatelessWidget {
                   TextButton(
                     onPressed: () => Get.to(() => const SalesManagerApprovals()),
                     style: TextButton.styleFrom(
-                        foregroundColor: TColors.primary,
+                      // ✅ FIXED: Now it will be White in Dark Mode, and Primary Purple in Light Mode
+                        foregroundColor: isDark ? TColors.light : TColors.dark,
                         padding: EdgeInsets.zero
                     ),
                     child: const Row(
@@ -362,8 +363,7 @@ class SalesManagerHome extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
+              ),              const SizedBox(height: 8),
               Obx(() {
                 if (controller.pendingOrders.isEmpty) {
                   return _buildEmptyState(isDark, "No pending orders", Icons.check_circle_outline);

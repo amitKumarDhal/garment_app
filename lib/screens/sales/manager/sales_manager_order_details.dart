@@ -90,8 +90,15 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: statusColor.withValues(alpha:0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: statusColor.withValues(alpha:0.3))),
-              child: Text(displayStatus.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: statusColor, letterSpacing: 1)),
+              decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3))
+              ),
+              child: Text(
+                  displayStatus.toUpperCase(),
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: statusColor, letterSpacing: 1)
+              ),
             ),
           ],
         ),
@@ -214,11 +221,12 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
               if (displayStatus == 'Placed' || displayStatus == 'Pending') ...[
                 Row(
                   children: [
+                    // ✅ FIXED REJECT: Now updates state immediately instead of kicking you out
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => _confirmAction("Reject", Colors.redAccent, () {
-                          controller.rejectOrder(currentOrder.id!);
-                          Get.back();
+                        onPressed: () => _confirmAction("Reject", Colors.redAccent, () async {
+                          await controller.rejectOrder(currentOrder.id!);
+                          setState(() => displayStatus = "Rejected");
                         }),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -247,34 +255,34 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   ],
                 ),
               ] else if (productionStages.contains(displayStatus)) ...[
+                // ✅ REDESIGNED: Pipeline Management
+                _buildSectionTitle("Pipeline Management", Icons.timeline_rounded, isDark),
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: TColors.primary.withValues(alpha:0.3), width: 1.5),
+                    border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.05)),
+                    boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.precision_manufacturing_rounded, color: TColors.primary, size: 20),
-                          SizedBox(width: 8),
-                          Text("Update Production Stage", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: TColors.primary)),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+                      // Sleek Dropdown
                       DropdownButtonFormField<String>(
                         initialValue: productionStages.contains(displayStatus) ? displayStatus : null,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: TColors.primary),
+                        icon: const Icon(Icons.swap_vert_rounded, color: Colors.grey),
                         decoration: InputDecoration(
+                          labelText: "Current Stage",
+                          labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600),
                           filled: true,
-                          fillColor: isDark ? Colors.black.withValues(alpha:0.3) : TColors.primary.withValues(alpha:0.05),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          fillColor: isDark ? Colors.black.withValues(alpha:0.2) : Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
-                        style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
+                        style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
                         items: productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
                         onChanged: (newValue) {
                           if (newValue != null) {
@@ -284,23 +292,42 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                           }
                         },
                       ),
+                      const SizedBox(height: 12),
+
+                      // Subtle Cancel Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _confirmAction("Cancel & Reject", Colors.redAccent, () async {
+                            await controller.rejectOrder(currentOrder.id!);
+                            setState(() => displayStatus = "Rejected");
+                          }),
+                          icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 16),
+                          label: const Text("CANCEL ORDER", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.5)),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: Colors.redAccent.withValues(alpha:0.3)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ] else ...[
+                // Order is already Rejected or Cancelled
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05), borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
                   child: Center(
-                    child: Text("Order is ${displayStatus.toUpperCase()}.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey.shade600, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                    child: Text("Order is ${displayStatus.toUpperCase()}.", style: TextStyle(color: isDark ? Colors.redAccent : Colors.red, fontWeight: FontWeight.w800, letterSpacing: 1)),
                   ),
                 ),
               ],
 
               const SizedBox(height: 24),
 
-              // ✅ NEW POSITION: EFFECTIVE REVENUE CALCULATOR (Compacted)
               EffectiveRevenueSection(order: currentOrder),
 
               /// Print Invoice Button
@@ -308,7 +335,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    // ✅ CALL THE PDF GENERATOR HERE!
                     onPressed: () async {
                       HapticFeedback.lightImpact();
                       await PdfInvoiceService.generateAndPrintInvoice(currentOrder);
@@ -402,8 +428,9 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
   void _confirmAction(String action, Color color, VoidCallback onConfirm) {
     Get.defaultDialog(
       title: "$action Order",
-      titleStyle: const TextStyle(fontWeight: FontWeight.w900),
-      middleText: "Are you sure you want to $action this transaction?",
+      titleStyle: TextStyle(fontWeight: FontWeight.w900, color: color),
+      middleText: "Are you sure you want to $action this order?\n\nIf rejected, the revenue will be deducted automatically.",
+      middleTextStyle: const TextStyle(fontSize: 14),
       confirm: ElevatedButton(
         onPressed: () {
           onConfirm();
@@ -517,9 +544,8 @@ class EffectiveRevenueController extends GetxController {
   }
 }
 
-
 // =========================================================================
-// ✅ 2. THE EXECUTIVE UI SECTION FOR MARGIN CALCULATION (COMPACT)
+// ✅ 2. REDESIGNED MARGIN CALCULATOR (Simple & Relevant)
 // =========================================================================
 class EffectiveRevenueSection extends StatelessWidget {
   final OrderModel order;
@@ -531,44 +557,38 @@ class EffectiveRevenueSection extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A24) : const Color(0xFFF8F4FF),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.purple.withValues(alpha:isDark ? 0.3 : 0.5), width: 1.5),
-        boxShadow: [
-          if (!isDark) BoxShadow(color: Colors.purple.withValues(alpha:0.05), blurRadius: 10, offset: const Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header (Subtitle removed)
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Title
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: Colors.purple.withValues(alpha:0.2), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.insights_rounded, color: Colors.purple, size: 18),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.15), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.calculate_outlined, size: 16, color: TColors.primary)
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  "Internal Margin Calculator",
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
-                ),
-              ),
+              Text("Internal Margin", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
             ],
           ),
-          const SizedBox(height: 16),
+        ),
 
-          // The Math Row ("/ 30 =" removed)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+        // Main Card
+        Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
+            boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: Row(
             children: [
-              // 1. Margin Input Field (X)
+              // 1. Margin Input Field
               SizedBox(
                 width: 75,
                 child: TextField(
@@ -577,71 +597,51 @@ class EffectiveRevenueSection extends StatelessWidget {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: controller.calculateRevenue,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
                   decoration: InputDecoration(
                     labelText: "Margin (x)",
-                    labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple),
-                    filled: true,
+                    labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500),
                     isDense: true,
-                    fillColor: isDark ? Colors.black26 : Colors.white,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.purple.withValues(alpha:0.3), width: 1.5)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.purple, width: 2)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: TColors.primary, width: 1.5)),
                   ),
                 ),
               ),
 
-              const SizedBox(width: 16), // Adjusted spacing between input and result
+              const SizedBox(width: 16),
 
-              // 2. Live Result Display
+              // 2. Live Calculation Result
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.purple,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [BoxShadow(color: Colors.purple.withValues(alpha:0.4), blurRadius: 8, offset: const Offset(0, 3))],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text("EFFECTIVE REVENUE", style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white70, letterSpacing: 0.5)),
-                      Obx(
-                            () => Text(
-                          currency.format(controller.effectiveRevenue.value),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
-                        ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("EFFECTIVE REVENUE", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.grey.shade500, letterSpacing: 0.5)),
+                    Obx(
+                          () => Text(
+                        currency.format(controller.effectiveRevenue.value),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: TColors.primary),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+
+              // 3. Simple Checkmark Save Button
+              Obx(() => IconButton(
+                onPressed: controller.isSaving.value ? null : controller.saveEffectiveRevenue,
+                style: IconButton.styleFrom(
+                    backgroundColor: TColors.primary.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                ),
+                icon: controller.isSaving.value
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: TColors.primary))
+                    : const Icon(Icons.check_rounded, color: TColors.primary),
+              )),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Save Button
-          SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: Obx(
-                  () => OutlinedButton.icon(
-                onPressed: controller.isSaving.value ? null : controller.saveEffectiveRevenue,
-                icon: controller.isSaving.value
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purple))
-                    : const Icon(Icons.save_rounded, size: 16),
-                label: Text(controller.isSaving.value ? "SAVING..." : "SAVE METRIC", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.purple,
-                  side: BorderSide(color: Colors.purple.withValues(alpha:0.5), width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

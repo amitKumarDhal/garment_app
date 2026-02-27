@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -6,7 +7,6 @@ import '../../controllers/floor_management/marketing_upload_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../controllers/sales/sales_history_controller.dart';
 import '../../data/models/order_model.dart';
-// ✅ IMPORT THE REUSABLE UPLOAD SCREEN FOR EDITING
 import '../floor_management/marketing_upload_screen.dart';
 
 class SalesOrderHistoryScreen extends StatelessWidget {
@@ -23,7 +23,8 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
         elevation: 0,
         centerTitle: false,
-        titleSpacing: 24,
+        automaticallyImplyLeading: false, // ✅ Ensures no default back arrow appears
+        titleSpacing: 20, // ✅ Gives the title nice padding from the left edge
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         title: Text(
           "My Ledger",
@@ -35,6 +36,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
           ),
         ),
       ),
+
       body: Column(
         children: [
           // --- 1. CLEAN SEARCH & FILTER HEADER ---
@@ -80,7 +82,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       _buildFilterChip(controller, "Shipping", isDark),
                       _buildFilterChip(controller, "Delivered", isDark),
                       _buildFilterChip(controller, "Rejected", isDark),
-                      _buildFilterChip(controller, "Trash", isDark), // ✅ Added Trash Tab
+                      _buildFilterChip(controller, "Trash", isDark),
                     ],
                   ),
                 ),
@@ -113,7 +115,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               }
 
               return ListView.separated(
-                // padding ensures bottom cards clear the Floating Glass Dock!
                 padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 120),
                 physics: const BouncingScrollPhysics(),
                 itemCount: controller.displayedOrders.length,
@@ -166,31 +167,27 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     });
   }
 
-  // ✅ UPGRADED CARD DESIGN (Perfectly matches Sales Manager Ledger)
+  // ✅ UPGRADED CARD DESIGN (Matches Sales Manager exactly)
   Widget _buildHistoryCard(BuildContext context, OrderModel order, bool isDark) {
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     Color statusColor = _getStatusColor(order.status);
-
-    // ✅ Check if order was soft-deleted
     bool isDeleted = order.toJson()['isDeleted'] == true;
 
-    // Smart Summary Logic
-    String productSummary = "No Items";
-    String qtyPriceSummary = "";
+    // Dynamic Math logic for units and price
+    int totalUnits = order.quantity;
+    if (order.products.isNotEmpty) {
+      totalUnits = order.products.fold(0, (sum, item) => sum + (int.tryParse(item['qty']?.toString() ?? '0') ?? 0));
+    }
+    double unitPrice = totalUnits > 0 ? (order.totalAmount / totalUnits) : 0.0;
 
+    // Smart Product Summary
+    String productSummary = "No Items";
     if (order.products.isNotEmpty) {
       String firstItem = order.products.first['productName'] ?? "Unknown Item";
       int extraCount = order.products.length - 1;
-
-      if (extraCount > 0) {
-        int totalQty = order.products.fold(0, (sum, item) => sum + (int.tryParse(item['qty']?.toString() ?? '0') ?? 0));
-        productSummary = "$firstItem + $extraCount more";
-        qtyPriceSummary = "$totalQty Total Units";
-      } else {
-        productSummary = firstItem;
-        int qty = int.tryParse(order.products.first['qty']?.toString() ?? '0') ?? 0;
-        double price = double.tryParse(order.products.first['price']?.toString() ?? '0') ?? 0.0;
-        qtyPriceSummary = "$qty Units × ₹${price.toStringAsFixed(0)}";
-      }
+      productSummary = extraCount > 0 ? "$firstItem + $extraCount more" : firstItem;
+    } else {
+      productSummary = order.productName;
     }
 
     return GestureDetector(
@@ -199,163 +196,152 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         _showOrderDetails(context, order, isDark);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
               color: isDeleted
-                  ? Colors.redAccent.withValues(alpha: 0.2)
-                  : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03))
+                  ? Colors.redAccent.withValues(alpha: 0.3)
+                  : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
+              width: 1.5
           ),
-          boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // --- LEFT SIDE: Order Info ---
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    // ✅ 1. SOFT DELETED BADGE
-                    if (isDeleted) ...[
-                      Row(
-                        children: [
-                          const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            "SOFT DELETED",
-                            style: TextStyle(
-                              color: Colors.redAccent.withValues(alpha: 0.8),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-
-                    // ✅ 2. VIBRANT CYAN/BLUE ID
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: isDeleted
-                              ? Colors.grey.withValues(alpha: 0.1)
-                              : (isDark ? Colors.cyanAccent : Colors.blueAccent).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6)
-                      ),
-                      child: Text(
-                        order.manualOrderNo ?? "NO ID",
-                        style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                            color: isDeleted ? Colors.grey : (isDark ? Colors.cyanAccent : Colors.blueAccent),
-                            letterSpacing: 0.5
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Client Name
-                    Text(
-                      order.clientName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)
-                      ),
-                    ),
-
-                    // Product Name Summary
-                    const SizedBox(height: 2),
-                    Text(
-                      productSummary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-
-                    // ✅ 3. DEEP ORANGE QTY SUMMARY
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: (isDark ? Colors.deepOrangeAccent : Colors.deepOrange).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        qtyPriceSummary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: isDark ? Colors.orangeAccent : Colors.deepOrange,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Date & Time
-                    Row(
-                      children: [
-                        Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade400),
-                        const SizedBox(width: 4),
-                        Text(
-                          DateFormat('MMM dd, yyyy • hh:mm a').format(order.orderDate),
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade400),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // --- RIGHT SIDE: Price & Status ---
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- SOFT DELETED BADGE ---
+            if (isDeleted) ...[
+              Row(
                 children: [
+                  const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 14),
+                  const SizedBox(width: 4),
                   Text(
-                    "₹${order.totalAmount.toStringAsFixed(0)}",
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: isDeleted ? Colors.grey : Colors.green
-                    ),
-                  ),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDeleted ? Colors.grey.withValues(alpha: 0.1) : statusColor.withValues(alpha:0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isDeleted ? Colors.grey.withValues(alpha: 0.3) : statusColor.withValues(alpha:0.3)),
-                    ),
-                    child: Text(
-                      isDeleted ? "DELETED" : order.status.toUpperCase(),
-                      style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: isDeleted ? Colors.grey : statusColor,
-                          fontSize: 9,
-                          letterSpacing: 0.5
-                      ),
-                    ),
+                    "SOFT DELETED",
+                    style: TextStyle(color: Colors.redAccent.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
             ],
-          ),
+
+            // --- TOP ROW: Order No & Status ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isDeleted ? Colors.grey : Colors.orange, width: 1.5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    order.manualOrderNo ?? "---",
+                    style: TextStyle(color: isDeleted ? Colors.grey : Colors.orange, fontWeight: FontWeight.w900, fontSize: 11),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: isDeleted ? Colors.grey.withValues(alpha: 0.1) : statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6)
+                  ),
+                  child: Text(
+                    isDeleted ? "DELETED" : order.status.toUpperCase(),
+                    style: TextStyle(color: isDeleted ? Colors.grey : statusColor, fontWeight: FontWeight.w900, fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // --- Client & Product ---
+            Text(
+              order.clientName,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)),
+            ),
+            Text(
+              productSummary,
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+
+            // --- Associate & Date ---
+            Row(
+              children: [
+                Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey.shade500),
+                const SizedBox(width: 4),
+                Text(order.marketingPersonName, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                const SizedBox(width: 16),
+                Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade500),
+                const SizedBox(width: 4),
+                Text(
+                  DateFormat('MMM dd, yyyy • hh:mm a').format(order.orderDate),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+
+            // --- BOTTOM ROW: Math & Total ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "$totalUnits Units × ${currency.format(unitPrice)}",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54),
+                ),
+                Text(
+                  currency.format(order.totalAmount),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  // ✅ NEW: Payment Dialog for Associate
+  void _showPaymentDialog(BuildContext context, OrderModel order, SalesHistoryController controller) {
+    final TextEditingController amountController = TextEditingController(text: order.balanceDue.toStringAsFixed(0));
+
+    Get.defaultDialog(
+      title: "Update Due Amount",
+      titleStyle: const TextStyle(fontWeight: FontWeight.w900),
+      content: Column(
+        children: [
+          Text("Remaining Balance: ₹${order.balanceDue}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+          const SizedBox(height: 15),
+          TextField(
+            controller: amountController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              prefixText: "₹ ",
+              prefixStyle: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 2)),
+            ),
+          ),
+        ],
+      ),
+      confirm: ElevatedButton(
+        onPressed: () {
+          double amount = double.tryParse(amountController.text) ?? 0.0;
+          if (amount > 0) {
+            Get.back(); // Close dialog
+            HapticFeedback.mediumImpact();
+            controller.recordPayment(order, amount);
+          }
+        },
+        style: ElevatedButton.styleFrom(backgroundColor: TColors.primary, minimumSize: const Size(120, 45)),
+        child: const Text("Save Payment", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+      cancel: OutlinedButton(onPressed: () => Get.back(), child: const Text("Cancel")),
     );
   }
 
@@ -363,11 +349,8 @@ class SalesOrderHistoryScreen extends StatelessWidget {
   void _showOrderDetails(BuildContext context, OrderModel order, bool isDark) {
     bool isDeleted = order.toJson()['isDeleted'] == true;
 
-    // 🔒 SECURITY FIX: Added 'shipping', deleted, etc. to the locked list
     final lockedStatuses = ['shipping', 'shipped', 'delivered', 'rejected'];
     final bool isLocked = lockedStatuses.contains(order.status.toLowerCase()) || isDeleted;
-
-    // Safety lock for deleting (Allow requests if NOT shipped/delivered/already deleted)
     final bool canRequestDelete = !lockedStatuses.contains(order.status.toLowerCase()) && !isDeleted;
 
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
@@ -478,12 +461,116 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               const SizedBox(height: 12),
 
               _modalRow("Shipping Charge", currency.format(order.shippingCharge), isDark),
-              _modalRow("Advance Paid", "- ${currency.format(order.advanceAmount)}", isDark, valueColor: Colors.green),
+              _modalRow("Advance Paid", "- ${currency.format(order.advanceAmount)}", isDark, valueColor: Colors.orange),
               _modalRow("Grand Total", currency.format(order.totalAmount), isDark, isBold: true),
               const SizedBox(height: 8),
-              _modalRow("Balance Due", currency.format(order.balanceDue), isDark, isBold: true, valueColor: Colors.redAccent),
 
-              const SizedBox(height: 32),
+              // ✅ DYNAMIC BALANCE DUE / FULLY PAID BADGE
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Balance Due", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
+                  order.balanceDue <= 0
+                      ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(6)),
+                    child: const Text("FULLY PAID", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.5)),
+                  )
+                      : Text(currency.format(order.balanceDue), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.redAccent)),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // ✅ NEW: ASSOCIATE PAYMENT BUTTONS (Only show if balance > 0)
+              if (order.balanceDue > 0 && !isDeleted) ...[
+                Row(
+                  children: [
+                    // Button 1: Partial Payment
+                    Expanded(
+                      flex: 1,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context); // Close bottom sheet
+                          _showPaymentDialog(context, order, Get.find<SalesHistoryController>());
+                        },
+                        icon: const Icon(Icons.edit_note_rounded, size: 18),
+                        label: const Text("Update Due"),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Button 2: Mark Fully Paid (One-Tap Action)
+                    Expanded(
+                      flex: 1,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context); // Close bottom sheet
+                          HapticFeedback.heavyImpact();
+                          Get.find<SalesHistoryController>().recordPayment(order, order.balanceDue);
+                        },
+                        icon: const Icon(Icons.done_all_rounded, size: 18, color: Colors.white),
+                        label: const Text("FULLY PAID", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // ✅ PAYMENT HISTORY TIMELINE FOR ASSOCIATE
+              if (order.paymentHistory.isNotEmpty) ...[
+                Text("PAYMENT HISTORY", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey.shade500, fontSize: 11, letterSpacing: 1)),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: order.paymentHistory.length,
+                    separatorBuilder: (_, _) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), height: 1),
+                    ),
+                    itemBuilder: (context, index) {
+                      final record = order.paymentHistory[index];
+                      DateTime date = (record['date'] as Timestamp).toDate();
+                      double amount = double.tryParse(record['amount'].toString()) ?? 0.0;
+
+                      return Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Payment Recorded", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+                                Text(DateFormat('MMM dd • hh:mm a').format(date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          ),
+                          Text("+ ${currency.format(amount)}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.green)),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
 
               // ACTION BUTTONS
               Row(
@@ -537,7 +624,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED CONFIRM DELETE METHOD (Now sends a request)
   void _confirmDelete(BuildContext context, OrderModel order) {
     Get.defaultDialog(
       title: "Request Deletion?",
@@ -546,13 +632,10 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       textConfirm: "Send Request",
       textCancel: "Cancel",
       confirmTextColor: Colors.white,
-      buttonColor: Colors.orange, // Changed to orange to indicate a request
+      buttonColor: Colors.orange,
       cancelTextColor: Colors.black87,
       onConfirm: () {
-        // Trigger the request function
         Get.find<SalesHistoryController>().requestDeleteOrder(order);
-
-        // Double pop: Closes the dialog, then closes the bottom sheet
         Get.back();
         Get.back();
       },
@@ -591,7 +674,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       case 'printing': return const Color(0xFF9C27B0);
       case 'packing': return const Color(0xFFFF9800);
       case 'shipping': return const Color(0xFF009688);
-      case 'delivered': return const Color(0xFF13D421); // Bright green
+      case 'delivered': return const Color(0xFF13D421);
       case 'rejected': return const Color(0xFFF44336);
       case 'pending': return const Color(0xFFFFC107);
       case 'placed': return const Color(0xFFFFC107);

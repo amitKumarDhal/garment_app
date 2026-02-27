@@ -279,7 +279,7 @@ class SalesDashboard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text(
-                          "GROSS SALES",
+                          "GROSS SALES (TR)",
                           style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5),
                         ),
                       ),
@@ -316,7 +316,7 @@ class SalesDashboard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                          "Net Achievement",
+                          "Net Achievement (ER)",
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600)
                       ),
                       const SizedBox(height: 2),
