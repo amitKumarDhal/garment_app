@@ -5,12 +5,34 @@ import '../../controllers/sales/order_tracking_controller.dart';
 import '../../utils/widgets/order_status_timeline.dart'; // ✅ Correct Path
 import '../../utils/constants/colors.dart';
 
-class OrderTrackingScreen extends StatelessWidget {
-  const OrderTrackingScreen({super.key});
+// ✅ 1. Converted to StatefulWidget to allow auto-searching on load
+class OrderTrackingScreen extends StatefulWidget {
+  final String? searchKey; // Optional parameter for notifications
+
+  const OrderTrackingScreen({super.key, this.searchKey});
+
+  @override
+  State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
+}
+
+class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
+  final controller = Get.put(OrderTrackingController());
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ 2. If the user came from a notification, auto-fill and auto-search!
+    if (widget.searchKey != null && widget.searchKey!.isNotEmpty) {
+      controller.searchController.text = widget.searchKey!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.searchOrder(widget.searchKey!);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(OrderTrackingController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -53,9 +75,9 @@ class OrderTrackingScreen extends StatelessWidget {
                 onSubmitted: (val) => controller.searchOrder(val),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // --- SEARCH BUTTON ---
             SizedBox(
               width: double.infinity,
@@ -125,7 +147,7 @@ class OrderTrackingScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   order.manualOrderNo ?? "ID: ${order.id?.substring(0, 6)}",
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
                                     color: TColors.primary,
@@ -148,7 +170,7 @@ class OrderTrackingScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            
+
                             const SizedBox(height: 8),
                             Text("Client: ${order.clientName}", style: const TextStyle(fontWeight: FontWeight.w500)),
                             Text("Product: ${order.productName} (${order.quantity} pcs)", style: TextStyle(color: Colors.grey[600], fontSize: 13)),

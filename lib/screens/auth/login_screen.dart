@@ -240,7 +240,7 @@ class LoginScreen extends StatelessWidget {
               ),
               child: Text(
                 "Forgot Password?",
-                style: TextStyle(color: TColors.primary, fontWeight: FontWeight.w800, fontSize: 12),
+                style: TextStyle(color: TColors.light, fontWeight: FontWeight.w800, fontSize: 12),
               ),
             ),
           ),

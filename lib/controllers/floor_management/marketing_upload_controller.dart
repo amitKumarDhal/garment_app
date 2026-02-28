@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // ✅ NEW
-import 'package:image_picker/image_picker.dart'; // ✅ NEW
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../data/models/order_model.dart';
 
 // ✅ Helper Class for Dynamic Items
@@ -43,7 +43,7 @@ class MarketingUploadController extends GetxController {
 
   // --- Financial Global Controllers ---
   final shippingCharge = TextEditingController();
-  final advanceAmount = TextEditingController();
+  final advanceAmount = TextEditingController(); // Only used for initial payment requests
 
   // ✅ DYNAMIC ITEM LIST
   final items = <OrderItemForm>[].obs;
@@ -55,8 +55,8 @@ class MarketingUploadController extends GetxController {
   String? editingOrderId;
 
   // ✅ IMAGE OBSERVABLES
-  final RxString selectedImagePath = ''.obs; // Local file path
-  final RxString existingImageUrl = ''.obs;  // Cloud URL if editing
+  final RxString selectedImagePath = ''.obs;
+  final RxString existingImageUrl = ''.obs;
 
   // Observables for Financials
   final RxDouble subTotal = 0.0.obs;
@@ -151,9 +151,11 @@ class MarketingUploadController extends GetxController {
     phone.text = order.clientPhone ?? "";
     address.text = order.clientAddress ?? "";
     shippingCharge.text = order.shippingCharge.toString();
-    advanceAmount.text = order.advanceAmount.toString();
 
-    // ✅ Load existing image URL if present
+    // In edit mode, we shouldn't allow changing the advance from this form to prevent fraud.
+    // They must use the "Record Payment" button on the ledger.
+    advanceAmount.text = "0";
+
     existingImageUrl.value = order.toJson()['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
@@ -161,7 +163,6 @@ class MarketingUploadController extends GetxController {
       deadline.text = "${_selectedDeadline!.day} ${_getMonthName(_selectedDeadline!.month)} ${_selectedDeadline!.year}";
     }
 
-    // Load Items into Form
     items.clear();
     for (var prod in order.products) {
       final itemForm = OrderItemForm();
@@ -226,7 +227,7 @@ class MarketingUploadController extends GetxController {
     return months[month - 1];
   }
 
-  // ✅ NEW: IMAGE PICKER LOGIC
+  // ✅ IMAGE PICKER LOGIC
   Future<void> pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -241,13 +242,12 @@ class MarketingUploadController extends GetxController {
     }
   }
 
-  // ✅ NEW: Clear selected image
   void removeImage() {
     selectedImagePath.value = '';
     existingImageUrl.value = '';
   }
 
-  // ✅ NEW: FIREBASE STORAGE UPLOAD FUNCTION
+  // ✅ FIREBASE STORAGE UPLOAD
   Future<String?> _uploadImageToStorage() async {
     if (selectedImagePath.value.isEmpty) return null;
 
@@ -279,15 +279,13 @@ class MarketingUploadController extends GetxController {
 
       if (userId.isNotEmpty) {
         try {
-          final userDoc = await _db.collection('users').doc(userId).get();
+          final userDoc = await _db.collection('id_requests').doc(userId).get();
           if (userDoc.exists) {
-            final data = userDoc.data()!;
-            agentName = data['FullName'] ?? data['Name'] ?? user?.displayName ?? "Agent";
+            agentName = userDoc.data()?['name'] ?? user?.displayName ?? "Agent";
           }
         } catch (e) {}
       }
 
-      // ✅ UPLOAD IMAGE BEFORE SAVING ORDER
       String? finalImageUrl = existingImageUrl.value;
       if (selectedImagePath.value.isNotEmpty) {
         finalImageUrl = await _uploadImageToStorage();
@@ -322,6 +320,7 @@ class MarketingUploadController extends GetxController {
       }
 
       String rootProductName = items.length > 1 ? "$firstProductName + ${items.length - 1} more" : firstProductName;
+      double advance = double.tryParse(advanceAmount.text.trim()) ?? 0.0;
 
       final orderMap = {
         "clientName": clientName.text.trim(),
@@ -339,25 +338,23 @@ class MarketingUploadController extends GetxController {
         "deliveryDate": Timestamp.fromDate(_selectedDeadline!),
         "shippingCharge": double.tryParse(shippingCharge.text.trim()) ?? 0.0,
         "totalAmount": grandTotal.value,
-        "advanceAmount": double.tryParse(advanceAmount.text.trim()) ?? 0.0,
-        "balanceDue": balanceDue.value,
         "marketingPersonName": agentName,
         "marketingPersonId": userId,
-        "status": "Pending",
         "products": productsList,
 
-        // ✅ SAVE THE CLOUD URL IN FIRESTORE
         if (finalImageUrl != null && finalImageUrl.isNotEmpty) "designMockupUrl": finalImageUrl,
       };
 
       if (isEditing.value && editingOrderId != null) {
+        // In edit mode, we strip out financials from the update to protect the ledger.
         orderMap['manualOrderNo'] = orderNo.text.trim();
         await _db.collection('orders').doc(editingOrderId).update(orderMap);
         Get.snackbar("Success", "Order updated successfully!", backgroundColor: Colors.green, colorText: Colors.white);
       }
       else {
-        // ✅ 1. Declare this outside so the notification can access it
+        // ✅ NEW ORDER WORKFLOW
         String newOrderId = "";
+        String generatedDocId = "";
 
         await _db.runTransaction((transaction) async {
           DocumentReference counterRef = _db.collection('counters').doc('order_counter');
@@ -372,38 +369,55 @@ class MarketingUploadController extends GetxController {
           orderMap['createdAt'] = FieldValue.serverTimestamp();
           orderMap['orderDate'] = DateTime.now();
 
+          // 🔒 SECURE THE ADVANCE PAYMENT
+          orderMap['advanceAmount'] = 0.0;
+          orderMap['balanceDue'] = grandTotal.value;
+          orderMap['status'] = advance > 0 ? "Pending" : "Placed";
+
           DocumentReference newOrderRef = _db.collection('orders').doc();
+          generatedDocId = newOrderRef.id;
           transaction.set(newOrderRef, orderMap);
         });
 
-        // ✅ 2. NOTIFY MANAGERS
-        try {
-          // Finds all users marked as "Sales Manager"
-          final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+        // ✅ IF ADVANCE COLLECTED: Request Manager Approval
+        if (advance > 0 && generatedDocId.isNotEmpty) {
+          await _db.collection('payment_requests').add({
+            'orderId': generatedDocId,
+            'manualOrderNo': newOrderId,
+            'clientName': clientName.text.trim(),
+            'agentName': agentName,
+            'amount': advance,
+            'status': 'pending',
+            'requestedAt': FieldValue.serverTimestamp(),
+          });
 
+          final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+          for (var managerDoc in managerSnapshot.docs) {
+            await _db.collection('notifications').add({
+              'targetUserId': managerDoc.id,
+              'title': 'New Order + Payment 💰',
+              'message': '$agentName created Order $newOrderId and collected ₹$advance.',
+              'orderId': generatedDocId, // Required for tap-to-route
+              'timestamp': FieldValue.serverTimestamp(),
+              'isRead': false,
+            });
+          }
+        } else {
+          // Standard Order Notification
+          final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
           for (var managerDoc in managerSnapshot.docs) {
             await _db.collection('notifications').add({
               'targetUserId': managerDoc.id,
               'title': 'New Order Alert 🚨',
               'message': '$agentName just placed Order $newOrderId.',
+              'orderId': generatedDocId, // Required for tap-to-route
               'timestamp': FieldValue.serverTimestamp(),
               'isRead': false,
             });
           }
-        } catch (e) {
-          debugPrint("Could not notify manager: $e");
         }
 
-        // ✅ 3. NOTIFY THE ASSOCIATE (Confirmation)
-        await _db.collection('notifications').add({
-          'targetUserId': userId,
-          'title': 'Order Placed ✅',
-          'message': 'Your order $newOrderId has been sent to the Manager for approval.',
-          'timestamp': FieldValue.serverTimestamp(),
-          'isRead': false,
-        });
-
-        Get.snackbar("Success", "Order saved securely!", backgroundColor: Colors.green, colorText: Colors.white);
+        Get.snackbar("Success", advance > 0 ? "Order saved! Advance payment sent for approval." : "Order saved securely!", backgroundColor: Colors.green, colorText: Colors.white);
       }
       clearForm();
 
@@ -429,7 +443,7 @@ class MarketingUploadController extends GetxController {
 
     _selectedDeadline = null;
     selectedImagePath.value = '';
-    existingImageUrl.value = ''; // ✅ Clear
+    existingImageUrl.value = '';
     subTotal.value = 0.0;
     taxAmount.value = 0.0;
     grandTotal.value = 0.0;

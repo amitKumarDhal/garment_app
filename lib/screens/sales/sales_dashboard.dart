@@ -47,12 +47,10 @@ class SalesDashboard extends StatelessWidget {
             automaticallyImplyLeading: false,
             titleSpacing: 20,
             systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-            // ✅ WRAPPED IN OBX TO LISTEN FOR AGENT NAME
             title: Obx(() {
               String name = "Agent";
               if (controller.agentName.value.isNotEmpty) {
                 name = controller.agentName.value.trim().split(' ').first;
-                // Capitalize first letter
                 name = name[0].toUpperCase() + name.substring(1);
               }
 
@@ -82,7 +80,6 @@ class SalesDashboard extends StatelessWidget {
             }),
             centerTitle: false,
             actions: [
-              // ✅ LIVE NOTIFICATION BELL
               Obx(() {
                 final notifController = Get.put(NotificationController());
                 int unread = notifController.unreadCount.value;
@@ -140,9 +137,61 @@ class SalesDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. MY MONTHLY TARGET SECTION ---
-              _buildSectionHeader("My Progress", Icons.track_changes_rounded, isDark, trailing: DateFormat('MMM yyyy').format(DateTime.now())),
-              _buildMyPerformanceCard(isDark, controller),
+              // --- 1. MY MONTHLY TARGET SECTION WITH MONTH PICKER ---
+              _buildSectionHeader(
+                "My Progress",
+                Icons.track_changes_rounded,
+                isDark,
+                // ✅ NEW: Interactive Month Selector
+                trailingWidget: Obx(() {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: () => controller.changeMonth(-1),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          color: Colors.transparent,
+                          child: Icon(Icons.chevron_left_rounded, size: 24, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        DateFormat('MMM yyyy').format(controller.selectedMonth.value),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => controller.changeMonth(1),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          color: Colors.transparent,
+                          child: Icon(Icons.chevron_right_rounded, size: 24, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+
+              // ✅ WRAPPED CARD IN OBX TO SHOW LOADING STATE WHEN MONTH CHANGES
+              Obx(() {
+                if (controller.isLoading.value) {
+                  return Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(24)
+                    ),
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                }
+                return _buildMyPerformanceCard(isDark, controller);
+              }),
 
               const SizedBox(height: 32),
 
@@ -165,7 +214,7 @@ class SalesDashboard extends StatelessWidget {
   }
 
   // --- MODERN SECTION HEADER ---
-  Widget _buildSectionHeader(String title, IconData icon, bool isDark, {Color? iconColor, String? trailing}) {
+  Widget _buildSectionHeader(String title, IconData icon, bool isDark, {Color? iconColor, String? trailing, Widget? trailingWidget}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16, left: 4),
       child: Row(
@@ -187,8 +236,10 @@ class SalesDashboard extends StatelessWidget {
               color: isDark ? Colors.white : Colors.black87,
             ),
           ),
-          if (trailing != null) ...[
-            const Spacer(),
+          const Spacer(),
+          if (trailingWidget != null)
+            trailingWidget
+          else if (trailing != null)
             Text(
               trailing,
               style: TextStyle(
@@ -196,30 +247,32 @@ class SalesDashboard extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
-            ),
-          ]
+            )
         ],
       ),
     );
   }
 
-  // --- WIDGET: Personal Performance Card (✅ FIXED TOTAL ORDERS) ---
+  // --- WIDGET: Personal Performance Card (✅ WITH EXTRA EARNINGS HIDDEN FOR MANAGERS) ---
   Widget _buildMyPerformanceCard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       final gross = controller.grossSales.value;
       final net = controller.netAchievement.value;
 
-      // Achievement percentage follows Gross Sales
       final percentage = controller.achievementPercentage.clamp(0.0, 1.0);
-
       final target = controller.monthlyTarget.value;
       final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
+
+      // ✅ EXTRA EARNING MATH
+      final double bonusThreshold = 100000.0;
+      final bool bonusUnlocked = net >= bonusThreshold;
+      final double extraEarning = bonusUnlocked ? (net - bonusThreshold) * 0.02 : 0.0;
 
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF5E35B1), Color(0xFF3949AB)],
+            colors: [Color(0xFF5E35B1), Color(0xFF3949AB)], // Deep Purple to Blue
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -237,7 +290,6 @@ class SalesDashboard extends StatelessWidget {
             // --- TOP ROW: Progress Ring + Gross Sales ---
             Row(
               children: [
-                // Progress Ring (Based on Gross)
                 SizedBox(
                   height: 75,
                   width: 75,
@@ -267,7 +319,6 @@ class SalesDashboard extends StatelessWidget {
                 ),
                 const SizedBox(width: 20),
 
-                // Gross Sales (The primary metric for the indicator)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,7 +352,7 @@ class SalesDashboard extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // --- BOTTOM ROW: Net Achievement vs Total Orders ---
+            // --- MIDDLE ROW: Net Achievement vs Total Orders ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -311,7 +362,6 @@ class SalesDashboard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Net Achievement (Moved here)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -329,7 +379,6 @@ class SalesDashboard extends StatelessWidget {
 
                   Container(height: 30, width: 1, color: Colors.white.withValues(alpha: 0.2)),
 
-                  // Total Orders
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -346,12 +395,75 @@ class SalesDashboard extends StatelessWidget {
                   )
                 ],
               ),
-            )
+            ),
+
+            // ✅ CONDITIONAL RENDER: ONLY SHOW FOR ASSOCIATES
+            if (!controller.isSalesManager.value) ...[
+              const SizedBox(height: 12),
+
+              // --- BOTTOM ROW: EXTRA EARNINGS BONUS BOX ---
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: bonusUnlocked ? Colors.amberAccent.withValues(alpha: 0.5) : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: bonusUnlocked ? Colors.amberAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        bonusUnlocked ? Icons.monetization_on_rounded : Icons.lock_outline_rounded,
+                        color: bonusUnlocked ? Colors.amberAccent : Colors.white54,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bonusUnlocked ? "Extra Earnings" : "Bonus Locked",
+                            style: TextStyle(
+                              color: bonusUnlocked ? Colors.amberAccent : Colors.white54,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            bonusUnlocked
+                                ? "+ ₹${formatCurrency.format(extraEarning)}"
+                                : "Hit ₹1 Lakh ER to unlock bonus",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: bonusUnlocked ? 18 : 11,
+                              fontWeight: bonusUnlocked ? FontWeight.w900 : FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       );
     });
-  }  Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
+  }
+
+  Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       if (controller.isLoading.value && controller.leaderboardData.isEmpty) {
         return const Center(
@@ -379,7 +491,7 @@ class SalesDashboard extends StatelessWidget {
               Icon(Icons.bar_chart_rounded, size: 40, color: Colors.grey.shade400),
               const SizedBox(height: 8),
               Text(
-                "No approved sales yet this month.",
+                "No approved sales for this month.",
                 style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500),
               ),
             ],
@@ -407,8 +519,6 @@ class SalesDashboard extends StatelessWidget {
           ).format(rawAmount);
 
           double progress = agent['progress'] ?? 0.0;
-
-          // ✅ FETCH THE SM FLAG
           bool isSM = agent['isSM'] == true;
 
           List<Color> rankGradient;
@@ -503,7 +613,6 @@ class SalesDashboard extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // ✅ UPDATED: Wrapped Name and SM Tag in a Row
                           Row(
                             children: [
                               Text(
@@ -596,7 +705,7 @@ class SalesDashboard extends StatelessWidget {
       );
     });
   }
-  // --- WIDGET: PREMIUM QUICK LINKS GRID ---
+
   Widget _buildQuickLinksGrid(bool isDark) {
     return GridView.count(
       shrinkWrap: true,
@@ -638,14 +747,7 @@ class SalesDashboard extends StatelessWidget {
     );
   }
 
-  // Helper: Premium Action Card
-  Widget _buildPremiumActionCard(
-      String title,
-      IconData icon,
-      Color themeColor,
-      bool isDark,
-      VoidCallback onTap,
-      ) {
+  Widget _buildPremiumActionCard(String title, IconData icon, Color themeColor, bool isDark, VoidCallback onTap) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -697,7 +799,6 @@ class SalesDashboard extends StatelessWidget {
     );
   }
 
-  // --- HELPER: App Bar Circular Action Button ---
   Widget _buildCircularAction(IconData icon, bool isDark, VoidCallback onTap, {int notificationCount = 0}) {
     return Stack(
       clipBehavior: Clip.none,
@@ -746,7 +847,7 @@ class SalesDashboard extends StatelessWidget {
       ],
     );
   }
-  // --- HELPER: Time-based Greeting ---
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return "Good Morning,";

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Needed for HapticFeedback
 import 'package:get/get.dart';
 import '../../data/models/order_model.dart';
 
@@ -23,6 +24,25 @@ class SalesAgentController extends GetxController {
   // Observable Target that adapts based on the user role
   final monthlyTarget = 100000.0.obs;
 
+  // ✅ Checks if user is a manager (hides bonus UI if true)
+  var isSalesManager = false.obs;
+
+  // ✅ OBSERVABLE FOR SELECTED MONTH
+  var selectedMonth = DateTime.now().obs;
+
+  // ✅ METHOD TO CHANGE MONTH AND RELOAD
+  void changeMonth(int offset) {
+    HapticFeedback.selectionClick();
+    DateTime current = selectedMonth.value;
+    selectedMonth.value = DateTime(current.year, current.month + offset, 1);
+
+    // Reload data for the new month
+    isLoading.value = true;
+    Future.wait([fetchAgentStats(), fetchLeaderboard()]).then((_) {
+      isLoading.value = false;
+    });
+  }
+
   Future<void> fetchAgentIdentity() async {
     try {
       final user = _auth.currentUser;
@@ -35,10 +55,13 @@ class SalesAgentController extends GetxController {
 
           // CHECK ROLE to set the personal target dynamically
           String role = (userDoc.data()?['Role'] ?? userDoc.data()?['role'] ?? '').toString().toLowerCase();
+
           if (role.contains('manager') || role == 'sales manager') {
             monthlyTarget.value = 150000.0;
+            isSalesManager.value = true;
           } else {
             monthlyTarget.value = 100000.0;
+            isSalesManager.value = false;
           }
         }
         agentName.value = name;
@@ -64,9 +87,10 @@ class SalesAgentController extends GetxController {
     if (agentName.value.isEmpty) return;
 
     try {
-      DateTime now = DateTime.now();
-      DateTime startOfMonth = DateTime(now.year, now.month, 1);
-      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      // ✅ USE SELECTED MONTH INSTEAD OF DateTime.now()
+      DateTime targetMonth = selectedMonth.value;
+      DateTime startOfMonth = DateTime(targetMonth.year, targetMonth.month, 1);
+      DateTime endOfMonth = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
       final snapshot = await _db
           .collection('orders')
@@ -88,7 +112,6 @@ class SalesAgentController extends GetxController {
         final data = doc.data();
         String status = (data['status'] ?? 'pending').toString().toLowerCase();
 
-        // ✅ NEW: Check for both Delete Requests AND Soft Deletes
         bool isDeleteRequested = data['isDeleteRequested'] == true;
         bool isDeleted = data['isDeleted'] == true;
 
@@ -116,9 +139,10 @@ class SalesAgentController extends GetxController {
     try {
       isLoading.value = true;
 
-      DateTime now = DateTime.now();
-      DateTime start = DateTime(now.year, now.month, 1);
-      DateTime end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      // ✅ USE SELECTED MONTH INSTEAD OF DateTime.now()
+      DateTime targetMonth = selectedMonth.value;
+      DateTime start = DateTime(targetMonth.year, targetMonth.month, 1);
+      DateTime end = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
       // FETCH USER ROLES to build the leaderboard targets & tags accurately
       final usersSnap = await _db.collection('users').get();
@@ -151,7 +175,6 @@ class SalesAgentController extends GetxController {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        // ✅ NEW: Check for Soft Deletes
         bool isDeleteRequested = data['isDeleteRequested'] == true;
         bool isDeleted = data['isDeleted'] == true;
 
@@ -262,13 +285,11 @@ class SalesAgentController extends GetxController {
     try {
       isLoading.value = true;
 
-      // ✅ CHANGE: Request deletion instead of hard deleting
       await _db.collection('orders').doc(orderId).update({
         'isDeleteRequested': true,
         'deleteRequestedAt': FieldValue.serverTimestamp(),
       });
 
-      // ✅ NOTIFY MANAGERS
       try {
         final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
         for (var managerDoc in managerSnapshot.docs) {
@@ -317,9 +338,8 @@ class SalesAgentController extends GetxController {
     return 0.0;
   }
 
-// ✅ UPDATED: Now shows progress according to Gross Sales
   double get achievementPercentage {
     if (monthlyTarget.value <= 0) return 0.0;
-    // Change netAchievement.value to grossSales.value
     return (grossSales.value / monthlyTarget.value).clamp(0.0, 1.0);
-  }}
+  }
+}

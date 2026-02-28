@@ -58,7 +58,10 @@ class NotificationScreen extends StatelessWidget {
             return GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
-                if (!isRead) controller.markAsRead(note['id']);
+                // ✅ TRIGGER THE SMART ROUTING
+                // This now intelligently decides whether to open the Manager's Approval Screen
+                // OR the Associate's Edit/View Screen based on the notification text!
+                controller.handleNotificationTap(note);
               },
               child: Container(
                 margin: const EdgeInsets.only(bottom: 12),

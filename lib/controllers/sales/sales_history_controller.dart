@@ -21,7 +21,7 @@ class SalesHistoryController extends GetxController {
   // Filter state: "All", "Pending", "Approved", "Trash", etc.
   var currentFilter = "All".obs;
 
-  // ✅ NEW: Store search query so it persists when switching tabs
+  // Store search query so it persists when switching tabs
   var currentSearchQuery = "".obs;
 
   @override
@@ -37,14 +37,12 @@ class SalesHistoryController extends GetxController {
       final user = _auth.currentUser;
 
       if (user != null) {
-        // Step A: Get the exact name stored in your profile
         String myName = user.displayName ?? "Unknown";
         final userDoc = await _db.collection('id_requests').doc(user.uid).get();
         if (userDoc.exists) {
           myName = userDoc.data()?['name'] ?? myName;
         }
 
-        // Step B: Query Firestore - STRICTLY FILTER BY AGENT NAME
         final snapshot = await _db
             .collection('orders')
             .where('marketingPersonName', isEqualTo: myName)
@@ -102,6 +100,7 @@ class SalesHistoryController extends GetxController {
           'targetUserId': managerDoc.id,
           'title': 'Deletion Request ⚠️',
           'message': 'Associate requested to delete Order ${order.manualOrderNo}. Approval required.',
+          'orderId': order.id,
           'timestamp': FieldValue.serverTimestamp(),
           'isRead': false,
         });
@@ -135,11 +134,11 @@ class SalesHistoryController extends GetxController {
 
   // --- 4. Search Bar Logic ---
   void searchOrders(String query) {
-    currentSearchQuery.value = query; // ✅ Save search text
+    currentSearchQuery.value = query;
     applyFilter();
   }
 
-  // --- 5. Main Filter Engine (✅ UPGRADED FOR SOFT DELETE) ---
+  // --- 5. Main Filter Engine ---
   void applyFilter() {
     List<OrderModel> temp = allHistoryOrders;
 
@@ -176,44 +175,71 @@ class SalesHistoryController extends GetxController {
     displayedOrders.assignAll(temp);
   }
 
-  // ✅ 6. ASSOCIATE PAYMENT LOGIC (Allows Associate to collect/mark full payment)
+  // ✅ 6. SECURE PAYMENT LOGIC (Requires Manager Approval)
   Future<void> recordPayment(OrderModel order, double amount) async {
     try {
-      double newAdvance = order.advanceAmount + amount;
-      double newBalance = order.totalAmount - newAdvance;
+      isLoading.value = true;
 
-      if (newBalance < 0) newBalance = 0;
-
-      // 1. Create the timestamped payment record
       final user = _auth.currentUser;
       String agentName = user?.displayName ?? 'Sales Associate';
+      String agentUid = user?.uid ?? ''; // ✅ CAPTURED EXACT UID
 
-      final paymentRecord = {
+      // 1. Create a Pending Payment Request
+      await _db.collection('payment_requests').add({
+        'orderId': order.id,
+        'manualOrderNo': order.manualOrderNo ?? 'Unknown',
+        'clientName': order.clientName,
+        'agentName': agentName,
+        'agentUid': agentUid, // ✅ SAVED UID FOR BULLETPROOF ROUTING
         'amount': amount,
-        'date': Timestamp.now(),
-        'recordedBy': agentName,
-      };
-
-      // 2. Update Firebase safely
-      await _db.collection('orders').doc(order.id).update({
-        'advanceAmount': newAdvance,
-        'balanceDue': newBalance,
-        'paymentStatus': newBalance <= 0 ? 'Fully Paid' : 'Partially Paid',
-        'paymentHistory': FieldValue.arrayUnion([paymentRecord]),
+        'status': 'pending',
+        'requestedAt': FieldValue.serverTimestamp(),
       });
 
-      // 3. Show Success Message
+      // 2. Notify the Sales Managers
+      final managerSnapshot = await _db.collection('users')
+          .where('Role', isEqualTo: 'Sales Manager')
+          .get();
+
+      for (var managerDoc in managerSnapshot.docs) {
+        await _db.collection('notifications').add({
+          'targetUserId': managerDoc.id,
+          'title': 'Payment Approval Required 💰',
+          'message': '$agentName collected ₹$amount for Order ${order.manualOrderNo}.',
+          'orderId': order.id,
+          'timestamp': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+      }
+
+      // 3. Show Success Message to Associate
       Get.snackbar(
-        "Payment Successful",
-        newBalance <= 0 ? "Order marked as FULLY PAID." : "₹$amount recorded successfully.",
-        backgroundColor: Colors.green,
+        "Approval Requested",
+        "Payment of ₹$amount sent to Manager. The due balance will update once approved.",
+        backgroundColor: Colors.orange.withValues(alpha: 0.9),
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
       );
 
-      fetchHistory(); // Refresh the associate's list
     } catch (e) {
-      Get.snackbar("Error", "Failed to update payment: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar(
+          "Error",
+          "Failed to submit payment request: $e",
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+          colorText: Colors.red
+      );
+    } finally {
+      isLoading.value = false;
     }
+  }
+
+  // ✅ 7. CHECK PENDING PAYMENT STATUS
+  Stream<bool> hasPendingPayment(String orderId) {
+    return _db.collection('payment_requests')
+        .where('orderId', isEqualTo: orderId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.isNotEmpty);
   }
 }

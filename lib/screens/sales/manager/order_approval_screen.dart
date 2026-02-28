@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:yoobbel/controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../utils/widgets/order_status_timeline.dart';
 
-// ✅ 1. Converted to StatefulWidget to handle updates
 class OrderApprovalScreen extends StatefulWidget {
   final OrderModel order;
   const OrderApprovalScreen({super.key, required this.order});
@@ -17,50 +17,38 @@ class OrderApprovalScreen extends StatefulWidget {
 
 class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   final controller = Get.put(SalesManagerController());
-  
-  // ✅ 2. State Variable for the current status
-  late String currentStatus;
 
-  // ✅ 3. List of stages for the dropdown
+  // State Variables
+  late String currentStatus;
+  late double localAdvanceAmount;
+  late double localBalanceDue;
+  bool isProcessingPayment = false;
+
   final List<String> productionStages = [
-    'Approved',
-    'Cutting',
-    'Stitching',
-    'Printing',
-    'Packing',
-    'Shipping',
-    'Delivered'
+    'Approved', 'Cutting', 'Stitching', 'Printing', 'Packing', 'Shipping', 'Delivered'
   ];
 
   @override
   void initState() {
     super.initState();
     currentStatus = widget.order.status;
+    localAdvanceAmount = widget.order.advanceAmount;
+    localBalanceDue = widget.order.balanceDue;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Convenience variable
     final order = widget.order;
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currency = NumberFormat.currency(
-      locale: 'en_IN',
-      symbol: '₹',
-      decimalDigits: 2,
-    );
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-    // Define text colors based on theme
     final Color textColor = isDark ? Colors.white : Colors.black87;
     final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text(
-          "Order Verification",
-          style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
-        ),
+        title: Text("Order Verification", style: TextStyle(fontWeight: FontWeight.w600, color: textColor)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -73,73 +61,41 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // --- LIVE TIMELINE ---
             _buildModernCard(
-              title: "Live Production Status",
-              icon: Icons.linear_scale,
-              isDark: isDark,
-              textColor: textColor,
+              title: "Live Production Status", icon: Icons.linear_scale, isDark: isDark, textColor: textColor,
               children: [
                 OrderStatusTimeline(currentStatus: currentStatus),
                 const SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    "Current Stage: $currentStatus",
-                    style: TextStyle(
-                        color: TColors.primary, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                Center(child: Text("Current Stage: $currentStatus", style: TextStyle(color: TColors.primary, fontWeight: FontWeight.bold))),
               ],
             ),
             const SizedBox(height: 20),
-
-            // --- TOP STATUS HEADER ---
             _buildStatusHeader(order),
             const SizedBox(height: 24),
-
-            // --- 1. CLIENT & AGENT SECTION ---
             _buildModernCard(
-              title: "Identity Information",
-              icon: Icons.badge_outlined,
-              isDark: isDark,
-              textColor: textColor,
+              title: "Identity Information", icon: Icons.badge_outlined, isDark: isDark, textColor: textColor,
               children: [
                 _buildInfoRow(Icons.person_outline, "Client Name", order.clientName, subTextColor, textColor),
                 _buildInfoRow(Icons.business, "Organization", order.organization ?? "N/A", subTextColor, textColor),
                 _buildInfoRow(Icons.phone_outlined, "Phone", order.clientPhone ?? "N/A", subTextColor, textColor),
                 _buildInfoRow(Icons.location_on_outlined, "Address", order.clientAddress ?? "N/A", subTextColor, textColor, isMultiLine: true),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(height: 1, thickness: 0.5, color: subTextColor.withValues(alpha: 0.3)),
-                ),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, thickness: 0.5, color: subTextColor.withValues(alpha: 0.3))),
                 _buildInfoRow(Icons.support_agent, "Sales Associate", order.marketingPersonName, subTextColor, textColor, highlight: true),
                 _buildInfoRow(Icons.event_note, "Order Date", _formatDate(order.orderDate), subTextColor, textColor),
                 _buildInfoRow(Icons.calendar_month_outlined, "Delivery Deadline", _formatDate(order.deliveryDate), subTextColor, textColor, isBold: true, customValueColor: Colors.redAccent),
               ],
             ),
-
             const SizedBox(height: 20),
-
-            // --- 2. PRODUCT & SIZES SECTION ---
             _buildModernCard(
-              title: "Product Specifications",
-              icon: Icons.inventory_2_outlined,
-              isDark: isDark,
-              textColor: textColor,
+              title: "Product Specifications", icon: Icons.inventory_2_outlined, isDark: isDark, textColor: textColor,
               children: [
                 _buildInfoRow(Icons.shopping_bag_outlined, "Product", order.productName, subTextColor, textColor, isBold: true),
                 _buildInfoRow(Icons.qr_code, "SKU / Code", order.productCode ?? "N/A", subTextColor, textColor),
                 _buildInfoRow(Icons.layers_outlined, "Quantity", "${order.quantity} Units", subTextColor, textColor),
-
-                // UNIT PRICE
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 12),
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-                  ),
+                  decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.blue.withValues(alpha: 0.3))),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -148,23 +104,14 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                     ],
                   ),
                 ),
-
                 const Text("Size Breakdown", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                 const SizedBox(height: 6),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.2)),
-                  ),
-                  child: Text(
-                    order.sizeDescription?.isNotEmpty == true ? order.sizeDescription! : "No specific sizes.",
-                    style: TextStyle(fontSize: 14, color: textColor, height: 1.4),
-                  ),
+                  decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100], borderRadius: BorderRadius.circular(8), border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.2))),
+                  child: Text(order.sizeDescription?.isNotEmpty == true ? order.sizeDescription! : "No specific sizes.", style: TextStyle(fontSize: 14, color: textColor, height: 1.4)),
                 ),
-
                 if (order.productDetails?.isNotEmpty == true) ...[
                   const SizedBox(height: 12),
                   const Text("Notes", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -173,60 +120,120 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                 ],
               ],
             ),
-
             const SizedBox(height: 20),
-
-            // --- 3. FINANCIAL SUMMARY ---
             _buildModernCard(
-              title: "Financial Breakdown",
-              icon: Icons.receipt_long,
-              isDark: isDark,
-              textColor: textColor,
+              title: "Financial Breakdown", icon: Icons.receipt_long, isDark: isDark, textColor: textColor,
               children: [
                 _buildFinanceRow("GST Percentage", "${order.gstPercentage}%", subTextColor, textColor),
                 _buildFinanceRow("Shipping Charges", currency.format(order.shippingCharge), subTextColor, textColor),
                 const Divider(height: 24),
                 _buildFinanceRow("Grand Total", currency.format(order.totalAmount), subTextColor, textColor, isTotal: true),
                 const SizedBox(height: 8),
-                _buildFinanceRow("Less: Advance", "- ${currency.format(order.advanceAmount)}", subTextColor, textColor, customValueColor: Colors.green),
+                _buildFinanceRow("Less: Advance", "- ${currency.format(localAdvanceAmount)}", subTextColor, textColor, customValueColor: Colors.green),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-                  ),
+                  decoration: BoxDecoration(color: localBalanceDue <= 0 ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: localBalanceDue <= 0 ? Colors.green.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.2))),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("BALANCE DUE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                      Text(currency.format(order.balanceDue), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 20)),
+                      Text(localBalanceDue <= 0 ? "FULLY PAID" : "BALANCE DUE", style: TextStyle(color: localBalanceDue <= 0 ? Colors.green : Colors.red, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      Text(currency.format(localBalanceDue), style: TextStyle(color: localBalanceDue <= 0 ? Colors.green : Colors.red, fontWeight: FontWeight.w900, fontSize: 20)),
                     ],
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 40),
+            // ✅ 3.5. UPGRADED PENDING PAYMENT REQUESTS STREAM
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('payment_requests')
+                  .where('orderId', isEqualTo: order.id)
+                  .where('status', isEqualTo: 'pending')
+                  .snapshots(),
+              builder: (context, snapshot) {
 
-            // --- ✅ 4. DYNAMIC ACTION AREA ---
-            
-            // CONDITION A: If Order is "Placed" or "Pending" -> Show Approve/Reject Buttons
+                if (snapshot.hasError) {
+                  return Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 20),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red)),
+                    child: Text("Database Error: ${snapshot.error}", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const SizedBox(height: 20);
+                }
+
+                return Column(
+                  children: snapshot.data!.docs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final amount = (data['amount'] as num).toDouble();
+                    final agent = data['agentName'] ?? 'Associate';
+
+                    return Container(
+                      margin: const EdgeInsets.only(top: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), border: Border.all(color: Colors.orange.withValues(alpha: 0.5), width: 1.5), borderRadius: BorderRadius.circular(16)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                              const SizedBox(width: 8),
+                              const Text("Payment Approval Required", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text("$agent has collected a payment of ${currency.format(amount)}. Do you approve this transaction?", style: TextStyle(color: textColor, fontSize: 14)),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: isProcessingPayment ? null : () => _rejectPaymentRequest(doc.id),
+                                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                  child: const Text("Reject"),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: isProcessingPayment ? null : () => _approvePaymentRequest(doc.id, amount, order.id!),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                  child: isProcessingPayment ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("Approve"),
+                                ),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            if (currentStatus != 'Placed' && currentStatus != 'Pending') const SizedBox(height: 20),
+
+            // --- 4. DYNAMIC ACTION AREA ---
             if (currentStatus == 'Placed' || currentStatus == 'Pending') ...[
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _confirmAction(context, "Reject", Colors.red, () {
-                        controller.rejectOrder(order.id!); // Added ! for safety
+                        controller.rejectOrder(order.id!);
                         Get.back();
                       }),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        side: const BorderSide(color: Colors.redAccent, width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18), side: const BorderSide(color: Colors.redAccent, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                       child: const Text("REJECT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   ),
@@ -234,38 +241,19 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _confirmAction(context, "Approve", Colors.green, () {
-                        controller.approveOrder(order.id!); // Added ! for safety
-                        setState(() {
-                          currentStatus = 'Approved'; // Update UI instantly to show dropdown
-                        });
+                        controller.approveOrder(order.id!);
+                        setState(() => currentStatus = 'Approved');
                       }),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        elevation: 4,
-                        shadowColor: Colors.green.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), elevation: 4, shadowColor: Colors.green.withValues(alpha: 0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                       child: const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   ),
                 ],
               ),
-            ] 
-            
-            // CONDITION B: If Order is Approved/Cutting/Stitching... -> Show Dropdown Input
-            else ...[
+            ] else ...[
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
-                  border: Border.all(color: TColors.primary.withValues(alpha: 0.3), width: 1.5),
-                ),
+                decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))], border: Border.all(color: TColors.primary.withValues(alpha: 0.3), width: 1.5)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -277,28 +265,16 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    
-                    // ✅ DROPDOWN FOR MANAGER INPUT
                     DropdownButtonFormField<String>(
                       initialValue: productionStages.contains(currentStatus) ? currentStatus : null,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: isDark ? Colors.grey[800] : Colors.grey[50],
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
+                      decoration: InputDecoration(filled: true, fillColor: isDark ? Colors.grey[800] : Colors.grey[50], border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
                       items: productionStages.map((stage) {
-                        return DropdownMenuItem(
-                          value: stage,
-                          child: Text(stage, style: TextStyle(color: textColor)),
-                        );
+                        return DropdownMenuItem(value: stage, child: Text(stage, style: TextStyle(color: textColor)));
                       }).toList(),
                       onChanged: (newValue) {
                         if (newValue != null) {
-                          // 1. Update Visuals
-                          setState(() => currentStatus = newValue); 
-                          // 2. Save to Database
-                          controller.updateOrderStatus(order.id!, newValue); 
+                          setState(() => currentStatus = newValue);
+                          controller.updateOrderStatus(order.id!, newValue);
                         }
                       },
                     ),
@@ -314,171 +290,141 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     );
   }
 
-  // --- EXISTING WIDGET HELPERS (Unchanged) ---
+  // ✅ FULLY UPGRADED PAYMENT APPROVAL
+  Future<void> _approvePaymentRequest(String requestId, double amount, String orderId) async {
+    setState(() => isProcessingPayment = true);
+    try {
+      final db = FirebaseFirestore.instance;
 
+      // 1. Mark as approved
+      await db.collection('payment_requests').doc(requestId).update({
+        'status': 'approved',
+        'approvedAt': FieldValue.serverTimestamp()
+      });
+
+      // 2. Fetch the request to grab the Associate's exact UID
+      final requestDoc = await db.collection('payment_requests').doc(requestId).get();
+      final data = requestDoc.data();
+
+      String? associateUid = data?['agentUid'];
+
+      // ✅ FALLBACK: If this is an old request created before the update, search by name
+      if (associateUid == null || associateUid.toString().isEmpty) {
+        final associateName = data?['agentName'] ?? "Associate";
+        final associateUserSnap = await db.collection('id_requests').where('name', isEqualTo: associateName).limit(1).get();
+        if (associateUserSnap.docs.isNotEmpty) {
+          associateUid = associateUserSnap.docs.first.id;
+        }
+      }
+
+      // ✅ 3. Send Notification to Associate
+      if (associateUid != null && associateUid.isNotEmpty) {
+        await db.collection('notifications').add({
+          'targetUserId': associateUid,
+          'title': 'Payment Approved! ✅',
+          'message': 'Manager approved your collection of ₹$amount for Order #${widget.order.manualOrderNo}.',
+          'orderId': orderId,
+          'timestamp': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+      }
+
+      // 4. Calculate new balance securely
+      final orderDoc = await db.collection('orders').doc(orderId).get();
+      double currentTotal = (orderDoc.data()?['totalAmount'] ?? 0).toDouble();
+      double currentAdvance = (orderDoc.data()?['advanceAmount'] ?? 0).toDouble();
+
+      double newAdvance = currentAdvance + amount;
+      double newBalance = currentTotal - newAdvance;
+      if (newBalance < 0) newBalance = 0;
+
+      final paymentRecord = {'amount': amount, 'date': Timestamp.now(), 'recordedBy': 'Manager Approved'};
+
+      // 5. Update the Order Ledger
+      await db.collection('orders').doc(orderId).update({
+        'advanceAmount': newAdvance,
+        'balanceDue': newBalance,
+        'paymentStatus': newBalance <= 0 ? 'Fully Paid' : 'Partially Paid',
+        'paymentHistory': FieldValue.arrayUnion([paymentRecord]),
+      });
+
+      // 6. Update UI
+      setState(() { localAdvanceAmount = newAdvance; localBalanceDue = newBalance; });
+      Get.snackbar("Payment Approved", "The order balance has been successfully updated.", backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      Get.snackbar("Error", "Could not approve payment: $e", backgroundColor: Colors.red, colorText: Colors.white);
+    } finally {
+      setState(() => isProcessingPayment = false);
+    }
+  }
+
+  Future<void> _rejectPaymentRequest(String requestId) async {
+    try {
+      await FirebaseFirestore.instance.collection('payment_requests').doc(requestId).update({'status': 'rejected', 'rejectedAt': FieldValue.serverTimestamp()});
+      Get.snackbar("Payment Rejected", "The payment request has been dismissed.", backgroundColor: Colors.orange, colorText: Colors.white);
+    } catch (e) {
+      Get.snackbar("Error", "Could not reject payment: $e", backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  // --- UI HELPERS ---
   Widget _buildStatusHeader(OrderModel order) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.orange.shade400, Colors.deepOrangeAccent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+      width: double.infinity, padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.orange.shade400, Colors.deepOrangeAccent], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Order #${order.manualOrderNo ?? '---'}",
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  currentStatus.toUpperCase(), // ✅ Uses live state variable
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-              ),
+              Text("Order #${order.manualOrderNo ?? '---'}", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)), child: Text(currentStatus.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            "Created on ${_formatDate(order.orderDate)}",
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
-          ),
+          Text("Created on ${_formatDate(order.orderDate)}", style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
         ],
       ),
     );
   }
 
-  Widget _buildModernCard({
-    required String title,
-    required IconData icon,
-    required bool isDark,
-    required Color textColor,
-    required List<Widget> children,
-  }) {
+  Widget _buildModernCard({required String title, required IconData icon, required bool isDark, required Color textColor, required List<Widget> children}) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: TColors.primary),
-              const SizedBox(width: 8),
-              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ...children,
-        ],
-      ),
+      width: double.infinity, padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Icon(icon, size: 20, color: TColors.primary), const SizedBox(width: 8), Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor))]), const SizedBox(height: 16), ...children]),
     );
   }
 
-  Widget _buildInfoRow(
-    IconData icon,
-    String label,
-    String? value,
-    Color labelColor,
-    Color valueColor, {
-    bool isBold = false,
-    bool highlight = false,
-    bool isMultiLine = false,
-    Color? customValueColor,
-  }) {
+  Widget _buildInfoRow(IconData icon, String label, String? value, Color labelColor, Color valueColor, {bool isBold = false, bool highlight = false, bool isMultiLine = false, Color? customValueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: isMultiLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: Colors.grey[400]),
-          const SizedBox(width: 12),
+          Icon(icon, size: 18, color: Colors.grey[400]), const SizedBox(width: 12),
           Expanded(flex: 3, child: Text(label, style: TextStyle(color: labelColor, fontSize: 13))),
-          Expanded(
-            flex: 4,
-            child: Text(
-              value ?? "N/A",
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontWeight: isBold || highlight ? FontWeight.bold : FontWeight.w500,
-                color: customValueColor ?? (highlight ? Colors.blue : valueColor),
-                fontSize: 14,
-              ),
-            ),
-          ),
+          Expanded(flex: 4, child: Text(value ?? "N/A", textAlign: TextAlign.end, style: TextStyle(fontWeight: isBold || highlight ? FontWeight.bold : FontWeight.w500, color: customValueColor ?? (highlight ? Colors.blue : valueColor), fontSize: 14))),
         ],
       ),
     );
   }
 
-  Widget _buildFinanceRow(
-    String label,
-    String value,
-    Color labelColor,
-    Color valueColor, {
-    bool isTotal = false,
-    Color? customValueColor,
-  }) {
+  Widget _buildFinanceRow(String label, String value, Color labelColor, Color valueColor, {bool isTotal = false, Color? customValueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: isTotal ? valueColor : labelColor,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: FontWeight.bold,
-              color: customValueColor ?? valueColor,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 14, color: isTotal ? valueColor : labelColor, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal)),
+          Text(value, style: TextStyle(fontSize: isTotal ? 18 : 14, fontWeight: FontWeight.bold, color: customValueColor ?? valueColor)),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
-  }
+  String _formatDate(DateTime date) => "${date.day}/${date.month}/${date.year}";
 
   String _calculateUnitPrice(OrderModel order) {
     if (order.quantity == 0) return "₹0.00";
@@ -489,28 +435,12 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     return "₹${unitPrice.toStringAsFixed(2)}";
   }
 
-  void _confirmAction(
-    BuildContext context,
-    String action,
-    Color color,
-    VoidCallback onConfirm,
-  ) {
+  void _confirmAction(BuildContext context, String action, Color color, VoidCallback onConfirm) {
     Get.defaultDialog(
-      title: "$action Order",
-      titleStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
+      title: "$action Order", titleStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
       middleText: "Are you sure you want to $action this transaction?",
-      confirm: ElevatedButton(
-        onPressed: () {
-          onConfirm();
-          Get.back();
-        },
-        style: ElevatedButton.styleFrom(backgroundColor: color),
-        child: const Text("Confirm", style: TextStyle(color: Colors.white)),
-      ),
-      cancel: OutlinedButton(
-        onPressed: () => Get.back(),
-        child: const Text("Cancel"),
-      ),
+      confirm: ElevatedButton(onPressed: () { onConfirm(); Get.back(); }, style: ElevatedButton.styleFrom(backgroundColor: color), child: const Text("Confirm", style: TextStyle(color: Colors.white))),
+      cancel: OutlinedButton(onPressed: () => Get.back(), child: const Text("Cancel")),
       radius: 12,
     );
   }

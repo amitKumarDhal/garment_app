@@ -120,10 +120,8 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   ),
 
                 // --- SECTION 1: DESIGN ---
-                // --- SECTION 1: DESIGN ---
                 _buildSectionHeader("Design Mockup", Icons.palette_outlined, isDark),
-                _buildImagePicker(isDark), // ✅ CONTROLLER REMOVED
-                const SizedBox(height: 28),
+                _buildImagePicker(isDark),
                 const SizedBox(height: 28),
 
                 // --- SECTION 2: CLIENT INFO ---
@@ -203,7 +201,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                     label: "Product Name / Details",
                                     controller: itemForm.productDetails,
                                     prefixIcon: Icons.notes_rounded,
-                                    maxLines: 2, // Makes the field bigger vertically
+                                    maxLines: 2,
                                     validator: (val) => val!.isEmpty ? "Required" : null
                                 ),
                                 const SizedBox(height: 12),
@@ -213,7 +211,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                   label: "Sizes Breakdown (e.g., S:10, M:20, L:15)",
                                   controller: itemForm.sizeDescription,
                                   prefixIcon: Icons.straighten_rounded,
-                                  maxLines: 2, // Makes the field bigger vertically
+                                  maxLines: 2,
                                 ),
                                 const SizedBox(height: 12),
 
@@ -351,7 +349,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     );
   }
 
-// ✅ REPLACED WITH "COMING SOON" PLACEHOLDER
+  // ✅ "COMING SOON" PLACEHOLDER
   Widget _buildImagePicker(bool isDark) {
     return Container(
       width: double.infinity,
@@ -408,7 +406,12 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
         ],
       ),
     );
-  }  Widget _buildCalculationSummary(bool isDark, MarketingUploadController controller) {
+  }
+
+  // ✅ UPDATED SUMMARY: Locks "Advance" in Edit Mode
+  Widget _buildCalculationSummary(bool isDark, MarketingUploadController controller) {
+    final bool isEditMode = controller.isEditing.value;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -422,11 +425,38 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: _buildSmallInput(controller.shippingCharge, "Shipping (₹)", isDark, icon: Icons.local_shipping_outlined)),
+              Expanded(
+                  child: _buildSmallInput(
+                      controller.shippingCharge,
+                      "Shipping (₹)",
+                      isDark,
+                      icon: Icons.local_shipping_outlined
+                  )
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildSmallInput(controller.advanceAmount, "Advance (₹)", isDark, isBold: true, icon: Icons.payments_outlined)),
+              Expanded(
+                  child: _buildSmallInput(
+                      controller.advanceAmount,
+                      "Advance (₹)",
+                      isDark,
+                      isBold: true,
+                      icon: Icons.payments_outlined,
+                      readOnly: isEditMode, // 🔒 Lock advance field when editing
+                      hintText: isEditMode ? "Locked" : "Advance (₹)"
+                  )
+              ),
             ],
           ),
+
+          if (isEditMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Text(
+                "*Use the 'Record Payment' button on your ledger to update payments.",
+                style: TextStyle(fontSize: 10, color: Colors.orange.shade400, fontStyle: FontStyle.italic),
+              ),
+            ),
+
           const SizedBox(height: 20),
           _buildDashedDivider(isDark),
           const SizedBox(height: 16),
@@ -436,7 +466,18 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
           const SizedBox(height: 8),
           Obx(() => _buildLedgerRow("Grand Total", "₹${controller.grandTotal.value.toStringAsFixed(2)}", isDark, isBold: true)),
           const SizedBox(height: 8),
-          _buildLedgerRow("Less Advance", "- ₹${(double.tryParse(controller.advanceAmount.text) ?? 0).toStringAsFixed(2)}", isDark, isRed: true),
+          // ✅ THE FIXED CODE
+          Obx(() {
+            // We do a "dummy read" of an observable so GetX knows when to rebuild this row
+            final _ = controller.balanceDue.value;
+
+            return _buildLedgerRow(
+                "Less Advance",
+                "- ₹${(double.tryParse(controller.advanceAmount.text) ?? 0).toStringAsFixed(2)}",
+                isDark,
+                isRed: true
+            );
+          }),
           const SizedBox(height: 16),
           _buildDashedDivider(isDark),
           const SizedBox(height: 16),
@@ -457,25 +498,36 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     return Row(children: List.generate(40, (index) => Expanded(child: Container(color: index % 2 == 0 ? Colors.transparent : (isDark ? Colors.grey.shade800 : Colors.grey.shade300), height: 1.5))));
   }
 
-  Widget _buildSmallInput(TextEditingController controller, String label, bool isDark, {bool isBold = false, required IconData icon}) {
+  // ✅ UPDATED INPUT HELPER: Supports Read-Only State
+  Widget _buildSmallInput(TextEditingController controller, String label, bool isDark, {bool isBold = false, required IconData icon, bool readOnly = false, String? hintText}) {
     return Container(
       height: 48,
       padding: const EdgeInsets.only(left: 12, right: 8),
       decoration: BoxDecoration(
-        color: isDark ? Colors.black26 : Colors.grey.shade50,
+        color: readOnly ? (isDark ? Colors.grey.shade900 : Colors.grey.shade200) : (isDark ? Colors.black26 : Colors.grey.shade50),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isBold ? Colors.green.withValues(alpha:0.5) : (isDark ? Colors.white10 : Colors.grey.shade300)),
+        border: Border.all(color: isBold && !readOnly ? Colors.green.withValues(alpha:0.5) : (isDark ? Colors.white10 : Colors.grey.shade300)),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: isBold ? Colors.green : Colors.grey),
+          Icon(icon, size: 14, color: readOnly ? Colors.grey : (isBold ? Colors.green : Colors.grey)),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: controller,
               keyboardType: TextInputType.number,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: 14),
-              decoration: InputDecoration(border: InputBorder.none, isDense: true, hintText: label, hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400, fontWeight: FontWeight.normal)),
+              readOnly: readOnly,
+              style: TextStyle(
+                  color: readOnly ? Colors.grey : (isDark ? Colors.white : Colors.black),
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 14
+              ),
+              decoration: InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                  hintText: hintText ?? label,
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400, fontWeight: FontWeight.normal)
+              ),
             ),
           ),
         ],
