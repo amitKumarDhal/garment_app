@@ -18,6 +18,9 @@ class OrderApprovalScreen extends StatefulWidget {
 class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   final controller = Get.put(SalesManagerController());
 
+  // ✅ NEW: Controller for Margin Input
+  final TextEditingController _marginController = TextEditingController();
+
   // State Variables
   late String currentStatus;
   late double localAdvanceAmount;
@@ -34,6 +37,17 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     currentStatus = widget.order.status;
     localAdvanceAmount = widget.order.advanceAmount;
     localBalanceDue = widget.order.balanceDue;
+
+    // If a margin is already set, pre-fill the text field
+    if (widget.order.effectiveRevenue > 0) {
+      _marginController.text = widget.order.effectiveRevenue.toStringAsFixed(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _marginController.dispose();
+    super.dispose();
   }
 
   @override
@@ -86,7 +100,8 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            // ✅ DYNAMIC MULTI-ITEM PRODUCT SPECIFICATIONS
+
+            // MULTI-ITEM PRODUCT SPECIFICATIONS
             _buildModernCard(
               title: "Product Specifications (${order.products.length} Items)",
               icon: Icons.inventory_2_outlined,
@@ -163,6 +178,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
               ],
             ),
             const SizedBox(height: 20),
+
             _buildModernCard(
               title: "Financial Breakdown", icon: Icons.receipt_long, isDark: isDark, textColor: textColor,
               children: [
@@ -187,7 +203,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
               ],
             ),
 
-            // ✅ 3.5. UPGRADED PENDING PAYMENT REQUESTS STREAM
+            // PENDING PAYMENT REQUESTS STREAM
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('payment_requests')
                   .where('orderId', isEqualTo: order.id)
@@ -267,6 +283,10 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
             // --- 4. DYNAMIC ACTION AREA ---
             if (currentStatus == 'Placed' || currentStatus == 'Pending') ...[
+
+              // ✅ NEW: MARGIN CONSOLE (Only visible when approving)
+              _buildMarginInput(isDark),
+
               Row(
                 children: [
                   Expanded(
@@ -282,10 +302,21 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _confirmAction(context, "Approve", Colors.green, () {
-                        controller.approveOrder(order.id!);
-                        setState(() => currentStatus = 'Approved');
-                      }),
+                      onPressed: () {
+                        // ✅ Check for Margin before Approving
+                        double erAmount = double.tryParse(_marginController.text) ?? 0.0;
+                        if (erAmount <= 0) {
+                          Get.snackbar("Missing Data", "Please enter the Effective Revenue (Margin) before approving.",
+                              backgroundColor: Colors.orange.withValues(alpha: 0.8), colorText: Colors.white);
+                          return;
+                        }
+
+                        _confirmAction(context, "Approve", Colors.green, () {
+                          // Use the new method from the controller
+                          controller.approveOrderWithMargin(order.id!, erAmount);
+                          setState(() => currentStatus = 'Approved');
+                        });
+                      },
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), elevation: 4, shadowColor: Colors.green.withValues(alpha: 0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                       child: const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
@@ -293,6 +324,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                 ],
               ),
             ] else ...[
+              // If already approved, just show the stage updater
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))], border: Border.all(color: TColors.primary.withValues(alpha: 0.3), width: 1.5)),
@@ -332,25 +364,69 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     );
   }
 
-  // ✅ FULLY UPGRADED PAYMENT APPROVAL
+  // ✅ NEW: MARGIN INPUT WIDGET
+  Widget _buildMarginInput(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.amber.withValues(alpha: 0.05) : Colors.amber.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.analytics_outlined, color: Colors.amber, size: 18),
+              SizedBox(width: 8),
+              Text(
+                "Management: Set Effective Revenue",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _marginController,
+            keyboardType: TextInputType.number,
+            style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+            decoration: InputDecoration(
+              hintText: "Enter company margin (ER)",
+              prefixText: "₹ ",
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "This value determines the Associate's target achievement and clears their pending status.",
+            style: TextStyle(fontSize: 10, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // FULLY UPGRADED PAYMENT APPROVAL
   Future<void> _approvePaymentRequest(String requestId, double amount, String orderId) async {
     setState(() => isProcessingPayment = true);
     try {
       final db = FirebaseFirestore.instance;
 
-      // 1. Mark as approved
       await db.collection('payment_requests').doc(requestId).update({
         'status': 'approved',
         'approvedAt': FieldValue.serverTimestamp()
       });
 
-      // 2. Fetch the request to grab the Associate's exact UID
       final requestDoc = await db.collection('payment_requests').doc(requestId).get();
       final data = requestDoc.data();
 
       String? associateUid = data?['agentUid'];
 
-      // ✅ FALLBACK: If this is an old request created before the update, search by name
       if (associateUid == null || associateUid.toString().isEmpty) {
         final associateName = data?['agentName'] ?? "Associate";
         final associateUserSnap = await db.collection('id_requests').where('name', isEqualTo: associateName).limit(1).get();
@@ -359,7 +435,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         }
       }
 
-      // ✅ 3. Send Notification to Associate
       if (associateUid != null && associateUid.isNotEmpty) {
         await db.collection('notifications').add({
           'targetUserId': associateUid,
@@ -371,7 +446,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         });
       }
 
-      // 4. Calculate new balance securely
       final orderDoc = await db.collection('orders').doc(orderId).get();
       double currentTotal = (orderDoc.data()?['totalAmount'] ?? 0).toDouble();
       double currentAdvance = (orderDoc.data()?['advanceAmount'] ?? 0).toDouble();
@@ -382,7 +456,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
       final paymentRecord = {'amount': amount, 'date': Timestamp.now(), 'recordedBy': 'Manager Approved'};
 
-      // 5. Update the Order Ledger
       await db.collection('orders').doc(orderId).update({
         'advanceAmount': newAdvance,
         'balanceDue': newBalance,
@@ -390,7 +463,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         'paymentHistory': FieldValue.arrayUnion([paymentRecord]),
       });
 
-      // 6. Update UI
       setState(() { localAdvanceAmount = newAdvance; localBalanceDue = newBalance; });
       Get.snackbar("Payment Approved", "The order balance has been successfully updated.", backgroundColor: Colors.green, colorText: Colors.white);
     } catch (e) {
@@ -467,15 +539,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   String _formatDate(DateTime date) => "${date.day}/${date.month}/${date.year}";
-
-  // String _calculateUnitPrice(OrderModel order) {
-  //   if (order.quantity == 0) return "₹0.00";
-  //   double amountWithoutShipping = order.totalAmount - order.shippingCharge;
-  //   double gstMultiplier = 1 + (order.gstPercentage / 100);
-  //   double baseTotal = amountWithoutShipping / gstMultiplier;
-  //   double unitPrice = baseTotal / order.quantity;
-  //   return "₹${unitPrice.toStringAsFixed(2)}";
-  // }
 
   void _confirmAction(BuildContext context, String action, Color color, VoidCallback onConfirm) {
     Get.defaultDialog(

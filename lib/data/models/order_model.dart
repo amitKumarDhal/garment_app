@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // ✅ REQUIRED FOR DATE FORMATTING
 
 class OrderModel {
   final String? id;
@@ -34,18 +35,21 @@ class OrderModel {
   final String? imageUrl;
   final String? localImagePath;
 
-  // ✅ THE DYNAMIC MULTI-ITEM LIST
+  // THE DYNAMIC MULTI-ITEM LIST
   final List<Map<String, dynamic>> products;
 
-  // ✅ NEW INTERNAL MARGIN FIELDS
+  // NEW INTERNAL MARGIN FIELDS
   final int marginNumber;
   final double effectiveRevenue;
 
-  // ✅ NEW FLAG FOR DELETION WORKFLOW
+  // NEW FLAG FOR DELETION WORKFLOW
   final bool isDeleteRequested;
 
-  // ✅ NEW PAYMENT HISTORY LOG
+  // NEW PAYMENT HISTORY LOG
   final List<dynamic> paymentHistory;
+
+  // ✅ THE FIX: Automatically formats the deliveryDate into a readable deadline string
+  String get deadline => DateFormat('dd-MM-yyyy').format(deliveryDate);
 
   OrderModel({
     this.id,
@@ -122,7 +126,7 @@ class OrderModel {
       // SAVE DELETION FLAG
       "isDeleteRequested": isDeleteRequested,
 
-      // ✅ SAVE PAYMENT HISTORY
+      // SAVE PAYMENT HISTORY
       "paymentHistory": paymentHistory,
     };
   }
@@ -191,7 +195,7 @@ class OrderModel {
       // FETCH DELETION FLAG SAFELY
       isDeleteRequested: data['isDeleteRequested'] ?? false,
 
-      // ✅ FETCH PAYMENT HISTORY SAFELY
+      // FETCH PAYMENT HISTORY SAFELY
       paymentHistory: data['paymentHistory'] ?? [],
     );
   }

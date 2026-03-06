@@ -16,6 +16,7 @@ class SalesManagerController extends GetxController {
 
   // ✅ NEW: Observable for Deletion Requests
   var deletionRequests = <OrderModel>[].obs;
+  var urgentDeliverablesCount = 0.obs; // ✅ NEW: Tracks orders at risk
 
   var managerName = 'Manager'.obs;
   var activeOrders = <OrderModel>[].obs;
@@ -25,6 +26,7 @@ class SalesManagerController extends GetxController {
   var totalRevenue = 0.0.obs;
   var isLoading = true.obs;
   var totalOrdersCount = 0.obs;
+  var totalUnitsSold = 0.obs; // ✅ NEW: Tracks total physical units sold
 
   var selectedMonth = DateTime.now().obs;
 
@@ -58,7 +60,6 @@ class SalesManagerController extends GetxController {
   }
 
   /// --- 1. Fetch Pending Orders ---
-  /// --- 1. Fetch Pending Orders ---
   void fetchPendingOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -85,7 +86,8 @@ class SalesManagerController extends GetxController {
     } catch (e) {
       debugPrint("Error fetching pending: $e");
     }
-  }  /// --- 2. Fetch Approved Orders ---
+  }
+  /// --- 2. Fetch Approved Orders ---
   void fetchApprovedOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -110,9 +112,40 @@ class SalesManagerController extends GetxController {
         .orderBy('orderDate', descending: true)
         .snapshots()
         .listen((snapshot) {
-      activeOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+      // 1. Map the orders
+      var orders = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+      activeOrders.value = orders;
+
+      // 2. ✅ NEW: Calculate Urgent Deliverables Count
+      // Normalize today to midnight for accurate day-to-day comparison
+      DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+      // These statuses are considered "safe" and won't trigger a warning
+      List<String> safeStatuses = ['packing', 'shipping', 'delivered', 'completed', 'rejected'];
+
+      int urgentCount = orders.where((order) {
+        String status = (order.status).toLowerCase();
+        if (safeStatuses.contains(status)) return false;
+
+        // Normalize delivery date
+        DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
+
+        // Calculate days remaining
+        int daysLeft = deadline.difference(today).inDays;
+
+        // ✅ AT RISK: If due in 3 days or already overdue
+        return daysLeft <= 3;
+      }).length;
+
+      // 3. Update the observable for the Home Screen badge
+      urgentDeliverablesCount.value = urgentCount;
+
+    }, onError: (e) {
+      debugPrint("Error in Active Orders Stream: $e");
     });
 
+    // Keep your completed orders listener as is
     _db.collection('orders')
         .where('status', whereIn: ['Delivered', 'Rejected'])
         .orderBy('orderDate', descending: true)
@@ -122,7 +155,6 @@ class SalesManagerController extends GetxController {
       completedOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
     });
   }
-
   /// ✅ NEW: FETCH DELETION REQUESTS (Real-time)
   void fetchDeletionRequests() {
     if (FirebaseAuth.instance.currentUser == null) return;
@@ -160,7 +192,6 @@ class SalesManagerController extends GetxController {
       DateTime startOfMonth = DateTime(targetDate.year, targetDate.month, 1);
       DateTime endOfMonth = DateTime(targetDate.year, targetDate.month + 1, 0, 23, 59, 59);
 
-      // 👇 ADD THIS NEW BLOCK HERE 👇
       // 1. Fetch Users Collection to Identify Managers for the "SM" tag
       final usersSnap = await _db.collection('users').get();
       Map<String, bool> managerMap = {};
@@ -168,12 +199,10 @@ class SalesManagerController extends GetxController {
         final d = doc.data();
         String n = d['FullName'] ?? d['Name'] ?? '';
         String r = (d['Role'] ?? d['role'] ?? '').toString().toLowerCase();
-        // If role is manager, mark them in the map
         if (n.isNotEmpty && (r.contains('manager') || r == 'sales manager')) {
           managerMap[n] = true;
         }
       }
-      // 👆 END OF NEW BLOCK 👆
 
       final snapshot = await _db.collection('orders')
           .where('orderDate', isGreaterThanOrEqualTo: startOfMonth)
@@ -183,6 +212,7 @@ class SalesManagerController extends GetxController {
       List<String> excludedStatuses = ['rejected', 'cancelled'];
       int validOrderCount = 0;
       double total = 0.0;
+      int unitsCount = 0; // ✅ NEW: Variable to hold total units
       Map<String, double> agentSales = {};
       Map<String, int> countMap = {};
 
@@ -190,18 +220,25 @@ class SalesManagerController extends GetxController {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        // ✅ 1. Check if the order has a pending deletion request
         bool isDeleteRequested = data['isDeleteRequested'] == true;
 
-        // ✅ 2. Skip the order if it is rejected, cancelled, OR pending deletion
         if (!excludedStatuses.contains(status) && !isDeleteRequested) {
+          validOrderCount++;
 
-          validOrderCount++; // Count this as a valid order!
+          // ✅ COUNT UNITS: Handles both new multi-product format and old single-quantity format
+          int orderQty = 0;
+          if (data['products'] != null && data['products'] is List) {
+            for (var item in data['products']) {
+              orderQty += (item['qty'] is num) ? (item['qty'] as num).toInt() : int.tryParse(item['qty'].toString()) ?? 0;
+            }
+          } else if (data['quantity'] != null) {
+            orderQty = (data['quantity'] is num) ? (data['quantity'] as num).toInt() : int.tryParse(data['quantity'].toString()) ?? 0;
+          }
+          unitsCount += orderQty; // Add to total units
 
           List<String> revenueStatuses = ['approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered'];
 
           if (revenueStatuses.contains(status)) {
-            // ✅ 3. Use Effective Revenue if available, otherwise fallback to Total Amount
             double amount = 0.0;
             var rawEffRevenue = data['effectiveRevenue'];
 
@@ -220,19 +257,17 @@ class SalesManagerController extends GetxController {
         }
       }
 
-      // Update the UI observables with the clean numbers
+      // Update the UI observables
       totalOrdersCount.value = validOrderCount;
       totalRevenue.value = total;
+      totalUnitsSold.value = unitsCount; // ✅ Push units to observable
 
       var sortedAgents = agentSales.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-      double _ = 100000.0;
 
-// 👇 REPLACE YOUR EXISTING topAgents MAPPING WITH THIS 👇
       topAgents.value = sortedAgents.take(10).map((e) {
         String agentName = e.key;
         double currentSales = e.value;
 
-        // ✅ DYNAMIC TARGET: 150k for SM, 100k for normal agents
         bool isSM = managerMap[agentName] == true;
         double targetAmount = isSM ? 150000.0 : 100000.0;
 
@@ -252,13 +287,13 @@ class SalesManagerController extends GetxController {
           'progress': progress,
           'greeting': greeting,
           'count': countMap[agentName] ?? 0,
-          'isSM': isSM, // ✅ Pass the SM flag to the UI
+          'isSM': isSM,
         };
-      }).toList();    } catch (e) {
+      }).toList();
+    } catch (e) {
       print("❌ STATS ERROR: $e");
     }
-  }
-  /// --- ACTIONS ---
+  }  /// --- ACTIONS ---
   Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
   }
@@ -316,8 +351,8 @@ class SalesManagerController extends GetxController {
       Get.snackbar("Update Failed", e.toString());
     }
   }
-  // ✅ NEW: APPROVE DELETION
-// ✅ UPDATED: Soft Delete instead of hard delete
+
+  // ✅ UPDATED: Soft Delete instead of hard delete
   Future<void> approveDeletionRequest(OrderModel order) async {
     try {
       await _db.collection('orders').doc(order.id).update({
@@ -371,6 +406,26 @@ class SalesManagerController extends GetxController {
       );
     } catch (e) {
       Get.snackbar("Error", "Could not deny request: $e");
+    }
+  }
+
+  // ✅ ADD THIS INSIDE SALES_MANAGER_CONTROLLER.DART
+  Future<void> approveOrderWithMargin(String orderId, double marginAmount) async {
+    try {
+      await _db.collection('orders').doc(orderId).update({
+        'status': 'Approved',
+        'effectiveRevenue': marginAmount, // Saves the margin to DB
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local data
+      fetchMonthlyStats();
+      Get.back(); // Closes the approval screen
+
+      Get.snackbar("Success", "Order approved and ER logged successfully!",
+          backgroundColor: Colors.green.withValues(alpha: 0.1), colorText: Colors.green);
+    } catch (e) {
+      Get.snackbar("Error", "Failed to update margin: $e");
     }
   }
 }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../data/models/order_model.dart';
+import '../order_deliverables_screen.dart';
 import 'order_approval_screen.dart';
 import 'sales_manager_history_screen.dart';
 import 'sales_manager_approvals.dart';
@@ -275,8 +276,123 @@ class SalesManagerHome extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
 
+              const SizedBox(height: 16),
+
+// ✅ SLIM SIDE-BY-SIDE CARDS: Units Sold & Deliverables
+              Row(
+                children: [
+                  // --- 1. TOTAL UNITS SOLD CARD ---
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.2), width: 1.2),
+                        boxShadow: [
+                          if (!isDark)
+                            BoxShadow(color: Colors.blueAccent.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          // Left Icon
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.12), shape: BoxShape.circle),
+                            child: const Icon(Icons.inventory_2_rounded, color: Colors.blueAccent, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+
+                          // Right Text Data
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Obx(() => Text(
+                                  NumberFormat('#,##,###').format(controller.totalUnitsSold.value),
+                                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Text("Units Sold ", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 11, fontWeight: FontWeight.w600)),
+                                    Obx(() => Text(
+                                      "(${DateFormat('MMM').format(controller.selectedMonth.value)})",
+                                      style: TextStyle(color: Colors.blueAccent.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.bold),
+                                    )),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12), // Space between the two cards
+
+                  // --- 2. ORDER DELIVERABLES CARD ---
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Get.to(() => const OrderDeliverablesScreen()),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isDark ? [const Color(0xFF2C1E3A), const Color(0xFF1F112B)] : [const Color(0xFFF3E5F5), const Color(0xFFE1BEE7)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.3), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.purpleAccent.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 3))
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Left Icon
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.purpleAccent.withValues(alpha: 0.2), shape: BoxShape.circle),
+                              child: const Icon(Icons.calendar_month_rounded, color: Colors.purple, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+
+                            // Right Text Data
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Deliverables", style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14, fontWeight: FontWeight.w900), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  Obx(() {
+                                    final count = controller.urgentDeliverablesCount.value;
+                                    if (count == 0) {
+                                      return Text("All on track", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 11, fontWeight: FontWeight.w600));
+                                    }
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(6)),
+                                      child: Text("$count URGENT", style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               // ✅ NEW: DELETION REQUESTS (Only shows if there are pending requests)
               Obx(() {
                 if (controller.deletionRequests.isEmpty) return const SizedBox.shrink();
