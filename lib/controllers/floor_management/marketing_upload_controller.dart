@@ -43,7 +43,7 @@ class MarketingUploadController extends GetxController {
 
   // --- Financial Global Controllers ---
   final shippingCharge = TextEditingController();
-  final advanceAmount = TextEditingController(); // Only used for initial payment requests
+  final advanceAmount = TextEditingController();
 
   // ✅ DYNAMIC ITEM LIST
   final items = <OrderItemForm>[].obs;
@@ -53,6 +53,10 @@ class MarketingUploadController extends GetxController {
 
   final isEditing = false.obs;
   String? editingOrderId;
+
+  // ✅ NEW: Memory variables to prevent overwriting the creator's name
+  String? originalMarketingPersonName;
+  String? originalMarketingPersonId;
 
   // ✅ IMAGE OBSERVABLES
   final RxString selectedImagePath = ''.obs;
@@ -74,7 +78,6 @@ class MarketingUploadController extends GetxController {
     advanceAmount.addListener(_calculateTotal);
   }
 
-  // ✅ DYNAMIC ITEM MANAGEMENT
   void addNewItem() {
     final newItem = OrderItemForm();
     newItem.quantity.addListener(_calculateTotal);
@@ -93,7 +96,6 @@ class MarketingUploadController extends GetxController {
     }
   }
 
-  // --- Serial Logic ---
   Future<void> fetchLastOrderSerial() async {
     if (_auth.currentUser == null) return;
     isLoading.value = true;
@@ -127,7 +129,6 @@ class MarketingUploadController extends GetxController {
     }
   }
 
-  // ✅ LOAD DATA (Edit Mode)
   void loadOrderData(OrderModel order) {
     final lockedStatuses = ['shipping', 'shipped', 'delivered', 'rejected'];
     if (lockedStatuses.contains(order.status.toLowerCase())) {
@@ -145,15 +146,16 @@ class MarketingUploadController extends GetxController {
     isEditing.value = true;
     editingOrderId = order.id;
 
+    // ✅ SAVE ORIGINAL CREATOR SO WE DON'T OVERWRITE IT
+    originalMarketingPersonName = order.marketingPersonName;
+    originalMarketingPersonId = order.marketingPersonId;
+
     orderNo.text = order.manualOrderNo ?? "";
     clientName.text = order.clientName;
     organization.text = order.organization ?? "";
     phone.text = order.clientPhone ?? "";
     address.text = order.clientAddress ?? "";
     shippingCharge.text = order.shippingCharge.toString();
-
-    // In edit mode, we shouldn't allow changing the advance from this form to prevent fraud.
-    // They must use the "Record Payment" button on the ledger.
     advanceAmount.text = "0";
 
     existingImageUrl.value = order.toJson()['designMockupUrl'] ?? '';
@@ -227,7 +229,6 @@ class MarketingUploadController extends GetxController {
     return months[month - 1];
   }
 
-  // ✅ IMAGE PICKER LOGIC
   Future<void> pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -247,10 +248,8 @@ class MarketingUploadController extends GetxController {
     existingImageUrl.value = '';
   }
 
-  // ✅ FIREBASE STORAGE UPLOAD
   Future<String?> _uploadImageToStorage() async {
     if (selectedImagePath.value.isEmpty) return null;
-
     try {
       File file = File(selectedImagePath.value);
       String fileName = 'mockups/${DateTime.now().millisecondsSinceEpoch}_${orderNo.text}.jpg';
@@ -274,14 +273,17 @@ class MarketingUploadController extends GetxController {
     try {
       isLoading.value = true;
       final user = _auth.currentUser;
-      String agentName = "Agent";
-      String userId = user?.uid ?? "";
 
-      if (userId.isNotEmpty) {
+      // ✅ USE ORIGINAL CREATOR IF EDITING, OTHERWISE USE CURRENT USER
+      String agentName = originalMarketingPersonName ?? "Agent";
+      String userId = originalMarketingPersonId ?? user?.uid ?? "";
+
+      // Only fetch the current user's name if this is a BRAND NEW order
+      if (!isEditing.value && user != null) {
         try {
-          final userDoc = await _db.collection('id_requests').doc(userId).get();
+          final userDoc = await _db.collection('id_requests').doc(user.uid).get();
           if (userDoc.exists) {
-            agentName = userDoc.data()?['name'] ?? user?.displayName ?? "Agent";
+            agentName = userDoc.data()?['name'] ?? user.displayName ?? "Agent";
           }
         } catch (e) {}
       }
@@ -346,13 +348,28 @@ class MarketingUploadController extends GetxController {
       };
 
       if (isEditing.value && editingOrderId != null) {
-        // In edit mode, we strip out financials from the update to protect the ledger.
         orderMap['manualOrderNo'] = orderNo.text.trim();
         await _db.collection('orders').doc(editingOrderId).update(orderMap);
+
+        try {
+          final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+          for (var managerDoc in managerSnapshot.docs) {
+            await _db.collection('notifications').add({
+              'targetUserId': managerDoc.id,
+              'title': 'Order Updated 🔄',
+              'message': '$agentName modified the details for Order ${orderNo.text.trim()}.',
+              'orderId': editingOrderId,
+              'timestamp': FieldValue.serverTimestamp(),
+              'isRead': false,
+            });
+          }
+        } catch (e) {
+          debugPrint("Could not notify manager of update: $e");
+        }
+
         Get.snackbar("Success", "Order updated successfully!", backgroundColor: Colors.green, colorText: Colors.white);
       }
       else {
-        // ✅ NEW ORDER WORKFLOW
         String newOrderId = "";
         String generatedDocId = "";
 
@@ -369,7 +386,6 @@ class MarketingUploadController extends GetxController {
           orderMap['createdAt'] = FieldValue.serverTimestamp();
           orderMap['orderDate'] = DateTime.now();
 
-          // 🔒 SECURE THE ADVANCE PAYMENT
           orderMap['advanceAmount'] = 0.0;
           orderMap['balanceDue'] = grandTotal.value;
           orderMap['status'] = advance > 0 ? "Pending" : "Placed";
@@ -379,7 +395,6 @@ class MarketingUploadController extends GetxController {
           transaction.set(newOrderRef, orderMap);
         });
 
-        // ✅ IF ADVANCE COLLECTED: Request Manager Approval
         if (advance > 0 && generatedDocId.isNotEmpty) {
           await _db.collection('payment_requests').add({
             'orderId': generatedDocId,
@@ -397,20 +412,19 @@ class MarketingUploadController extends GetxController {
               'targetUserId': managerDoc.id,
               'title': 'New Order + Payment 💰',
               'message': '$agentName created Order $newOrderId and collected ₹$advance.',
-              'orderId': generatedDocId, // Required for tap-to-route
+              'orderId': generatedDocId,
               'timestamp': FieldValue.serverTimestamp(),
               'isRead': false,
             });
           }
         } else {
-          // Standard Order Notification
           final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
           for (var managerDoc in managerSnapshot.docs) {
             await _db.collection('notifications').add({
               'targetUserId': managerDoc.id,
               'title': 'New Order Alert 🚨',
               'message': '$agentName just placed Order $newOrderId.',
-              'orderId': generatedDocId, // Required for tap-to-route
+              'orderId': generatedDocId,
               'timestamp': FieldValue.serverTimestamp(),
               'isRead': false,
             });
@@ -450,6 +464,10 @@ class MarketingUploadController extends GetxController {
     balanceDue.value = 0.0;
     isEditing.value = false;
     editingOrderId = null;
+
+    // ✅ Clear memory variables
+    originalMarketingPersonName = null;
+    originalMarketingPersonId = null;
 
     fetchLastOrderSerial();
   }

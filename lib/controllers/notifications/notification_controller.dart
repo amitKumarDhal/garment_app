@@ -67,8 +67,8 @@ class NotificationController extends GetxController {
         if (doc.exists) {
           final order = OrderModel.fromSnapshot(doc);
 
-          // 🚨 ROUTE FOR MANAGER
-          if (title.contains("Approval Required") || title.contains("Alert") || title.contains("Deletion Request")) {
+          // 🚨 ROUTE FOR MANAGER (Now catches Updates and New Orders!)
+          if (title.contains("Approval") || title.contains("Alert") || title.contains("Deletion") || title.contains("Updated") || title.contains("New Order")) {
             Get.to(() => OrderApprovalScreen(order: order));
           }
           // 👨‍💼 ROUTE FOR ASSOCIATE
@@ -86,7 +86,6 @@ class NotificationController extends GetxController {
             "Order Not Found",
             "This order might have been deleted.",
             snackPosition: SnackPosition.BOTTOM,
-            // ✅ FIXED: Updated from withOpacity to withValues
             backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
             colorText: Colors.red,
           );

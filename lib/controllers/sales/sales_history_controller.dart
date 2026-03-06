@@ -177,26 +177,40 @@ class SalesHistoryController extends GetxController {
 
   // ✅ 6. SECURE PAYMENT LOGIC (Requires Manager Approval)
   Future<void> recordPayment(OrderModel order, double amount) async {
+
+    // 🚨 1. NEW VALIDATION: PREVENT OVERPAYMENT!
+    if (amount > order.balanceDue) {
+      Get.snackbar(
+        "Invalid Payment Amount",
+        "You cannot collect ₹$amount because the remaining balance is only ₹${order.balanceDue}.",
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+        colorText: Colors.red,
+        duration: const Duration(seconds: 4),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return; // Stops the function from proceeding
+    }
+
     try {
       isLoading.value = true;
 
       final user = _auth.currentUser;
       String agentName = user?.displayName ?? 'Sales Associate';
-      String agentUid = user?.uid ?? ''; // ✅ CAPTURED EXACT UID
+      String agentUid = user?.uid ?? ''; // CAPTURED EXACT UID
 
-      // 1. Create a Pending Payment Request
+      // 2. Create a Pending Payment Request
       await _db.collection('payment_requests').add({
         'orderId': order.id,
         'manualOrderNo': order.manualOrderNo ?? 'Unknown',
         'clientName': order.clientName,
         'agentName': agentName,
-        'agentUid': agentUid, // ✅ SAVED UID FOR BULLETPROOF ROUTING
+        'agentUid': agentUid, // SAVED UID FOR BULLETPROOF ROUTING
         'amount': amount,
         'status': 'pending',
         'requestedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Notify the Sales Managers
+      // 3. Notify the Sales Managers
       final managerSnapshot = await _db.collection('users')
           .where('Role', isEqualTo: 'Sales Manager')
           .get();
@@ -212,7 +226,7 @@ class SalesHistoryController extends GetxController {
         });
       }
 
-      // 3. Show Success Message to Associate
+      // 4. Show Success Message to Associate
       Get.snackbar(
         "Approval Requested",
         "Payment of ₹$amount sent to Manager. The due balance will update once approved.",

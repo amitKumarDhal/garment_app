@@ -20,11 +20,9 @@ class SalesDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Initialize Controller
     final controller = Get.put(SalesAgentController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // 2. Fetch Data Safely
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (FirebaseAuth.instance.currentUser != null) {
         if (controller.leaderboardData.isEmpty) {
@@ -36,7 +34,6 @@ class SalesDashboard extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
-      // ✅ SLEEK TRANSPARENT APP BAR
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(90),
         child: Padding(
@@ -137,12 +134,10 @@ class SalesDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. MY MONTHLY TARGET SECTION WITH MONTH PICKER ---
               _buildSectionHeader(
                 "My Progress",
                 Icons.track_changes_rounded,
                 isDark,
-                // ✅ NEW: Interactive Month Selector
                 trailingWidget: Obx(() {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
@@ -178,7 +173,6 @@ class SalesDashboard extends StatelessWidget {
                 }),
               ),
 
-              // ✅ WRAPPED CARD IN OBX TO SHOW LOADING STATE WHEN MONTH CHANGES
               Obx(() {
                 if (controller.isLoading.value) {
                   return Container(
@@ -195,13 +189,11 @@ class SalesDashboard extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              // --- 2. TEAM LEADERBOARD SECTION ---
               _buildSectionHeader("Team Leaderboard", Icons.leaderboard_rounded, isDark, iconColor: Colors.orange),
               _buildTeamLeaderboard(isDark, controller),
 
               const SizedBox(height: 32),
 
-              // --- 3. SHORTCUTS SECTION ---
               _buildSectionHeader("Quick Actions", Icons.bolt_rounded, isDark, iconColor: Colors.amber),
               _buildQuickLinksGrid(isDark),
 
@@ -213,7 +205,6 @@ class SalesDashboard extends StatelessWidget {
     );
   }
 
-  // --- MODERN SECTION HEADER ---
   Widget _buildSectionHeader(String title, IconData icon, bool isDark, {Color? iconColor, String? trailing, Widget? trailingWidget}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16, left: 4),
@@ -253,26 +244,29 @@ class SalesDashboard extends StatelessWidget {
     );
   }
 
-  // --- WIDGET: Personal Performance Card (✅ WITH EXTRA EARNINGS HIDDEN FOR MANAGERS) ---
   Widget _buildMyPerformanceCard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       final gross = controller.grossSales.value;
       final net = controller.netAchievement.value;
 
       final percentage = controller.achievementPercentage.clamp(0.0, 1.0);
-      final target = controller.monthlyTarget.value;
+      final dynamicTarget = controller.currentDynamicTarget.value;
+      final isPrevCompleted = controller.isPrevMonthCompleted.value;
+      final prevPendingAmount = controller.prevMonthPendingAmount.value;
+
+      // ✅ CHECKS IF PREVIOUS MONTH HAD DATA
+      final hasPrevMonthData = controller.hasPrevMonthData.value;
+
       final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
 
-      // ✅ EXTRA EARNING MATH
-      final double bonusThreshold = 100000.0;
-      final bool bonusUnlocked = net >= bonusThreshold;
-      final double extraEarning = bonusUnlocked ? (net - bonusThreshold) * 0.02 : 0.0;
+      final bool bonusUnlocked = net >= dynamicTarget;
+      final double extraEarning = bonusUnlocked ? (net - dynamicTarget) * 0.02 : 0.0;
 
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF5E35B1), Color(0xFF3949AB)], // Deep Purple to Blue
+            colors: [Color(0xFF5E35B1), Color(0xFF3949AB)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -341,7 +335,7 @@ class SalesDashboard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "Target: ₹${formatCurrency.format(target)}",
+                        "Target: ₹${formatCurrency.format(dynamicTarget)}",
                         style: TextStyle(color: Colors.white.withValues(alpha:0.8), fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -365,15 +359,45 @@ class SalesDashboard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                          "Net Achievement (ER)",
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600)
+                      Row(
+                        children: [
+                          Text(
+                              "Net Achievement (ER)",
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600)
+                          ),
+                          const SizedBox(width: 8),
+                          // ✅ DOT ONLY SHOWS IF THERE ARE ORDERS
+                          if (controller.totalOrders.value > 0)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: controller.hasPendingER.value ? Colors.amber : Colors.greenAccent,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (controller.hasPendingER.value ? Colors.amber : Colors.greenAccent).withValues(alpha: 0.5),
+                                      blurRadius: 4,
+                                    )
+                                  ]
+                              ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                           "₹${formatCurrency.format(net)}",
                           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)
                       ),
+                      // ✅ WARNING ONLY SHOWS IF PENDING ER IS TRUE
+                      if (controller.hasPendingER.value && controller.totalOrders.value > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            "Margin pending from SM",
+                            style: TextStyle(color: Colors.amber.withValues(alpha: 0.9), fontSize: 9, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
+                          ),
+                        )
                     ],
                   ),
 
@@ -397,11 +421,64 @@ class SalesDashboard extends StatelessWidget {
               ),
             ),
 
-            // ✅ CONDITIONAL RENDER: ONLY SHOW FOR ASSOCIATES
+            // ✅ CONDITIONAL RENDER: ONLY SHOW FOR ASSOCIATES *AND* IF PREVIOUS DATA EXISTS
+            if (!controller.isSalesManager.value && hasPrevMonthData) ...[
+
+              const SizedBox(height: 12),
+
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isPrevCompleted ? Colors.greenAccent.withValues(alpha: 0.3) : Colors.redAccent.withValues(alpha: 0.3),
+                      width: 1,
+                    )
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Previous Month Target:", style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: isPrevCompleted ? Colors.greenAccent.withValues(alpha: 0.15) : Colors.redAccent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6)
+                          ),
+                          child: Text(
+                              isPrevCompleted ? "COMPLETED" : "PENDING",
+                              style: TextStyle(
+                                  color: isPrevCompleted ? Colors.greenAccent : Colors.redAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5
+                              )
+                          ),
+                        )
+                      ],
+                    ),
+                    if (!isPrevCompleted) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Shortfall added to target:", style: TextStyle(color: Colors.redAccent, fontSize: 11, fontStyle: FontStyle.italic)),
+                          Text("+ ₹${formatCurrency.format(prevPendingAmount)}", style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w800)),
+                        ],
+                      )
+                    ]
+                  ],
+                ),
+              ),
+            ], // End of Previous Month Conditional
+
+            // ✅ EXTRA EARNINGS ONLY SHOW FOR ASSOCIATES
             if (!controller.isSalesManager.value) ...[
               const SizedBox(height: 12),
 
-              // --- BOTTOM ROW: EXTRA EARNINGS BONUS BOX ---
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -421,7 +498,7 @@ class SalesDashboard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        bonusUnlocked ? Icons.monetization_on_rounded : Icons.lock_outline_rounded,
+                        bonusUnlocked ? Icons.currency_rupee_outlined : Icons.lock_outline_rounded,
                         color: bonusUnlocked ? Colors.amberAccent : Colors.white54,
                         size: 20,
                       ),
@@ -443,7 +520,7 @@ class SalesDashboard extends StatelessWidget {
                           Text(
                             bonusUnlocked
                                 ? "+ ₹${formatCurrency.format(extraEarning)}"
-                                : "Hit ₹1 Lakh ER to unlock bonus",
+                                : "Hit ₹${(dynamicTarget / 100000).toStringAsFixed(1)}L ER to unlock bonus",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: bonusUnlocked ? 18 : 11,

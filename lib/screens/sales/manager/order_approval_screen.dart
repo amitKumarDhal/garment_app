@@ -86,35 +86,77 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
               ],
             ),
             const SizedBox(height: 20),
+            // ✅ DYNAMIC MULTI-ITEM PRODUCT SPECIFICATIONS
             _buildModernCard(
-              title: "Product Specifications", icon: Icons.inventory_2_outlined, isDark: isDark, textColor: textColor,
+              title: "Product Specifications (${order.products.length} Items)",
+              icon: Icons.inventory_2_outlined,
+              isDark: isDark,
+              textColor: textColor,
               children: [
-                _buildInfoRow(Icons.shopping_bag_outlined, "Product", order.productName, subTextColor, textColor, isBold: true),
-                _buildInfoRow(Icons.qr_code, "SKU / Code", order.productCode ?? "N/A", subTextColor, textColor),
-                _buildInfoRow(Icons.layers_outlined, "Quantity", "${order.quantity} Units", subTextColor, textColor),
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.blue.withValues(alpha: 0.3))),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Calculated Unit Price", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w600)),
-                      Text(_calculateUnitPrice(order), style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 16)),
-                    ],
-                  ),
-                ),
-                const Text("Size Breakdown", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 6),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100], borderRadius: BorderRadius.circular(8), border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.2))),
-                  child: Text(order.sizeDescription?.isNotEmpty == true ? order.sizeDescription! : "No specific sizes.", style: TextStyle(fontSize: 14, color: textColor, height: 1.4)),
-                ),
+                ...order.products.map((item) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item['productName'] ?? "Unknown Item",
+                                style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 15),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                "${item['qty']} Units",
+                                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.blue, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text("SKU / Code: ${item['productCode'] ?? 'N/A'}", style: TextStyle(color: subTextColor, fontSize: 13)),
+                        const SizedBox(height: 12),
+
+                        const Text("Size Breakdown", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.black26 : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            item['sizeDescription'] != null && item['sizeDescription'].toString().isNotEmpty
+                                ? item['sizeDescription']
+                                : "No specific sizes requested.",
+                            style: TextStyle(fontSize: 14, color: textColor, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+
                 if (order.productDetails?.isNotEmpty == true) ...[
                   const SizedBox(height: 12),
-                  const Text("Notes", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const Text("Overall Notes", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                   const SizedBox(height: 4),
                   Text(order.productDetails!, style: TextStyle(fontStyle: FontStyle.italic, color: subTextColor)),
                 ],
@@ -426,14 +468,14 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
   String _formatDate(DateTime date) => "${date.day}/${date.month}/${date.year}";
 
-  String _calculateUnitPrice(OrderModel order) {
-    if (order.quantity == 0) return "₹0.00";
-    double amountWithoutShipping = order.totalAmount - order.shippingCharge;
-    double gstMultiplier = 1 + (order.gstPercentage / 100);
-    double baseTotal = amountWithoutShipping / gstMultiplier;
-    double unitPrice = baseTotal / order.quantity;
-    return "₹${unitPrice.toStringAsFixed(2)}";
-  }
+  // String _calculateUnitPrice(OrderModel order) {
+  //   if (order.quantity == 0) return "₹0.00";
+  //   double amountWithoutShipping = order.totalAmount - order.shippingCharge;
+  //   double gstMultiplier = 1 + (order.gstPercentage / 100);
+  //   double baseTotal = amountWithoutShipping / gstMultiplier;
+  //   double unitPrice = baseTotal / order.quantity;
+  //   return "₹${unitPrice.toStringAsFixed(2)}";
+  // }
 
   void _confirmAction(BuildContext context, String action, Color color, VoidCallback onConfirm) {
     Get.defaultDialog(

@@ -178,7 +178,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
               ),
               const SizedBox(height: 28),
 
-              // --- 3. FINANCIAL BREAKDOWN ---
+              // --- 3. FINANCIAL BREAKDOWN WITH PAYMENT HISTORY ---
               _buildSectionTitle("Financial Ledger", Icons.receipt_long_rounded, isDark),
               Container(
                 padding: const EdgeInsets.all(20),
@@ -189,6 +189,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   boxShadow: [if (!isDark) BoxShadow(color: Colors.green.withValues(alpha:0.05), blurRadius: 15, offset: const Offset(0, 5))],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildFinanceRow("Items Subtotal", currency.format(calculatedSubtotal), isDark),
                     const SizedBox(height: 8),
@@ -199,19 +200,89 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     _buildDashedDivider(isDark),
                     const SizedBox(height: 16),
                     _buildFinanceRow("Grand Total", currency.format(currentOrder.totalAmount), isDark, isBold: true, fontSize: 16),
-                    const SizedBox(height: 8),
-                    _buildFinanceRow("Advance Paid", "- ${currency.format(currentOrder.advanceAmount)}", isDark, color: Colors.redAccent),
+                    const SizedBox(height: 12),
+
+                    // ✅ STAGE-BY-STAGE PAYMENT HISTORY LOOP
+                    if (currentOrder.paymentHistory.isNotEmpty) ...[
+                      const Text("Payment Record:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+                      const SizedBox(height: 8),
+                      ...currentOrder.paymentHistory.map((payment) {
+
+                        double amount = 0.0;
+                        if (payment['amount'] != null) {
+                          amount = double.tryParse(payment['amount'].toString()) ?? 0.0;
+                        }
+
+                        String dateStr = "Unknown Date";
+                        if (payment['date'] != null) {
+                          DateTime dt = (payment['date'] as Timestamp).toDate();
+                          dateStr = DateFormat('dd MMM, hh:mm a').format(dt);
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                  "Paid on $dateStr",
+                                  style: TextStyle(fontSize: 12, color: Colors.redAccent.withValues(alpha: 0.8), fontStyle: FontStyle.italic)
+                              ),
+                              Text(
+                                  "- ${currency.format(amount)}",
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.redAccent)
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ] else if (currentOrder.advanceAmount > 0) ...[
+                      _buildFinanceRow("Advance Paid", "- ${currency.format(currentOrder.advanceAmount)}", isDark, color: Colors.redAccent),
+                    ],
+
                     const SizedBox(height: 16),
                     _buildDashedDivider(isDark),
                     const SizedBox(height: 16),
+
+                    // ✅ ALWAYS SHOW THE REMAINING AMOUNT
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text("BALANCE DUE", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.grey, letterSpacing: 0.5)),
-                        Text(currency.format(currentOrder.balanceDue), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.green)),
+                        const Text("REMAINING AMOUNT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.grey, letterSpacing: 0.5)),
+                        Text(currency.format(currentOrder.balanceDue), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: currentOrder.balanceDue <= 0 ? Colors.green : Colors.redAccent)),
                       ],
                     ),
+
+                    // ✅ SHOW THE BANNER ONLY IF BALANCE IS ZERO
+                    if (currentOrder.balanceDue <= 0) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.3), width: 1.5),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.verified_rounded, color: Colors.green, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              "FULL PAYMENT SUCCESSFUL",
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    ]
                   ],
                 ),
               ),
@@ -221,7 +292,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
               if (displayStatus == 'Placed' || displayStatus == 'Pending') ...[
                 Row(
                   children: [
-                    // ✅ FIXED REJECT: Now updates state immediately instead of kicking you out
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => _confirmAction("Reject", Colors.redAccent, () async {
@@ -255,7 +325,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   ],
                 ),
               ] else if (productionStages.contains(displayStatus)) ...[
-                // ✅ REDESIGNED: Pipeline Management
                 _buildSectionTitle("Pipeline Management", Icons.timeline_rounded, isDark),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -268,7 +337,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Sleek Dropdown
                       DropdownButtonFormField<String>(
                         initialValue: productionStages.contains(displayStatus) ? displayStatus : null,
                         icon: const Icon(Icons.swap_vert_rounded, color: Colors.grey),
@@ -293,8 +361,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         },
                       ),
                       const SizedBox(height: 12),
-
-                      // Subtle Cancel Button
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
@@ -315,7 +381,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   ),
                 ),
               ] else ...[
-                // Order is already Rejected or Cancelled
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -330,7 +395,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
 
               EffectiveRevenueSection(order: currentOrder),
 
-              /// Print Invoice Button
               if (displayStatus != 'Rejected')
                 SizedBox(
                   width: double.infinity,
@@ -501,7 +565,6 @@ class EffectiveRevenueController extends GetxController {
 
     int input = int.tryParse(val) ?? 0;
 
-    // ENFORCE RULE: x must be <= 30
     if (input > 30) {
       input = 30;
       marginInput.text = '30';
@@ -510,7 +573,6 @@ class EffectiveRevenueController extends GetxController {
     }
 
     marginX.value = input;
-    // FORMULA: Effective Revenue = Total Amount * (x / 30)
     effectiveRevenue.value = order.totalAmount * (input / 30.0);
   }
 
@@ -545,7 +607,7 @@ class EffectiveRevenueController extends GetxController {
 }
 
 // =========================================================================
-// ✅ 2. REDESIGNED MARGIN CALCULATOR (Simple & Relevant)
+// ✅ 2. REDESIGNED MARGIN CALCULATOR
 // =========================================================================
 class EffectiveRevenueSection extends StatelessWidget {
   final OrderModel order;
@@ -560,7 +622,6 @@ class EffectiveRevenueSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Title
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Row(
@@ -576,7 +637,6 @@ class EffectiveRevenueSection extends StatelessWidget {
           ),
         ),
 
-        // Main Card
         Container(
           margin: const EdgeInsets.only(bottom: 24),
           padding: const EdgeInsets.all(16),
@@ -588,7 +648,6 @@ class EffectiveRevenueSection extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // 1. Margin Input Field
               SizedBox(
                 width: 75,
                 child: TextField(
@@ -611,7 +670,6 @@ class EffectiveRevenueSection extends StatelessWidget {
 
               const SizedBox(width: 16),
 
-              // 2. Live Calculation Result
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,7 +685,6 @@ class EffectiveRevenueSection extends StatelessWidget {
                 ),
               ),
 
-              // 3. Simple Checkmark Save Button
               Obx(() => IconButton(
                 onPressed: controller.isSaving.value ? null : controller.saveEffectiveRevenue,
                 style: IconButton.styleFrom(

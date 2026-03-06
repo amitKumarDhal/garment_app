@@ -187,25 +187,27 @@ class SalesManagerHome extends StatelessWidget {
                         end: Alignment.topCenter,
                         colors: [Color(0xFFFFB74D), Color(0xFFF57C00)]
                     ),
-                    borderRadius: BorderRadius.circular(32),
+                    // ✅ MODIFIED: Radius set to 22 for a slightly square, modern look
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.orange.withValues(alpha:0.3),
+                          color: Colors.orange.withValues(alpha: 0.3),
                           blurRadius: 15,
                           offset: const Offset(0, 6)
                       )
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(32),
+                    // ✅ MODIFIED: Matches outer container radius
+                    borderRadius: BorderRadius.circular(16),
                     child: Stack(
                       children: [
                         Positioned(
-                            top: -15,
-                            right: -15,
+                            top: -11, // Slightly adjusted for radius 22
+                            right: -11,
                             child: CircleAvatar(
                                 radius: 50,
-                                backgroundColor: Colors.white.withValues(alpha:0.05)
+                                backgroundColor: Colors.white.withValues(alpha: 0.05)
                             )
                         ),
                         Padding(

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Needed for HapticFeedback
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../data/models/order_model.dart';
 
@@ -21,22 +21,30 @@ class SalesAgentController extends GetxController {
   final netAchievement = 0.0.obs;
   final totalOrders = 0.obs;
 
-  // Observable Target that adapts based on the user role
-  final monthlyTarget = 100000.0.obs;
+  // Observable to track if the personal margin is pending
+  final hasPendingER = false.obs;
 
-  // ✅ Checks if user is a manager (hides bonus UI if true)
+  // Dynamic Target Observables
+  final baseTarget = 100000.0.obs;
+  final currentDynamicTarget = 100000.0.obs;
+  final prevMonthPendingAmount = 0.0.obs;
+  final isPrevMonthCompleted = true.obs;
+
+  // ✅ NEW: Tracks if the previous month actually had any data
+  final hasPrevMonthData = false.obs;
+
+  // Checks if user is a manager (hides bonus UI if true)
   var isSalesManager = false.obs;
 
-  // ✅ OBSERVABLE FOR SELECTED MONTH
+  // OBSERVABLE FOR SELECTED MONTH
   var selectedMonth = DateTime.now().obs;
 
-  // ✅ METHOD TO CHANGE MONTH AND RELOAD
+  // METHOD TO CHANGE MONTH AND RELOAD
   void changeMonth(int offset) {
     HapticFeedback.selectionClick();
     DateTime current = selectedMonth.value;
     selectedMonth.value = DateTime(current.year, current.month + offset, 1);
 
-    // Reload data for the new month
     isLoading.value = true;
     Future.wait([fetchAgentStats(), fetchLeaderboard()]).then((_) {
       isLoading.value = false;
@@ -53,14 +61,13 @@ class SalesAgentController extends GetxController {
         if (userDoc.exists) {
           name = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? name;
 
-          // CHECK ROLE to set the personal target dynamically
           String role = (userDoc.data()?['Role'] ?? userDoc.data()?['role'] ?? '').toString().toLowerCase();
 
           if (role.contains('manager') || role == 'sales manager') {
-            monthlyTarget.value = 150000.0;
+            baseTarget.value = 150000.0;
             isSalesManager.value = true;
           } else {
-            monthlyTarget.value = 100000.0;
+            baseTarget.value = 100000.0;
             isSalesManager.value = false;
           }
         }
@@ -71,54 +78,99 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  /// Master function to reload all data
   Future<void> loadDashboardData() async {
-    if (_auth.currentUser == null) return; // Security Check
-
+    if (_auth.currentUser == null) return;
     isLoading.value = true;
     await fetchAgentIdentity();
     await Future.wait([fetchAgentStats(), fetchLeaderboard()]);
     isLoading.value = false;
   }
 
-  // --- 2. Calculate My Personal Stats (Gross vs Net) ---
+  // --- 2. Calculate My Personal Stats & Previous Month Rollover ---
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
     if (agentName.value.isEmpty) return;
 
     try {
-      // ✅ USE SELECTED MONTH INSTEAD OF DateTime.now()
+      // 1. Setup Dates for Current Selected Month
       DateTime targetMonth = selectedMonth.value;
       DateTime startOfMonth = DateTime(targetMonth.year, targetMonth.month, 1);
       DateTime endOfMonth = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
-      final snapshot = await _db
-          .collection('orders')
+      // 2. Setup Dates for PREVIOUS Month (to check for shortfall)
+      DateTime prevMonth = DateTime(targetMonth.year, targetMonth.month - 1, 1);
+      DateTime startOfPrevMonth = DateTime(prevMonth.year, prevMonth.month, 1);
+      DateTime endOfPrevMonth = DateTime(prevMonth.year, prevMonth.month + 1, 0, 23, 59, 59);
+
+      // 3. Fetch both months simultaneously for speed
+      final currentMonthFuture = _db.collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
           .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
           .where('orderDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
           .orderBy('orderDate', descending: true)
           .get();
 
-      double totalGross = 0.0;
-      double totalNet = 0.0;
-      int orderCount = 0;
+      final prevMonthFuture = _db.collection('orders')
+          .where('marketingPersonName', isEqualTo: agentName.value)
+          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfPrevMonth))
+          .where('orderDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfPrevMonth))
+          .get();
+
+      final results = await Future.wait([currentMonthFuture, prevMonthFuture]);
+      final currentSnap = results[0];
+      final prevSnap = results[1];
 
       List<String> validStatuses = [
         'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered', 'completed'
       ];
 
-      for (var doc in snapshot.docs) {
+      // --- CALCULATE PREVIOUS MONTH ---
+      double prevTotalNet = 0.0;
+
+      // ✅ Check if we actually have data for the previous month
+      hasPrevMonthData.value = prevSnap.docs.isNotEmpty;
+
+      for (var doc in prevSnap.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'pending').toString().toLowerCase();
+        if (validStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
+          double totalAmt = _parseAmount(data['totalAmount']);
+          double effRev = _parseAmount(data['effectiveRevenue']);
+          prevTotalNet += (effRev > 0) ? effRev : totalAmt;
+        }
+      }
 
-        bool isDeleteRequested = data['isDeleteRequested'] == true;
-        bool isDeleted = data['isDeleted'] == true;
+      // CALCULATE SHORTFALL
+      double shortfall = baseTarget.value - prevTotalNet;
 
-        if (validStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
+      // ✅ LOGIC: If there is no previous data OR shortfall is 0, start fresh
+      if (!hasPrevMonthData.value || shortfall <= 0) {
+        isPrevMonthCompleted.value = true;
+        prevMonthPendingAmount.value = 0.0;
+        currentDynamicTarget.value = baseTarget.value;
+      } else {
+        isPrevMonthCompleted.value = false;
+        prevMonthPendingAmount.value = shortfall;
+        currentDynamicTarget.value = baseTarget.value + shortfall;
+      }
+
+      // --- CALCULATE CURRENT MONTH ---
+      double totalGross = 0.0;
+      double totalNet = 0.0;
+      int orderCount = 0;
+      bool currentMonthMissingMargin = false;
+
+      for (var doc in currentSnap.docs) {
+        final data = doc.data();
+        String status = (data['status'] ?? 'pending').toString().toLowerCase();
+        if (validStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
           orderCount++;
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
+
+          if (effRev <= 0) {
+            currentMonthMissingMargin = true;
+          }
 
           totalGross += totalAmt;
           totalNet += (effRev > 0) ? effRev : totalAmt;
@@ -128,23 +180,22 @@ class SalesAgentController extends GetxController {
       grossSales.value = totalGross;
       netAchievement.value = totalNet;
       totalOrders.value = orderCount;
+      hasPendingER.value = currentMonthMissingMargin;
 
     } catch (e) {
       debugPrint("❌ Stats Error: $e");
     }
   }
 
-  // --- 3. Calculate Team Leaderboard (Using Effective Revenue) ---
+  // --- 3. Calculate Team Leaderboard ---
   Future<void> fetchLeaderboard() async {
     try {
       isLoading.value = true;
 
-      // ✅ USE SELECTED MONTH INSTEAD OF DateTime.now()
       DateTime targetMonth = selectedMonth.value;
       DateTime start = DateTime(targetMonth.year, targetMonth.month, 1);
       DateTime end = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
-      // FETCH USER ROLES to build the leaderboard targets & tags accurately
       final usersSnap = await _db.collection('users').get();
       Map<String, bool> managerMap = {};
       for (var doc in usersSnap.docs) {
@@ -170,19 +221,22 @@ class SalesAgentController extends GetxController {
 
       Map<String, double> salesMap = {};
       Map<String, int> countMap = {};
+      Map<String, bool> pendingERMap = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        bool isDeleteRequested = data['isDeleteRequested'] == true;
-        bool isDeleted = data['isDeleted'] == true;
-
-        if (revenueStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
+        if (revenueStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
           String agent = data['marketingPersonName'] ?? 'Unknown';
 
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
+
+          if (effRev <= 0) {
+            pendingERMap[agent] = true;
+          }
+
           double amountToCount = (effRev > 0) ? effRev : totalAmt;
 
           salesMap[agent] = (salesMap[agent] ?? 0) + amountToCount;
@@ -199,7 +253,6 @@ class SalesAgentController extends GetxController {
 
         bool isSM = managerMap[name] == true;
         double targetAmount = isSM ? 150000.0 : 100000.0;
-
         double progress = amount / targetAmount;
 
         String greeting = "";
@@ -216,6 +269,7 @@ class SalesAgentController extends GetxController {
           'progress': progress,
           'greeting': greeting,
           'isSM': isSM,
+          'hasPendingER': pendingERMap[name] ?? false,
         };
       }).toList();
     } catch (e) {
@@ -267,24 +321,17 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- 5. ✅ REQUEST DELETE ORDER LOGIC ---
+  // --- 5. REQUEST DELETE ORDER LOGIC ---
   Future<void> deleteOrder(String orderId, String currentStatus) async {
     final lockedStatuses = ['shipping', 'shipped', 'delivered'];
 
     if (lockedStatuses.contains(currentStatus.toLowerCase())) {
-      Get.snackbar(
-        "Action Denied",
-        "Orders in '$currentStatus' phase cannot be deleted.",
-        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-        colorText: Colors.red,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar("Action Denied", "Orders in '$currentStatus' phase cannot be deleted.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
       return;
     }
 
     try {
       isLoading.value = true;
-
       await _db.collection('orders').doc(orderId).update({
         'isDeleteRequested': true,
         'deleteRequestedAt': FieldValue.serverTimestamp(),
@@ -301,32 +348,17 @@ class SalesAgentController extends GetxController {
             'isRead': false,
           });
         }
-      } catch (e) {
-        debugPrint("Could not notify manager: $e");
-      }
+      } catch (e) {}
 
       await fetchAgentStats();
-
-      Get.snackbar(
-        "Request Sent",
-        "Deletion request sent to manager for approval.",
-        backgroundColor: Colors.orange.withValues(alpha: 0.1),
-        colorText: Colors.orange,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar("Request Sent", "Deletion request sent to manager for approval.", backgroundColor: Colors.orange.withValues(alpha: 0.1), colorText: Colors.orange);
     } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Could not send deletion request: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
-      );
+      Get.snackbar("Error", "Could not send deletion request: $e", backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
-  // --- Helper: Safely parse numbers ---
   double _parseAmount(dynamic value) {
     if (value == null) return 0.0;
     if (value is int) return value.toDouble();
@@ -339,7 +371,7 @@ class SalesAgentController extends GetxController {
   }
 
   double get achievementPercentage {
-    if (monthlyTarget.value <= 0) return 0.0;
-    return (grossSales.value / monthlyTarget.value).clamp(0.0, 1.0);
+    if (currentDynamicTarget.value <= 0) return 0.0;
+    return (grossSales.value / currentDynamicTarget.value).clamp(0.0, 1.0);
   }
 }
