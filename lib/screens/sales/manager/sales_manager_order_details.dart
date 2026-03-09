@@ -23,10 +23,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
   late OrderModel currentOrder;
   late String displayStatus;
 
-  final List<String> productionStages = [
-    'Approved', 'Cutting', 'Stitching', 'Printing', 'Packing', 'Shipping', 'Delivered'
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -55,7 +51,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     Color statusColor = _getStatusColor(displayStatus);
 
-    // ✅ DYNAMIC CALCULATIONS FOR RECEIPT
+    // DYNAMIC CALCULATIONS FOR RECEIPT
     double calculatedSubtotal = 0;
     double calculatedTax = 0;
 
@@ -202,7 +198,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     _buildFinanceRow("Grand Total", currency.format(currentOrder.totalAmount), isDark, isBold: true, fontSize: 16),
                     const SizedBox(height: 12),
 
-                    // ✅ STAGE-BY-STAGE PAYMENT HISTORY LOOP
                     if (currentOrder.paymentHistory.isNotEmpty) ...[
                       const Text("Payment Record:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
                       const SizedBox(height: 8),
@@ -244,7 +239,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     _buildDashedDivider(isDark),
                     const SizedBox(height: 16),
 
-                    // ✅ ALWAYS SHOW THE REMAINING AMOUNT
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -254,7 +248,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                       ],
                     ),
 
-                    // ✅ SHOW THE BANNER ONLY IF BALANCE IS ZERO
                     if (currentOrder.balanceDue <= 0) ...[
                       const SizedBox(height: 16),
                       Container(
@@ -324,7 +317,8 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     ),
                   ],
                 ),
-              ] else if (productionStages.contains(displayStatus)) ...[
+                // ✅ PULLS STAGES FROM CONTROLLER
+              ] else if (controller.productionStages.contains(displayStatus)) ...[
                 _buildSectionTitle("Pipeline Management", Icons.timeline_rounded, isDark),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -338,7 +332,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DropdownButtonFormField<String>(
-                        initialValue: productionStages.contains(displayStatus) ? displayStatus : null,
+                        initialValue: controller.productionStages.contains(displayStatus) ? displayStatus : null,
                         icon: const Icon(Icons.swap_vert_rounded, color: Colors.grey),
                         decoration: InputDecoration(
                           labelText: "Current Stage",
@@ -351,7 +345,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                         style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
-                        items: productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
+                        items: controller.productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
                         onChanged: (newValue) {
                           if (newValue != null) {
                             HapticFeedback.lightImpact();
@@ -518,16 +512,20 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return const Color(0xFF4CAF50);
-      case 'cutting': return const Color(0xFF2196F3);
-      case 'stitching': return const Color(0xFF3F51B5);
-      case 'printing': return const Color(0xFF9C27B0);
-      case 'packing': return const Color(0xFFFF9800);
-      case 'shipping': return const Color(0xFF009688);
-      case 'delivered': return const Color(0xFF1B5E20);
-      case 'rejected': return const Color(0xFFF44336);
+      case 'approved': return Colors.blue;
+      case 'cutting': return Colors.orange;
+      case 'printing': return Colors.indigo;
+      case 'printed': return Colors.cyan;
+      case 'stitching': return Colors.amber;
+      case 'stitched': return Colors.brown;
+      case 'packed': return Colors.purple;
+      case 'shipping':
+      case 'shipped': return Colors.teal;
+      case 'delivered': return Colors.green;
+      case 'completed': return Colors.green;
+      case 'rejected': return Colors.red;
       case 'pending': return const Color(0xFFFFC107);
-      default: return Colors.blueGrey;
+      default: return Colors.grey;
     }
   }
 }

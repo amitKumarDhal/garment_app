@@ -18,18 +18,11 @@ class OrderApprovalScreen extends StatefulWidget {
 class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   final controller = Get.put(SalesManagerController());
 
-  // ✅ NEW: Controller for Margin Input
-  final TextEditingController _marginController = TextEditingController();
-
   // State Variables
   late String currentStatus;
   late double localAdvanceAmount;
   late double localBalanceDue;
   bool isProcessingPayment = false;
-
-  final List<String> productionStages = [
-    'Approved', 'Cutting', 'Stitching', 'Printing', 'Packing', 'Shipping', 'Delivered'
-  ];
 
   @override
   void initState() {
@@ -37,17 +30,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     currentStatus = widget.order.status;
     localAdvanceAmount = widget.order.advanceAmount;
     localBalanceDue = widget.order.balanceDue;
-
-    // If a margin is already set, pre-fill the text field
-    if (widget.order.effectiveRevenue > 0) {
-      _marginController.text = widget.order.effectiveRevenue.toStringAsFixed(0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _marginController.dispose();
-    super.dispose();
   }
 
   @override
@@ -282,11 +264,8 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
             if (currentStatus != 'Placed' && currentStatus != 'Pending') const SizedBox(height: 20),
 
             // --- 4. DYNAMIC ACTION AREA ---
+            // --- 4. DYNAMIC ACTION AREA ---
             if (currentStatus == 'Placed' || currentStatus == 'Pending') ...[
-
-              // ✅ NEW: MARGIN CONSOLE (Only visible when approving)
-              _buildMarginInput(isDark),
-
               Row(
                 children: [
                   Expanded(
@@ -303,17 +282,8 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // ✅ Check for Margin before Approving
-                        double erAmount = double.tryParse(_marginController.text) ?? 0.0;
-                        if (erAmount <= 0) {
-                          Get.snackbar("Missing Data", "Please enter the Effective Revenue (Margin) before approving.",
-                              backgroundColor: Colors.orange.withValues(alpha: 0.8), colorText: Colors.white);
-                          return;
-                        }
-
                         _confirmAction(context, "Approve", Colors.green, () {
-                          // Use the new method from the controller
-                          controller.approveOrderWithMargin(order.id!, erAmount);
+                          controller.approveOrderWithMargin(order.id!, 0.0, order.totalAmount);
                           setState(() => currentStatus = 'Approved');
                         });
                       },
@@ -324,35 +294,23 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                 ],
               ),
             ] else ...[
-              // If already approved, just show the stage updater
+              // ✅ CLEANED UP: No more dropdown here. Just a clean status message.
               Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))], border: Border.all(color: TColors.primary.withValues(alpha: 0.3), width: 1.5)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.update, color: TColors.primary),
-                        const SizedBox(width: 8),
-                        Text("Update Production Stage", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: TColors.primary)),
-                      ],
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: isDark ? Colors.white10 : Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16)
+                ),
+                child: Center(
+                  child: Text(
+                    "Order is currently ${currentStatus.toUpperCase()}",
+                    style: TextStyle(
+                        color: isDark ? Colors.greenAccent : Colors.green,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: productionStages.contains(currentStatus) ? currentStatus : null,
-                      decoration: InputDecoration(filled: true, fillColor: isDark ? Colors.grey[800] : Colors.grey[50], border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
-                      items: productionStages.map((stage) {
-                        return DropdownMenuItem(value: stage, child: Text(stage, style: TextStyle(color: textColor)));
-                      }).toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setState(() => currentStatus = newValue);
-                          controller.updateOrderStatus(order.id!, newValue);
-                        }
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -360,53 +318,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
             const SizedBox(height: 30),
           ],
         ),
-      ),
-    );
-  }
-
-  // ✅ NEW: MARGIN INPUT WIDGET
-  Widget _buildMarginInput(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.amber.withValues(alpha: 0.05) : Colors.amber.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.analytics_outlined, color: Colors.amber, size: 18),
-              SizedBox(width: 8),
-              Text(
-                "Management: Set Effective Revenue",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _marginController,
-            keyboardType: TextInputType.number,
-            style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
-            decoration: InputDecoration(
-              hintText: "Enter company margin (ER)",
-              prefixText: "₹ ",
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "This value determines the Associate's target achievement and clears their pending status.",
-            style: TextStyle(fontSize: 10, color: isDark ? Colors.grey[400] : Colors.grey[600]),
-          ),
-        ],
       ),
     );
   }

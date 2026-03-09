@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // ✅ REQUIRED FOR DATE FORMATTING
+import 'package:intl/intl.dart';
 
 class OrderModel {
   final String? id;
@@ -8,9 +8,16 @@ class OrderModel {
   final String? clientPhone;
   final String? organization;
   final String? clientAddress;
+
+  // ✅ NEW LOCATION FIELDS
+  final String? pincode;
+  final String? state;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? marketingPersonId;
+  final String? neckType;
+  final String? productType;
 
   // Single Product Fields (Maintained for Legacy backward compatibility)
   final String? productCode;
@@ -44,11 +51,12 @@ class OrderModel {
 
   // NEW FLAG FOR DELETION WORKFLOW
   final bool isDeleteRequested;
+  final bool isDeleted;
 
   // NEW PAYMENT HISTORY LOG
   final List<dynamic> paymentHistory;
 
-  // ✅ THE FIX: Automatically formats the deliveryDate into a readable deadline string
+  // Automatically formats the deliveryDate into a readable deadline string
   String get deadline => DateFormat('dd-MM-yyyy').format(deliveryDate);
 
   OrderModel({
@@ -58,6 +66,8 @@ class OrderModel {
     this.clientPhone,
     this.organization,
     this.clientAddress,
+    this.pincode, // ✅ ADDED
+    this.state,   // ✅ ADDED
     this.productCode,
     required this.productName,
     this.productDetails,
@@ -82,7 +92,10 @@ class OrderModel {
     this.marginNumber = 0,
     this.effectiveRevenue = 0.0,
     this.isDeleteRequested = false,
-    this.paymentHistory = const [], // Default to empty list
+    this.isDeleted = false,
+    this.paymentHistory = const [],
+    this.neckType = 'Not Specified',
+    this.productType = 'Not Specified',
   });
 
   Map<String, dynamic> toJson() {
@@ -92,6 +105,8 @@ class OrderModel {
       "clientPhone": clientPhone,
       "organization": organization,
       "clientAddress": clientAddress,
+      "pincode": pincode, // ✅ ADDED
+      "state": state,     // ✅ ADDED
       "createdAt": createdAt ?? FieldValue.serverTimestamp(),
       "updatedAt": updatedAt,
       "marketingPersonId": marketingPersonId,
@@ -125,9 +140,12 @@ class OrderModel {
 
       // SAVE DELETION FLAG
       "isDeleteRequested": isDeleteRequested,
+      "isDeleted": isDeleted,
 
       // SAVE PAYMENT HISTORY
       "paymentHistory": paymentHistory,
+      "neckType": neckType,
+      "productType": productType,
     };
   }
 
@@ -156,6 +174,8 @@ class OrderModel {
         'price': unitPrice,
         'gstPercentage': _parseDouble(data['gstPercentage']),
         'total': total,
+        'neckType': data['neckType'] ?? 'Not Specified',
+        'productType': data['productType'] ?? 'Not Specified',
       });
     }
 
@@ -166,6 +186,8 @@ class OrderModel {
       clientPhone: data['clientPhone'] ?? '',
       organization: data['organization'] ?? '',
       clientAddress: data['clientAddress'] ?? '',
+      pincode: data['pincode']?.toString() ?? '', // ✅ ADDED
+      state: data['state']?.toString() ?? '',     // ✅ ADDED
       productCode: data['productCode'] ?? '',
       productName: data['productName'] ?? '',
       productDetails: data['productDetails'] ?? '',
@@ -178,6 +200,7 @@ class OrderModel {
       deliveryDate: _parseTimestamp(data['deliveryDate']),
       marketingPersonName: data['marketingPersonName'] ?? 'Unknown Agent',
       status: data['status'] ?? 'Pending',
+      isDeleted: data['isDeleted'] ?? false,
       totalAmount: total,
       gstPercentage: _parseDouble(data['gstPercentage']),
       sizeDescription: data['sizeDescription'] ?? '',
@@ -197,6 +220,8 @@ class OrderModel {
 
       // FETCH PAYMENT HISTORY SAFELY
       paymentHistory: data['paymentHistory'] ?? [],
+      neckType: data['neckType'] ?? 'Not Specified',
+      productType: data['productType'] ?? 'Not Specified',
     );
   }
 
@@ -219,10 +244,14 @@ class OrderModel {
     return 0;
   }
 
+  // ✅ SAFELY PARSES DOUBLES (Strips commas and Currency Symbols)
   static double _parseDouble(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
+    if (value is String) {
+      String clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
+      return double.tryParse(clean) ?? 0.0;
+    }
     return 0.0;
   }
 }

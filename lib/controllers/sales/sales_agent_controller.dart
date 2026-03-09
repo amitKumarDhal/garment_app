@@ -16,6 +16,9 @@ class SalesAgentController extends GetxController {
   final isLoading = true.obs;
   final agentName = "".obs;
 
+  // ✅ NEW: User Role Observable (JSA, SSA, SC, SM)
+  final userRole = "JSA".obs;
+
   // Observables for Gross vs Net
   final grossSales = 0.0.obs;
   final netAchievement = 0.0.obs;
@@ -30,7 +33,7 @@ class SalesAgentController extends GetxController {
   final prevMonthPendingAmount = 0.0.obs;
   final isPrevMonthCompleted = true.obs;
 
-  // ✅ NEW: Tracks if the previous month actually had any data
+  // Tracks if the previous month actually had any data
   final hasPrevMonthData = false.obs;
 
   // Checks if user is a manager (hides bonus UI if true)
@@ -63,12 +66,21 @@ class SalesAgentController extends GetxController {
 
           String role = (userDoc.data()?['Role'] ?? userDoc.data()?['role'] ?? '').toString().toLowerCase();
 
+          // ✅ Assign exact Role Acronym
+          userRole.value = _parseRoleAcronym(role);
+
           if (role.contains('manager') || role == 'sales manager') {
             baseTarget.value = 150000.0;
             isSalesManager.value = true;
           } else {
-            baseTarget.value = 100000.0;
+            // ✅ Dynamic Base Target based on Role
+            baseTarget.value = _getTargetForRole(userRole.value);
             isSalesManager.value = false;
+
+            // ✅ Silent Auto-Promotion Check (Only run if they are a Junior)
+            if (userRole.value == 'JSA') {
+              await _checkPromotionEligibility(user.uid);
+            }
           }
         }
         agentName.value = name;
@@ -78,6 +90,66 @@ class SalesAgentController extends GetxController {
     }
   }
 
+  // ✅ Helper: Role to Target Mapping
+  double _getTargetForRole(String role) {
+    if (role == 'SSA') return 150000.0; // 1.5 Lakh
+    if (role == 'SC') return 200000.0;  // 2 Lakh
+    if (role == 'SM') return 150000.0;
+    return 100000.0; // Default JSA 1L
+  }
+
+  // ✅ Helper: Parse Role String to Acronym
+  String _parseRoleAcronym(String role) {
+    if (role.contains('senior') || role == 'ssa') return 'SSA';
+    if (role.contains('coordinator') || role == 'sc') return 'SC';
+    if (role.contains('manager') || role == 'sm') return 'SM';
+    return 'JSA'; // Default
+  }
+
+  // ✅ THE SILENT PROMOTION ENGINE
+  Future<void> _checkPromotionEligibility(String uid) async {
+    DateTime now = DateTime.now();
+    DateTime firstOfThisMonth = DateTime(now.year, now.month, 1);
+    DateTime firstOfLastMonth = DateTime(now.year, now.month - 1, 1);
+
+    final lastMonthSnap = await _db.collection('orders')
+        .where('marketingPersonId', isEqualTo: uid)
+        .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(firstOfLastMonth))
+        .where('orderDate', isLessThan: Timestamp.fromDate(firstOfThisMonth))
+        .get();
+
+    int orderCount = 0;
+    double totalRevenue = 0.0;
+    bool has50kOrder = false;
+
+    for (var doc in lastMonthSnap.docs) {
+      final data = doc.data();
+      if (data['isDeleted'] == true) continue;
+
+      String status = (data['status'] ?? '').toString().toLowerCase();
+      if (status == 'rejected' || status == 'cancelled') continue;
+
+      orderCount++;
+      double effRev = _parseAmount(data['effectiveRevenue']);
+      double totAmt = _parseAmount(data['totalAmount']);
+      double val = (effRev > 0) ? effRev : totAmt;
+
+      totalRevenue += val;
+      if (val >= 50000) has50kOrder = true;
+    }
+
+    // 🏆 CRITERIA CHECK: 10 Orders + 1.5L Revenue + One 50k Order
+    if (orderCount >= 10 && totalRevenue >= 150000 && has50kOrder) {
+      await _db.collection('users').doc(uid).update({'Role': 'Senior Sales Associate'});
+      userRole.value = 'SSA';
+      baseTarget.value = 150000.0; // Upgrade their target immediately
+
+      Get.snackbar("Level Up! 🚀", "Congratulations! You've been promoted to Senior Sales Associate (SSA)!",
+          backgroundColor: Colors.purple.withValues(alpha:0.1), colorText: Colors.purple, duration: const Duration(seconds: 6));
+    }
+  }
+
+
   Future<void> loadDashboardData() async {
     if (_auth.currentUser == null) return;
     isLoading.value = true;
@@ -86,23 +158,20 @@ class SalesAgentController extends GetxController {
     isLoading.value = false;
   }
 
-  // --- 2. Calculate My Personal Stats & Previous Month Rollover ---
+  // --- Calculate My Personal Stats & Previous Month Rollover ---
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
     if (agentName.value.isEmpty) return;
 
     try {
-      // 1. Setup Dates for Current Selected Month
       DateTime targetMonth = selectedMonth.value;
       DateTime startOfMonth = DateTime(targetMonth.year, targetMonth.month, 1);
       DateTime endOfMonth = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
-      // 2. Setup Dates for PREVIOUS Month (to check for shortfall)
       DateTime prevMonth = DateTime(targetMonth.year, targetMonth.month - 1, 1);
       DateTime startOfPrevMonth = DateTime(prevMonth.year, prevMonth.month, 1);
       DateTime endOfPrevMonth = DateTime(prevMonth.year, prevMonth.month + 1, 0, 23, 59, 59);
 
-      // 3. Fetch both months simultaneously for speed
       final currentMonthFuture = _db.collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
           .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
@@ -120,14 +189,15 @@ class SalesAgentController extends GetxController {
       final currentSnap = results[0];
       final prevSnap = results[1];
 
+      // ✅ UPDATED: Added new granular statuses so orders don't disappear from agent's dashboard
       List<String> validStatuses = [
-        'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered', 'completed'
+        'approved', 'cutting', 'printing', 'printed',
+        'stitching', 'stitched', 'packing', 'packed',
+        'shipping', 'shipped', 'delivered', 'completed'
       ];
 
       // --- CALCULATE PREVIOUS MONTH ---
       double prevTotalNet = 0.0;
-
-      // ✅ Check if we actually have data for the previous month
       hasPrevMonthData.value = prevSnap.docs.isNotEmpty;
 
       for (var doc in prevSnap.docs) {
@@ -143,7 +213,6 @@ class SalesAgentController extends GetxController {
       // CALCULATE SHORTFALL
       double shortfall = baseTarget.value - prevTotalNet;
 
-      // ✅ LOGIC: If there is no previous data OR shortfall is 0, start fresh
       if (!hasPrevMonthData.value || shortfall <= 0) {
         isPrevMonthCompleted.value = true;
         prevMonthPendingAmount.value = 0.0;
@@ -187,7 +256,7 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- 3. Calculate Team Leaderboard ---
+  // --- Calculate Team Leaderboard ---
   Future<void> fetchLeaderboard() async {
     try {
       isLoading.value = true;
@@ -197,24 +266,26 @@ class SalesAgentController extends GetxController {
       DateTime end = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
       final usersSnap = await _db.collection('users').get();
-      Map<String, bool> managerMap = {};
+      Map<String, String> userRoleMap = {};
+
       for (var doc in usersSnap.docs) {
         final d = doc.data();
         String n = d['FullName'] ?? d['Name'] ?? '';
         String r = (d['Role'] ?? d['role'] ?? '').toString().toLowerCase();
-        if (n.isNotEmpty && (r.contains('manager') || r == 'sales manager')) {
-          managerMap[n] = true;
+        if (n.isNotEmpty) {
+          userRoleMap[n] = _parseRoleAcronym(r);
         }
       }
 
+      // ✅ UPDATED & CLEANED: Added new granular statuses. Only lowercase needed since we convert the data string to lowercase below.
       List<String> revenueStatuses = [
-        'Approved', 'Cutting', 'Stitching', 'Printing', 'Packing', 'Shipping', 'Delivered',
-        'approved', 'cutting', 'stitching', 'printing', 'packing', 'shipping', 'delivered'
+        'approved', 'cutting', 'printing', 'printed',
+        'stitching', 'stitched', 'packing', 'packed',
+        'shipping', 'shipped', 'delivered', 'completed'
       ];
 
       final snapshot = await _db
           .collection('orders')
-          .where('status', whereIn: revenueStatuses)
           .where('orderDate', isGreaterThanOrEqualTo: start)
           .where('orderDate', isLessThanOrEqualTo: end)
           .get();
@@ -237,6 +308,7 @@ class SalesAgentController extends GetxController {
             pendingERMap[agent] = true;
           }
 
+          // ✅ Perfect fallback logic remains intact
           double amountToCount = (effRev > 0) ? effRev : totalAmt;
 
           salesMap[agent] = (salesMap[agent] ?? 0) + amountToCount;
@@ -251,8 +323,10 @@ class SalesAgentController extends GetxController {
         double amount = e.value;
         int count = countMap[name] ?? 0;
 
-        bool isSM = managerMap[name] == true;
-        double targetAmount = isSM ? 150000.0 : 100000.0;
+        String role = userRoleMap[name] ?? 'JSA';
+        bool isSM = role == 'SM';
+        double targetAmount = _getTargetForRole(role);
+
         double progress = amount / targetAmount;
 
         String greeting = "";
@@ -269,6 +343,7 @@ class SalesAgentController extends GetxController {
           'progress': progress,
           'greeting': greeting,
           'isSM': isSM,
+          'roleStr': role,
           'hasPendingER': pendingERMap[name] ?? false,
         };
       }).toList();
@@ -279,7 +354,7 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- 4. UPDATE ORDER (Edit Logic) ---
+  // --- UPDATE ORDER (Edit Logic) ---
   Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
     try {
       isLoading.value = true;
@@ -321,9 +396,9 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- 5. REQUEST DELETE ORDER LOGIC ---
+  // --- REQUEST DELETE ORDER LOGIC ---
   Future<void> deleteOrder(String orderId, String currentStatus) async {
-    final lockedStatuses = ['shipping', 'shipped', 'delivered'];
+    final lockedStatuses = ['shipping', 'shipped', 'delivered', 'completed'];
 
     if (lockedStatuses.contains(currentStatus.toLowerCase())) {
       Get.snackbar("Action Denied", "Orders in '$currentStatus' phase cannot be deleted.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);

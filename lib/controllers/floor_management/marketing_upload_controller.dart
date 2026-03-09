@@ -16,6 +16,10 @@ class OrderItemForm {
   final orderValue = TextEditingController();
   final gstInfo = TextEditingController();
 
+  // ✅ Item-specific dropdowns
+  final selectedNeckType = Rx<String?>(null);
+  final selectedProductType = Rx<String?>(null);
+
   void dispose() {
     productCode.dispose();
     productDetails.dispose();
@@ -41,9 +45,22 @@ class MarketingUploadController extends GetxController {
   final address = TextEditingController();
   final deadline = TextEditingController();
 
+  // ✅ Location Fields
+  final pincode = TextEditingController();
+  final selectedState = "".obs;
+
   // --- Financial Global Controllers ---
   final shippingCharge = TextEditingController();
   final advanceAmount = TextEditingController();
+
+  // ✅ Dropdown Options
+  final List<String> neckTypes = ['Round Neck', 'Collared Neck'];
+  final List<String> productTypes = [
+    'Sports Jersey',
+    'Business Promotional',
+    'Team/Staff Wear',
+    'Specific Event Use'
+  ];
 
   // ✅ DYNAMIC ITEM LIST
   final items = <OrderItemForm>[].obs;
@@ -54,11 +71,11 @@ class MarketingUploadController extends GetxController {
   final isEditing = false.obs;
   String? editingOrderId;
 
-  // ✅ NEW: Memory variables to prevent overwriting the creator's name
+  // Memory variables to prevent overwriting the creator's name
   String? originalMarketingPersonName;
   String? originalMarketingPersonId;
 
-  // ✅ IMAGE OBSERVABLES
+  // IMAGE OBSERVABLES
   final RxString selectedImagePath = ''.obs;
   final RxString existingImageUrl = ''.obs;
 
@@ -76,6 +93,35 @@ class MarketingUploadController extends GetxController {
     addNewItem();
     shippingCharge.addListener(_calculateTotal);
     advanceAmount.addListener(_calculateTotal);
+
+    // ✅ PIN Code Listener for Auto-fetch
+    pincode.addListener(() {
+      String pin = pincode.text.trim();
+      if (pin.length == 6) {
+        _fetchStateFromPincode(pin);
+      } else if (pin.length < 6) {
+        selectedState.value = ""; // Clear state if pin is incomplete
+      }
+    });
+  }
+
+  // ✅ Free API to fetch State from PIN Code
+  Future<void> _fetchStateFromPincode(String pin) async {
+    try {
+      final response = await GetConnect().get('https://api.postalpincode.in/pincode/$pin');
+
+      if (response.body != null &&
+          response.body is List &&
+          response.body[0]['Status'] == 'Success') {
+
+        final String fetchedState = response.body[0]['PostOffice'][0]['State'];
+        selectedState.value = fetchedState;
+      } else {
+        selectedState.value = ""; // Invalid PIN
+      }
+    } catch (e) {
+      debugPrint("PIN fetch error: $e");
+    }
   }
 
   void addNewItem() {
@@ -146,7 +192,6 @@ class MarketingUploadController extends GetxController {
     isEditing.value = true;
     editingOrderId = order.id;
 
-    // ✅ SAVE ORIGINAL CREATOR SO WE DON'T OVERWRITE IT
     originalMarketingPersonName = order.marketingPersonName;
     originalMarketingPersonId = order.marketingPersonId;
 
@@ -158,7 +203,12 @@ class MarketingUploadController extends GetxController {
     shippingCharge.text = order.shippingCharge.toString();
     advanceAmount.text = "0";
 
-    existingImageUrl.value = order.toJson()['designMockupUrl'] ?? '';
+    // ✅ Load location data if editing
+    final orderJson = order.toJson();
+    pincode.text = orderJson['pincode'] ?? "";
+    selectedState.value = orderJson['state'] ?? "";
+
+    existingImageUrl.value = orderJson['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
     if (_selectedDeadline != null) {
@@ -174,6 +224,10 @@ class MarketingUploadController extends GetxController {
       itemForm.quantity.text = (prod['qty'] ?? 0).toString();
       itemForm.orderValue.text = (prod['price'] ?? 0.0).toStringAsFixed(2);
       itemForm.gstInfo.text = (prod['gstPercentage'] ?? 0.0).toString();
+
+      // ✅ Load per-item dropdowns
+      itemForm.selectedNeckType.value = prod['neckType'];
+      itemForm.selectedProductType.value = prod['productType'];
 
       itemForm.quantity.addListener(_calculateTotal);
       itemForm.orderValue.addListener(_calculateTotal);
@@ -274,11 +328,9 @@ class MarketingUploadController extends GetxController {
       isLoading.value = true;
       final user = _auth.currentUser;
 
-      // ✅ USE ORIGINAL CREATOR IF EDITING, OTHERWISE USE CURRENT USER
       String agentName = originalMarketingPersonName ?? "Agent";
       String userId = originalMarketingPersonId ?? user?.uid ?? "";
 
-      // Only fetch the current user's name if this is a BRAND NEW order
       if (!isEditing.value && user != null) {
         try {
           final userDoc = await _db.collection('id_requests').doc(user.uid).get();
@@ -318,6 +370,10 @@ class MarketingUploadController extends GetxController {
           "price": price,
           "gstPercentage": gst,
           "total": itemTotal,
+
+          // ✅ Save Per-Item specifications
+          "neckType": item.selectedNeckType.value ?? 'Not Specified',
+          "productType": item.selectedProductType.value ?? 'Not Specified',
         });
       }
 
@@ -329,6 +385,10 @@ class MarketingUploadController extends GetxController {
         "clientPhone": phone.text.trim(),
         "organization": organization.text.trim(),
         "clientAddress": address.text.trim(),
+
+        // ✅ Save Location details
+        "pincode": pincode.text.trim(),
+        "state": selectedState.value,
 
         "productCode": items.first.productCode.text.trim(),
         "productDetails": rootProductName,
@@ -452,6 +512,10 @@ class MarketingUploadController extends GetxController {
     shippingCharge.clear();
     advanceAmount.clear();
 
+    // ✅ Clear location variables
+    pincode.clear();
+    selectedState.value = "";
+
     items.clear();
     addNewItem();
 
@@ -465,7 +529,6 @@ class MarketingUploadController extends GetxController {
     isEditing.value = false;
     editingOrderId = null;
 
-    // ✅ Clear memory variables
     originalMarketingPersonName = null;
     originalMarketingPersonId = null;
 

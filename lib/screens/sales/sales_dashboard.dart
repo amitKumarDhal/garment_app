@@ -12,7 +12,6 @@ import '../../controllers/sales/sales_agent_controller.dart';
 import '../../utils/constants/colors.dart';
 import 'package:yoobbel/controllers/notifications/notification_controller.dart';
 import 'package:yoobbel/screens/notifications/notification_screen.dart';
-
 import '../profile/profile_screen.dart';
 
 class SalesDashboard extends StatelessWidget {
@@ -64,13 +63,34 @@ class SalesDashboard extends StatelessWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  Text(
-                    name,
-                    style: TextStyle(
-                      color: isDark ? Colors.blue.shade200 : TColors.primary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  // ✅ FIX 1: Wrapped name in Flexible to prevent App Bar overflow
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isDark ? Colors.blue.shade200 : TColors.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: TColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: TColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          controller.userRole.value,
+                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: TColors.primary),
+                        ),
+                      )
+                    ],
                   ),
                 ],
               );
@@ -253,8 +273,6 @@ class SalesDashboard extends StatelessWidget {
       final dynamicTarget = controller.currentDynamicTarget.value;
       final isPrevCompleted = controller.isPrevMonthCompleted.value;
       final prevPendingAmount = controller.prevMonthPendingAmount.value;
-
-      // ✅ CHECKS IF PREVIOUS MONTH HAD DATA
       final hasPrevMonthData = controller.hasPrevMonthData.value;
 
       final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
@@ -366,7 +384,6 @@ class SalesDashboard extends StatelessWidget {
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600)
                           ),
                           const SizedBox(width: 8),
-                          // ✅ DOT ONLY SHOWS IF THERE ARE ORDERS
                           if (controller.totalOrders.value > 0)
                             Container(
                               width: 8,
@@ -389,7 +406,6 @@ class SalesDashboard extends StatelessWidget {
                           "₹${formatCurrency.format(net)}",
                           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)
                       ),
-                      // ✅ WARNING ONLY SHOWS IF PENDING ER IS TRUE
                       if (controller.hasPendingER.value && controller.totalOrders.value > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
@@ -421,11 +437,8 @@ class SalesDashboard extends StatelessWidget {
               ),
             ),
 
-            // ✅ CONDITIONAL RENDER: ONLY SHOW FOR ASSOCIATES *AND* IF PREVIOUS DATA EXISTS
             if (!controller.isSalesManager.value && hasPrevMonthData) ...[
-
               const SizedBox(height: 12),
-
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -473,12 +486,10 @@ class SalesDashboard extends StatelessWidget {
                   ],
                 ),
               ),
-            ], // End of Previous Month Conditional
+            ],
 
-            // ✅ EXTRA EARNINGS ONLY SHOW FOR ASSOCIATES
             if (!controller.isSalesManager.value) ...[
               const SizedBox(height: 12),
-
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -520,7 +531,7 @@ class SalesDashboard extends StatelessWidget {
                           Text(
                             bonusUnlocked
                                 ? "+ ₹${formatCurrency.format(extraEarning)}"
-                                : "Hit ₹${(dynamicTarget / 100000).toStringAsFixed(1)}L ER to unlock bonus",
+                                : "Hit target ER to unlock bonus",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: bonusUnlocked ? 18 : 11,
@@ -582,21 +593,13 @@ class SalesDashboard extends StatelessWidget {
           var agent = entry.value;
           int rank = index + 1;
 
-          double rawAmount = 0.0;
-          if (agent['amount'] is num) {
-            rawAmount = (agent['amount'] as num).toDouble();
-          }
-
+          double rawAmount = (agent['amount'] as num).toDouble();
           int totalOrders = agent['count'] ?? 0;
 
-          String exactAmountDisplay = NumberFormat.currency(
-            locale: 'en_IN',
-            symbol: '₹',
-            decimalDigits: 0,
-          ).format(rawAmount);
+          String exactAmountDisplay = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0,).format(rawAmount);
 
           double progress = agent['progress'] ?? 0.0;
-          bool isSM = agent['isSM'] == true;
+          String roleStr = agent['roleStr'] ?? 'JSA';
 
           List<Color> rankGradient;
           Color rankBorder;
@@ -687,33 +690,39 @@ class SalesDashboard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ✅ FIX 2 & 3: Wrapped internal Row in Expanded to push Progress Pill safely
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                agent['name'] ?? 'Unknown',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: nameColor,
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    agent['name'] ?? 'Unknown',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: nameColor,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              if (isSM) ...[
                                 const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.blueAccent.withValues(alpha: 0.15),
+                                    color: Colors.blueAccent.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+                                    border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.2)),
                                   ),
-                                  child: const Text("SM", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
+                                  child: Text(roleStr, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
                                 ),
                               ],
-                            ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(

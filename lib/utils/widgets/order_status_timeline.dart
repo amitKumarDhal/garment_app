@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// If you use TColors, import it here: import '../constants/colors.dart';
 
 class OrderStatusTimeline extends StatelessWidget {
   final String currentStatus;
@@ -8,20 +7,29 @@ class OrderStatusTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Define the standard workflow steps
+    // ✅ UPDATED: The full 10-step timeline (including Placed)
     final steps = [
       'Placed',
       'Approved',
       'Cutting',
-      'Stitching',
       'Printing',
+      'Printed',
+      'Stitching',
+      'Stitched',
       'Packing',
-      'Shipping',
+      'Packed',
+      'Shipped',
       'Delivered'
     ];
 
-    // Find index of current status (default to 0 if not found)
+    // Find index of current status
     int currentIndex = steps.indexWhere((s) => s.toLowerCase() == currentStatus.toLowerCase());
+
+    // Treat 'Pending' the same as 'Placed' for the timeline UI
+    if (currentStatus.toLowerCase() == 'pending') {
+      currentIndex = 0;
+    }
+
     if (currentIndex == -1) currentIndex = 0; // Default start
 
     // Handle "Rejected" case specifically
@@ -47,12 +55,15 @@ class OrderStatusTimeline extends StatelessWidget {
         // Horizontal Scrollable Timeline
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(), // Adds a smooth scrolling effect
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start, // Aligns elements to the top
             children: List.generate(steps.length, (index) {
               bool isCompleted = index <= currentIndex;
               bool isLast = index == steps.length - 1;
 
               return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // The Step Dot & Label
                   Column(
@@ -72,13 +83,13 @@ class OrderStatusTimeline extends StatelessWidget {
                           child: isCompleted
                               ? const Icon(Icons.check, size: 16, color: Colors.white)
                               : Text(
-                                  "${index + 1}",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                            "${index + 1}",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -92,13 +103,14 @@ class OrderStatusTimeline extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
+
                   // The Line Connector
                   if (!isLast)
                     Container(
                       width: 40,
                       height: 4,
-                      margin: const EdgeInsets.only(bottom: 20, left: 4, right: 4),
+                      // ✅ Perfectly aligns the line with the center of the 30x30 circle
+                      margin: const EdgeInsets.only(top: 13, left: 4, right: 4),
                       color: index < currentIndex ? Colors.green : Colors.grey[300],
                     ),
                 ],

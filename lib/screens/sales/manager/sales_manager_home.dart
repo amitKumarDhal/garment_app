@@ -372,7 +372,7 @@ class SalesManagerHome extends StatelessWidget {
                                   Text("Deliverables", style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14, fontWeight: FontWeight.w900), maxLines: 1, overflow: TextOverflow.ellipsis),
                                   const SizedBox(height: 4),
                                   Obx(() {
-                                    final count = controller.urgentDeliverablesCount.value;
+                                    final count = controller.urgentDeliverablesCount;
                                     if (count == 0) {
                                       return Text("All on track", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 11, fontWeight: FontWeight.w600));
                                     }

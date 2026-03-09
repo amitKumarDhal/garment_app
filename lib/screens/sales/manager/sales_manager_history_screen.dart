@@ -15,10 +15,10 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     final controller = Get.put(SalesManagerHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Force "All" filter on load
+    // ✅ FORCE "All NDO" ON LOAD
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.currentFilter.value != "All") {
-        controller.filterByStatus("All");
+      if (controller.currentFilter.value != "All NDO") {
+        controller.filterByStatus("All NDO");
       }
     });
 
@@ -118,21 +118,24 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                         physics: const BouncingScrollPhysics(),
                         child: Obx(
                               () => Row(
-                            children: [
-                              _buildFilterChip(controller, "All", isDark),
-                              _buildFilterChip(controller, "Pending", isDark),
-                              _buildFilterChip(controller, "Approved", isDark),
-                              _buildFilterChip(controller, "Cutting", isDark),
-                              _buildFilterChip(controller, "Stitching", isDark),
-                              _buildFilterChip(controller, "Printing", isDark),
-                              _buildFilterChip(controller, "Packing", isDark),
-                              _buildFilterChip(controller, "Shipping", isDark),
-                              _buildFilterChip(controller, "Delivered", isDark),
-                              _buildFilterChip(controller, "Rejected", isDark),
-                              _buildFilterChip(controller, "Trash", isDark), // ✅ ADD THIS LINE
-                            ],
-                          ),
-                        ),
+                                children: [
+                                  _buildFilterChip(controller, "All", isDark),      // 👈 NEW: Shows everything
+                                  _buildFilterChip(controller, "All NDO", isDark),  // 👈 Existing: Shows active production
+                                  _buildFilterChip(controller, "Delivered", isDark),
+                                  _buildFilterChip(controller, "Pending", isDark),
+                                  _buildFilterChip(controller, "Approved", isDark),
+                                  _buildFilterChip(controller, "Cutting", isDark),
+                                  _buildFilterChip(controller, "Printing", isDark),
+                                  _buildFilterChip(controller, "Printed", isDark),
+                                  _buildFilterChip(controller, "Stitching", isDark),
+                                  _buildFilterChip(controller, "Stitched", isDark),
+                                  _buildFilterChip(controller, "Packing", isDark),
+                                  _buildFilterChip(controller, "Packed", isDark),
+                                  _buildFilterChip(controller, "Shipping", isDark),
+                                  _buildFilterChip(controller, "Rejected", isDark),
+                                  _buildFilterChip(controller, "Trash", isDark),
+                                ],
+                              ),                        ),
                       ),
                     ),
                   ],
@@ -170,7 +173,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 physics: const BouncingScrollPhysics(),
                 itemCount: controller.displayedOrders.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
-// Look for this part in your body:
                 itemBuilder: (context, index) {
                   final order = controller.displayedOrders[index];
                   return GestureDetector(
@@ -178,10 +180,10 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                       HapticFeedback.lightImpact();
                       Get.to(() => SalesManagerOrderDetails(order: order));
                     },
-                    // ✅ CHANGE THIS LINE FROM _buildCompactOrderCard to:
                     child: _buildRedesignedOrderCard(context, order, isDark),
                   );
-                },              );
+                },
+              );
             }),
           ),
         ],
@@ -221,17 +223,15 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ UPGRADED COMPACT CARD
   Widget _buildRedesignedOrderCard(BuildContext context, OrderModel order, bool isDark) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final Color statusColor = _getStatusColor(order.status);
 
-    // Compact Math
     final int qty = order.quantity;
     final double unitPrice = qty > 0 ? (order.totalAmount / qty) : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(12), // Compact padding
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -243,7 +243,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Header: ID & Status ---
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -265,8 +264,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-
-          // --- Client & Product (Shortened) ---
           Text(
             order.clientName,
             maxLines: 1,
@@ -280,8 +277,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
           ),
           const SizedBox(height: 6),
-
-          // --- Meta: Associate & Date Time ---
           Row(
             children: [
               Icon(Icons.person, size: 12, color: Colors.grey.shade500),
@@ -294,7 +289,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                 ),
               ),
-              // ✅ TIME ADDED BACK HERE
               Icon(Icons.access_time_rounded, size: 10, color: Colors.grey.shade500),
               const SizedBox(width: 3),
               Text(
@@ -303,10 +297,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
               ),
             ],
           ),
-
           const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1, thickness: 0.5)),
-
-          // --- Bottom: Units & Total ---
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -323,18 +314,26 @@ class SalesManagerHistoryScreen extends StatelessWidget {
         ],
       ),
     );
-  }  Color _getStatusColor(String status) {
+  }
+
+  // ✅ UPDATED: Matches exact color mapping
+  Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return const Color(0xFF4CAF50);
-      case 'cutting': return const Color(0xFF2196F3);
-      case 'stitching': return const Color(0xFF3F51B5);
-      case 'printing': return const Color(0xFF9C27B0);
-      case 'packing': return const Color(0xFFFF9800);
-      case 'shipping': return const Color(0xFF009688);
-      case 'delivered': return const Color(0xFF13D421); // ✅ Made much lighter/brighter green
-      case 'rejected': return const Color(0xFFF44336);
+      case 'approved': return Colors.blue;
+      case 'cutting': return Colors.orange;
+      case 'printing': return Colors.indigo;
+      case 'printed': return Colors.cyan;
+      case 'stitching': return Colors.amber;
+      case 'stitched': return Colors.brown;
+      case 'packing':
+      case 'packed': return Colors.purple;
+      case 'shipping':
+      case 'shipped': return Colors.teal;
+      case 'delivered': return Colors.green;
+      case 'completed': return Colors.green;
+      case 'rejected': return Colors.red;
       case 'pending': return const Color(0xFFFFC107);
-      default: return Colors.blueGrey;
+      default: return Colors.grey;
     }
   }
 }

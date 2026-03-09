@@ -137,12 +137,67 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   const SizedBox(height: 16),
                   TCustomTextField(label: "Client Name", controller: controller.clientName, prefixIcon: Icons.person_outline_rounded, validator: (val) => val!.isEmpty ? "Required" : null),
                   const SizedBox(height: 16),
+
+                  // ✅ NEW: PIN CODE & STATE ROW
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TCustomTextField(
+                          label: "PIN Code",
+                          controller: controller.pincode, // Make sure to add this to your Controller
+                          prefixIcon: Icons.pin_drop_rounded,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 3,
+                        child: Obx(() => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.black26 : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                  Icons.map_rounded,
+                                  size: 20,
+                                  color: controller.selectedState.value.isEmpty ? Colors.grey : TColors.primary
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                controller.selectedState.value.isEmpty ? "State" : controller.selectedState.value,
+                                style: TextStyle(
+                                  color: controller.selectedState.value.isEmpty ? Colors.grey : (isDark ? Colors.white : Colors.black87),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
                   TCustomTextField(label: "Organization / Business", controller: controller.organization, prefixIcon: Icons.domain_rounded),
                   const SizedBox(height: 16),
                   TCustomTextField(label: "Phone Number", controller: controller.phone, prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone),
                   const SizedBox(height: 16),
-                  TCustomTextField(label: "Billing / Shipping Address", controller: controller.address, prefixIcon: Icons.location_on_outlined, maxLines: 2),
+
+                  // ✅ Detailed Address (Used for House/Street)
+                  TCustomTextField(label: "Street Address / Area", controller: controller.address, prefixIcon: Icons.location_on_outlined, maxLines: 2),
                   const SizedBox(height: 16),
+
                   GestureDetector(
                     onTap: () => controller.chooseDate(context),
                     child: AbsorbPointer(
@@ -150,10 +205,11 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                     ),
                   ),
                 ]),
-                const SizedBox(height: 28),
 
                 // --- SECTION 3: DYNAMIC PRODUCTS ---
                 _buildSectionHeader("Product Specs", Icons.inventory_2_outlined, isDark),
+
+                const SizedBox(height: 16),
 
                 Obx(
                       () => Column(
@@ -203,6 +259,33 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                     prefixIcon: Icons.notes_rounded,
                                     maxLines: 2,
                                     validator: (val) => val!.isEmpty ? "Required" : null
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start, // Align to top
+                                  children: [
+                                    Expanded(
+                                      child: Obx(() => _buildDropdown(
+                                        label: "Neck Type", // Shortened label to prevent overflow
+                                        value: itemForm.selectedNeckType.value,
+                                        items: controller.neckTypes,
+                                        icon: Icons.checkroom_rounded,
+                                        isDark: isDark,
+                                        onChanged: (val) => itemForm.selectedNeckType.value = val,
+                                      )),
+                                    ),
+                                    const SizedBox(width: 8), // Reduced gap slightly
+                                    Expanded(
+                                      child: Obx(() => _buildDropdown(
+                                        label: "Category", // Shortened label
+                                        value: itemForm.selectedProductType.value,
+                                        items: controller.productTypes,
+                                        icon: Icons.category_rounded,
+                                        isDark: isDark,
+                                        onChanged: (val) => itemForm.selectedProductType.value = val,
+                                      )),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 12),
 
@@ -323,6 +406,51 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     );
   }
 
+
+  Widget _buildDropdown({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required IconData icon,
+    required bool isDark,
+    required Function(String?) onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+
+      isExpanded: true,
+
+      icon: Icon(Icons.keyboard_arrow_down_rounded,
+          color: isDark ? Colors.white70 : Colors.black54, size: 18),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12),
+        prefixIcon: Icon(icon, color: isDark ? Colors.white70 : Colors.black54, size: 18),
+        filled: true,
+        fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05))),
+      ),
+      dropdownColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+      style: TextStyle(
+        color: isDark ? Colors.white : Colors.black87,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      items: items.map((String item) {
+        return DropdownMenuItem<String>(
+          value: item,
+          child: Text(item, overflow: TextOverflow.ellipsis),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
   Widget _buildSectionHeader(String title, IconData icon, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4),

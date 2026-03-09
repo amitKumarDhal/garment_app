@@ -3,7 +3,8 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../controllers/sales/deliverables_controller.dart';
 import '../../utils/constants/colors.dart';
-import 'manager/order_approval_screen.dart';
+// ✅ FIXED IMPORT: Now routing to the Details screen instead of Approval screen
+import 'manager/sales_manager_order_details.dart';
 
 class OrderDeliverablesScreen extends StatelessWidget {
   const OrderDeliverablesScreen({super.key});
@@ -30,36 +31,115 @@ class OrderDeliverablesScreen extends StatelessWidget {
           ),
         ),
       ),
-      // ✅ 1. Wrap the entire body in RefreshIndicator
       body: RefreshIndicator(
         color: TColors.primary,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         onRefresh: () async {
-          // Trigger a refresh of the main sales data
           await controller.smController.fetchMonthlyStats();
-          // Adding a small delay to let UI show the refresh animation nicely
           await Future.delayed(const Duration(milliseconds: 800));
         },
-        // ✅ 2. Use SingleChildScrollView for the whole page
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(), // Ensures it can be pulled down even if content is short
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. AT RISK WARNING SECTION ---
-// --- 1. CRITICAL ALERTS CONSOLE ---
+
+              // --- 0. PRE-STITCHING QUEUE (NOT STITCHED) ---
+              Obx(() {
+                final notStitchedOrders = controller.notStitchedOrders;
+                if (notStitchedOrders.isEmpty) return const SizedBox.shrink();
+
+                int totalNotStitchedUnits = controller.totalNotStitchedUnits;
+
+                return Container(
+                  margin: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 10),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? [const Color(0xFF1565C0), const Color(0xFF0D47A1)]
+                            : [Colors.blue.shade50, Colors.blue.shade100],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.4), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(color: Colors.blueAccent.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))
+                      ]
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                            Icons.precision_manufacturing_rounded,
+                            color: isDark ? Colors.blue.shade200 : Colors.blue.shade700,
+                            size: 24
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Pre-Stitching Queue",
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.blue.shade900,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "Approved, Cutting, Printing & Printed",
+                              style: TextStyle(
+                                color: isDark ? Colors.blue.shade100 : Colors.blue.shade800,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            "$totalNotStitchedUnits",
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.blue.shade900,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 24,
+                              height: 1,
+                            ),
+                          ),
+                          Text(
+                            "Units (${notStitchedOrders.length} Orders)",
+                            style: TextStyle(
+                              color: isDark ? Colors.blue.shade200 : Colors.blue.shade800,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                );
+              }),
+
+              // --- 1. CRITICAL ALERTS CONSOLE ---
               Obx(() {
                 if (controller.atRiskOrders.isEmpty) return const SizedBox.shrink();
 
-                // Sort orders by urgency (Overdue first, then due today, then due soon)
                 var sortedOrders = List.from(controller.atRiskOrders);
                 DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-
-                sortedOrders.sort((a, b) {
-                  DateTime aDate = DateTime(a.deliveryDate.year, a.deliveryDate.month, a.deliveryDate.day);
-                  DateTime bDate = DateTime(b.deliveryDate.year, b.deliveryDate.month, b.deliveryDate.day);
-                  return aDate.compareTo(bDate);
-                });
 
                 return Container(
                   margin: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 24),
@@ -109,7 +189,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                       ),
 
                       // --- LIST OF URGENT ORDERS ---
-                      // Using ListView inside a constrained box to keep the UI clean. Shows up to 3 items, scrolls if more.
                       ConstrainedBox(
                         constraints: BoxConstraints(maxHeight: sortedOrders.length > 3 ? 240 : (sortedOrders.length * 80).toDouble()),
                         child: ListView.separated(
@@ -127,7 +206,8 @@ class OrderDeliverablesScreen extends StatelessWidget {
                             bool isDueToday = daysLeft == 0;
 
                             return InkWell(
-                              onTap: () => Get.to(() => OrderApprovalScreen(order: order)),
+                              // ✅ FIXED ROUTING HERE
+                              onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 child: Row(
@@ -155,7 +235,9 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                                 style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, fontSize: 14),
                                               ),
                                               const SizedBox(width: 8),
-                                              Text("• ${order.clientName}", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              Expanded(
+                                                child: Text("• ${order.clientName}", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              ),
                                             ],
                                           ),
                                           const SizedBox(height: 4),
@@ -215,6 +297,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
                   ),
                 );
               }),
+
               // --- 2. DATE SELECTOR TIMELINE ---
               Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 10),
@@ -325,7 +408,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
                 ),
               ),
 
-              // ✅ 3. REPLACED EXPANDED WITH A SHRINK-WRAPPED LISTVIEW
+              // --- 4. ORDERS LIST FOR SELECTED DATE ---
               Obx(() {
                 if (controller.ordersForSelectedDate.isEmpty) {
                   return Padding(
@@ -350,16 +433,17 @@ class OrderDeliverablesScreen extends StatelessWidget {
                 }
 
                 return ListView.builder(
-                  shrinkWrap: true, // ✅ CRITICAL: Allows ListView to live inside a ScrollView
-                  physics: const NeverScrollableScrollPhysics(), // ✅ Disables internal scrolling
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4).copyWith(bottom: 100), // Extra bottom padding
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4).copyWith(bottom: 100),
                   itemCount: controller.ordersForSelectedDate.length,
                   itemBuilder: (context, index) {
                     var order = controller.ordersForSelectedDate[index];
                     Color statusColor = _getStatusColor(order.status);
 
                     return GestureDetector(
-                      onTap: () => Get.to(() => OrderApprovalScreen(order: order)),
+                      // ✅ FIXED ROUTING HERE TOO
+                      onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(16),
@@ -473,15 +557,18 @@ class OrderDeliverablesScreen extends StatelessWidget {
     );
   }
 
-  // Helper method for dynamic status colors
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
       case 'cutting': return Colors.orange;
-      case 'stitching': return Colors.amber;
       case 'printing': return Colors.indigo;
-      case 'packing': return Colors.purple;
-      case 'shipping': return Colors.teal;
+      case 'printed': return Colors.cyan;
+      case 'stitching': return Colors.amber;
+      case 'stitched': return Colors.brown;
+      case 'packing':
+      case 'packed': return Colors.purple;
+      case 'shipping':
+      case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;
       case 'completed': return Colors.green;
       case 'rejected': return Colors.red;
