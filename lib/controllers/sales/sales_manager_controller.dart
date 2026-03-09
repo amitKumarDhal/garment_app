@@ -214,7 +214,9 @@ class SalesManagerController extends GetxController {
           .where('orderDate', isLessThanOrEqualTo: endOfMonth)
           .get();
 
-      List<String> excludedStatuses = ['rejected', 'cancelled'];
+      // ✅ BUG FIXED: Added 'pending' and 'placed' so they don't inflate the stats
+      List<String> excludedStatuses = ['rejected', 'cancelled', 'pending', 'placed'];
+
       int validOrderCount = 0;
       double total = 0.0;
       int unitsCount = 0;
@@ -247,7 +249,7 @@ class SalesManagerController extends GetxController {
           ];
 
           if (revenueStatuses.contains(status)) {
-            // ✅ FIXED: Using robust parser for both values
+            // Using robust parser for both values
             double effRev = _parseAmount(data['effectiveRevenue']);
             double totalAmt = _parseAmount(data['totalAmount']);
 
@@ -298,7 +300,6 @@ class SalesManagerController extends GetxController {
       print("❌ STATS ERROR: $e");
     }
   }
-
   /// --- ACTIONS ---
   Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
