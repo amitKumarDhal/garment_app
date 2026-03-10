@@ -27,7 +27,7 @@ class DeliverablesController extends GetxController {
 
   // 2. GET "AT RISK" ORDERS
   List<OrderModel> get atRiskOrders {
-    List<String> safeStatuses = ['packed', 'shipping', 'shipped', 'delivered', 'completed', 'rejected'];
+    List<String> safeStatuses = ['shipping', 'shipped', 'delivered', 'completed', 'rejected'];
     DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
     var filtered = smController.activeOrders.where((order) {
@@ -52,7 +52,6 @@ class DeliverablesController extends GetxController {
 
     return filtered;
   }
-
   // 3. GET PRE-STITCHING QUEUE
   List<OrderModel> get notStitchedOrders {
     final preStitchingStatuses = ['approved', 'cutting', 'printing', 'printed'];

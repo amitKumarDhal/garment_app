@@ -13,7 +13,7 @@ class SalesManagerController extends GetxController {
   // ✅ Centralized master list of production stages
   final List<String> productionStages = [
     'Approved', 'Cutting', 'Printing', 'Printed',
-    'Stitching', 'Stitched', 'Packing', 'Packed', 'Shipped', 'Delivered'
+    'Stitching', 'Stitched', 'Packing', 'Packed', 'Shipping', 'Shipped', 'Delivered'
   ];
 
   // --- Observables ---

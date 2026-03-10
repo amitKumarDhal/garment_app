@@ -279,7 +279,6 @@ class SalesManagerHome extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-// ✅ SLIM SIDE-BY-SIDE CARDS: Units Sold & Deliverables
               Row(
                 children: [
                   // --- 1. TOTAL UNITS SOLD CARD ---
@@ -393,7 +392,6 @@ class SalesManagerHome extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              // ✅ NEW: DELETION REQUESTS (Only shows if there are pending requests)
               Obx(() {
                 if (controller.deletionRequests.isEmpty) return const SizedBox.shrink();
 
@@ -518,6 +516,30 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
+
+  // --- RANK CALCULATION HELPERS ---
+  String _getRankBadge(double sales, bool isSM) {
+    if (isSM) {
+      if (sales >= 200000) return "SSM"; // Senior Sales Manager
+      return "SM";       // Sales Manager
+    } else {
+      if (sales >= 150000) return "SE";  // Sales Executive
+      if (sales >= 100000) return "SSA"; // Senior Sales Associate
+      if (sales >= 50000) return "SA";   // Sales Associate
+      return "JSA";      // Junior Sales Associate
+    }
+  }
+
+  Color _getRankColor(String rank) {
+    switch (rank) {
+      case "SSM": return Colors.deepPurple;
+      case "SM": return Colors.purple;
+      case "SE": return Colors.teal;
+      case "SSA": return Colors.blue;
+      case "SA": return Colors.orange;
+      case "JSA": default: return Colors.blueGrey;
+    }
+  }
   /// ✅ NEW: DELETION REQUEST CARD UI
   Widget _buildDeletionRequestCard(BuildContext context, OrderModel order, bool isDark, SalesManagerController controller) {
     return GestureDetector(

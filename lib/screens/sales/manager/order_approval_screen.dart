@@ -264,56 +264,76 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
             if (currentStatus != 'Placed' && currentStatus != 'Pending') const SizedBox(height: 20),
 
             // --- 4. DYNAMIC ACTION AREA ---
-            // --- 4. DYNAMIC ACTION AREA ---
-            if (currentStatus == 'Placed' || currentStatus == 'Pending') ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _confirmAction(context, "Reject", Colors.red, () {
-                        controller.rejectOrder(order.id!);
-                        Get.back();
-                      }),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18), side: const BorderSide(color: Colors.redAccent, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                      child: const Text("REJECT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _confirmAction(context, "Approve", Colors.green, () {
-                          controller.approveOrderWithMargin(order.id!, 0.0, order.totalAmount);
-                          setState(() => currentStatus = 'Approved');
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), elevation: 4, shadowColor: Colors.green.withValues(alpha: 0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                      child: const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
-                    ),
-                  ),
-                ],
-              ),
-            ] else ...[
-              // ✅ CLEANED UP: No more dropdown here. Just a clean status message.
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: isDark ? Colors.white10 : Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16)
-                ),
-                child: Center(
-                  child: Text(
-                    "Order is currently ${currentStatus.toUpperCase()}",
-                    style: TextStyle(
-                        color: isDark ? Colors.greenAccent : Colors.green,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            Builder(
+                builder: (context) {
+                  final String statusCheck = currentStatus.toLowerCase();
+
+                  if (statusCheck == 'placed' || statusCheck == 'pending') {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _confirmAction(context, "Reject", Colors.red, () async {
+                              await controller.rejectOrder(widget.order.id!);
+                              setState(() => currentStatus = 'Rejected');
+                              // Get.back(); // Uncomment if you want to close the screen immediately
+                            }),
+                            style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 18),
+                                side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))
+                            ),
+                            child: const Text("REJECT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              _confirmAction(context, "Approve", Colors.green, () async {
+                                await controller.approveOrderWithMargin(widget.order.id!, 0.0, widget.order.totalAmount);
+                                setState(() => currentStatus = 'Approved');
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 18),
+                                elevation: 4,
+                                shadowColor: Colors.green.withValues(alpha: 0.4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))
+                            ),
+                            child: const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    final bool isRejected = statusCheck == 'rejected';
+                    final Color themeColor = isRejected ? Colors.red : Colors.green;
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : themeColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: themeColor.withValues(alpha: 0.2))
+                      ),
+                      child: Center(
+                        child: Text(
+                          "Order is currently ${currentStatus.toUpperCase()}",
+                          style: TextStyle(
+                              color: isDark ? (isRejected ? Colors.redAccent : Colors.greenAccent) : themeColor,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                }
+            ),
 
             const SizedBox(height: 30),
           ],

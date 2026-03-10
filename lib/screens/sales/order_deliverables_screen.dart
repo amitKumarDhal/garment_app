@@ -44,172 +44,159 @@ class OrderDeliverablesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. PIPELINE OVERVIEW ---
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: Text(
-                        "FLOOR PIPELINE",
-                        style: TextStyle(
-                          color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                    Obx(() {
-                      final pipeline = controller.stageUnitBreakdown;
-                      return SizedBox(
-                        height: 95,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          itemCount: pipeline.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 12),
-                          itemBuilder: (context, index) {
-                            final stage = pipeline[index];
-                            final int count = stage['count'];
-                            final bool isEmpty = count == 0;
-                            final Color stageColor = stage['color'];
-
-                            return Container(
-                              width: 100,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isEmpty
-                                    ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
-                                    : stageColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isEmpty
-                                      ? (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05))
-                                      : stageColor.withValues(alpha: 0.3),
-                                  width: isEmpty ? 1 : 1.5,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        stage['icon'],
-                                        size: 18,
-                                        color: isEmpty ? Colors.grey.shade400 : stageColor,
-                                      ),
-                                      Text(
-                                        "$count",
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w900,
-                                          color: isEmpty ? Colors.grey.shade500 : (isDark ? Colors.white : Colors.black87),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    stage['name'].toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                      color: isEmpty ? Colors.grey.shade500 : stageColor,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-
               // --- 2. ACTIONABLE SUMMARY CARDS ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    // Secondary Metric: Pre-Stitching
-                    Expanded(
-                      child: Obx(() {
-                        int units = controller.totalNotStitchedUnits;
-                        int orders = controller.notStitchedOrders.length;
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
-                            boxShadow: [if (!isDark) BoxShadow(color: Colors.blue.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), shape: BoxShape.circle),
-                                child: const Icon(Icons.cut_rounded, size: 16, color: Colors.blue),
-                              ),
-                              const SizedBox(height: 12),
-                              Text("$units", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, height: 1.1)),
-                              const SizedBox(height: 4),
-                              Text("Pre-Stitching", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
-                              Text("$orders Orders", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
-                            ],
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(width: 16),
-                    // Primary Metric: Ready to Ship (High Emphasis)
-                    Expanded(
-                      child: Obx(() {
-                        int units = controller.totalReadyUnits;
-                        int orders = controller.readyForDispatchOrders.length;
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch, // Makes both cards equal height
+                    children: [
+                      // --- Card 1: Pre-Stitching Breakdown ---
+                      Expanded(
+                        child: Obx(() {
+                          int units = controller.totalNotStitchedUnits;
+                          int orders = controller.notStitchedOrders.length;
+                          final pipeline = controller.stageUnitBreakdown;
+
+                          // ✅ Filter only the pre-stitching stages for the breakdown
+                          final preStitchStages = pipeline.where((s) =>
+                              ['Approved', 'Cutting', 'Printing', 'Printed'].contains(s['name'])
+                          ).toList();
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                              boxShadow: [if (!isDark) BoxShadow(color: Colors.blue.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
                             ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [BoxShadow(color: const Color(0xFF0083B0).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-                                child: const Icon(Icons.local_shipping_rounded, size: 16, color: Colors.white),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top Header & Icon
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), shape: BoxShape.circle),
+                                      child: const Icon(Icons.cut_rounded, size: 16, color: Colors.blue),
+                                    ),
+                                    Text("$orders Orders", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Total Metric
+                                Text("$units", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, height: 1.1)),
+                                const SizedBox(height: 4),
+                                Text("Pre-Stitching", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+
+                                const SizedBox(height: 12),
+                                Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), height: 1),
+                                const SizedBox(height: 12),
+
+                                // ✅ Line by Line Status Breakdown
+                                ...preStitchStages.map((stage) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(width: 6, height: 6, decoration: BoxDecoration(color: stage['color'], shape: BoxShape.circle)),
+                                            const SizedBox(width: 6),
+                                            Text(stage['name'], style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                        Text("${stage['count']}", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black87)),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          );
+                        }),
+                      ),
+
+                      const SizedBox(width: 16),
+
+                      // --- Card 2: Post-Stitching & Ready to Ship Breakdown ---
+                      Expanded(
+                        child: Obx(() {
+                          int units = controller.totalReadyUnits;
+                          int orders = controller.readyForDispatchOrders.length;
+                          final pipeline = controller.stageUnitBreakdown;
+
+                          // ✅ Filter the post-stitching stages to balance the UI and provide full tracking
+                          final postStitchStages = pipeline.where((s) =>
+                              ['Stitching', 'Stitched', 'Packing', 'Packed'].contains(s['name'])
+                          ).toList();
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                              const SizedBox(height: 12),
-                              Text("$units", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1)),
-                              const SizedBox(height: 4),
-                              const Text("Ready to Ship", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-                              Text("$orders Orders", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70)),
-                            ],
-                          ),
-                        );
-                      }),
-                    ),
-                  ],
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [BoxShadow(color: const Color(0xFF0083B0).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top Header & Icon
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                                      child: const Icon(Icons.local_shipping_rounded, size: 16, color: Colors.white),
+                                    ),
+                                    Text("$orders Orders", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white70)),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Total Metric
+                                Text("$units", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1)),
+                                const SizedBox(height: 4),
+                                const Text("Ready to Ship", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+
+                                const SizedBox(height: 12),
+                                Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+                                const SizedBox(height: 12),
+
+                                // ✅ Line by Line Status Breakdown
+                                ...postStitchStages.map((stage) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white70, shape: BoxShape.circle)),
+                                            const SizedBox(width: 6),
+                                            Text(stage['name'], style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500)),
+                                          ],
+                                        ),
+                                        Text("${stage['count']}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -222,171 +209,234 @@ class OrderDeliverablesScreen extends StatelessWidget {
                 var sortedOrders = List.from(controller.atRiskOrders);
                 DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.redAccent.shade400, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            "AT RISK (${sortedOrders.length})",
-                            style: TextStyle(
-                              color: Colors.redAccent.shade400,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFFF9F9),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4), width: 1),
                     ),
-                    const SizedBox(height: 12),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 250),
-                      child: Scrollbar(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          physics: const BouncingScrollPhysics(),
-                          shrinkWrap: true,
-                          itemCount: sortedOrders.length,
-                          itemBuilder: (context, index) {
-                            var order = sortedOrders[index];
-                            DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
-                            int daysLeft = deadline.difference(today).inDays;
-                            bool isOverdue = daysLeft < 0;
-                            bool isDueToday = daysLeft == 0;
-
-                            return GestureDetector(
-                              onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                                  boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      border: Border(left: BorderSide(color: Colors.redAccent.shade400, width: 4)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // --- HEADER ---
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // ✅ FIX 1: Wrap Title in Expanded so it doesn't push the badge off-screen
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.error_outline_rounded, color: Colors.redAccent.shade400, size: 18),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        "CRITICAL DEADLINES",
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.redAccent.shade400,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                          letterSpacing: 1.0,
+                                        ),
+                                      ),
                                     ),
-                                    padding: const EdgeInsets.all(16),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8), // Gap
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.shade400,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  "${sortedOrders.length} URGENT",
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Divider(color: isDark ? Colors.white10 : Colors.red.withValues(alpha: 0.1), height: 1),
+
+                        // --- SCROLLABLE LIST ---
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 280),
+                          child: Scrollbar(
+                            child: ListView.separated(
+                              padding: EdgeInsets.zero,
+                              physics: const BouncingScrollPhysics(),
+                              shrinkWrap: true,
+                              itemCount: sortedOrders.length,
+                              separatorBuilder: (context, index) => Divider(
+                                color: isDark ? Colors.white10 : Colors.red.withValues(alpha: 0.05),
+                                height: 1,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                              itemBuilder: (context, index) {
+                                var order = sortedOrders[index];
+                                DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
+                                int daysLeft = deadline.difference(today).inDays;
+
+                                bool isOverdue = daysLeft < 0;
+                                bool isDueToday = daysLeft == 0;
+                                bool isPacked = order.status.toLowerCase() == 'packed';
+
+                                Color alertColor = isPacked
+                                    ? Colors.green
+                                    : (isOverdue ? Colors.redAccent : (isDueToday ? Colors.orange : Colors.amber));
+
+                                return GestureDetector(
+                                  onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                     child: Row(
                                       children: [
+                                        Container(
+                                          width: 3,
+                                          height: 32,
+                                          decoration: BoxDecoration(color: alertColor, borderRadius: BorderRadius.circular(2)),
+                                        ),
+                                        const SizedBox(width: 12),
+
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(
-                                                order.clientName,
-                                                style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 14),
-                                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                              RichText(
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                text: TextSpan(
+                                                  style: const TextStyle(fontFamily: 'Urbanist'),
+                                                  children: [
+                                                    TextSpan(
+                                                      text: "${order.manualOrderNo ?? order.id?.substring(0,5)} ",
+                                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                                                    ),
+                                                    TextSpan(
+                                                      text: "• ${order.clientName}",
+                                                      style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                "ID: ${order.manualOrderNo ?? order.id?.substring(0,5)} • Stuck in ${order.status.toUpperCase()}",
-                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500),
+                                              const SizedBox(height: 6),
+                                              // ✅ FIX: Replaced Flexible with a standard Row,
+                                              // and wrapped ONLY the text inside an Expanded.
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.inventory_2_outlined, size: 12, color: Colors.grey.shade500),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      "${order.quantity} Units stuck in ${order.status.toUpperCase()}",
+                                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
+                                        ),                                        const SizedBox(width: 8),
+
+                                        // ✅ RIGHT PILL
+                                        Builder(
+                                            builder: (context) {
+                                              String text = isPacked
+                                                  ? "READY: ${daysLeft < 0 ? '${daysLeft.abs()} LATE' : (daysLeft == 0 ? 'TODAY' : 'IN $daysLeft DAYS')}"
+                                                  : (isOverdue ? "${daysLeft.abs()} DAYS LATE" : (isDueToday ? "DUE TODAY" : "In $daysLeft days"));
+
+                                              if (isOverdue || isDueToday || isPacked) {
+                                                return Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: alertColor.withValues(alpha: 0.05),
+                                                    border: Border.all(color: alertColor.withValues(alpha: 0.5)),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    text.toUpperCase(),
+                                                    style: TextStyle(color: alertColor, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                                  ),
+                                                );
+                                              } else {
+                                                return Text(text, style: TextStyle(color: alertColor, fontSize: 10, fontWeight: FontWeight.w800));
+                                              }
+                                            }
                                         ),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                  color: (isOverdue ? Colors.red : (isDueToday ? Colors.orange : Colors.amber)).withValues(alpha: 0.1),
-                                                  borderRadius: BorderRadius.circular(6)
-                                              ),
-                                              child: Text(
-                                                isOverdue ? "${daysLeft.abs()} DAYS LATE" : (isDueToday ? "DUE TODAY" : "IN $daysLeft DAYS"),
-                                                style: TextStyle(
-                                                  color: isOverdue ? Colors.red : (isDueToday ? Colors.orange.shade700 : Colors.amber.shade700),
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w900,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.chevron_right_rounded, color: Colors.grey.shade600, size: 18),
                                       ],
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
+                                );
+                              },
+                            ),
+                          ),
                         ),
-                      ),
+                        Divider(color: isDark ? Colors.white10 : Colors.red.withValues(alpha: 0.1), height: 1),
+                        // --- FOOTER ---
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: Text(
+                              "Tap any order to update production status",
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 10, fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                  ],
+                  ),
                 );
               }),
 
-              // --- 4. DELIVERY SCHEDULE ---
+              /// --- 4. DELIVERY SCHEDULE (Compact Version) ---
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
                   border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.transparent)),
-                  boxShadow: [
-                    if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 20, offset: const Offset(0, -4))
-                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // --- SLIM HEADER ---
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 32, 24, 20),
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Delivery Schedule",
-                                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Obx(() => Text(
-                                DateFormat('EEEE, dd MMM').format(controller.selectedDate.value),
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5),
-                              )),
-                            ],
-                          ),
-                          Obx(() => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(20)
-                            ),
-                            child: Text(
-                              "${controller.ordersForSelectedDate.length} Targets",
-                              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w800, fontSize: 11),
-                            ),
+                          Obx(() => Text(
+                            DateFormat('EEEE, dd MMM').format(controller.selectedDate.value),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
+                          )),
+                          Obx(() => Text(
+                            "${controller.ordersForSelectedDate.length} Targets",
+                            style: TextStyle(color: TColors.primary, fontWeight: FontWeight.w800, fontSize: 11),
                           ))
                         ],
                       ),
                     ),
 
-                    // Modern Pill Date Selector
+                    // --- COMPACT DATE SELECTOR ---
                     SizedBox(
-                      height: 80,
+                      height: 65, // Reduced from 80
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.symmetric(horizontal: 24),
-                        itemCount: 30, // 30 days window
+                        itemCount: 30,
                         itemBuilder: (context, index) {
                           DateTime date = DateTime.now().subtract(const Duration(days: 3)).add(Duration(days: index));
                           bool isToday = date.day == DateTime.now().day && date.month == DateTime.now().month;
@@ -398,15 +448,15 @@ class OrderDeliverablesScreen extends StatelessWidget {
 
                             return GestureDetector(
                               onTap: () => controller.selectDate(date),
-                              child: Container(
-                                width: 55,
-                                margin: const EdgeInsets.only(right: 12),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 45, // Narrower pills
+                                margin: const EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? Colors.black87 : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(30), // Pill shape
+                                  color: isSelected ? TColors.primary : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected ? Colors.black87 : (isDark ? Colors.white10 : Colors.grey.shade300),
-                                    width: 1.5,
+                                    color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.grey.shade200),
                                   ),
                                 ),
                                 child: Column(
@@ -414,27 +464,14 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                   children: [
                                     Text(
                                       DateFormat('EEE').format(date).toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade500 : Colors.grey.shade400),
-                                      ),
+                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isSelected ? Colors.white70 : Colors.grey),
                                     ),
-                                    const SizedBox(height: 4),
                                     Text(
                                       DateFormat('dd').format(date),
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w900,
-                                        color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87),
-                                      ),
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87)),
                                     ),
                                     if (isToday && !isSelected)
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 4),
-                                        width: 4, height: 4,
-                                        decoration: BoxDecoration(color: TColors.primary, shape: BoxShape.circle),
-                                      )
+                                      Container(margin: const EdgeInsets.only(top: 2), width: 3, height: 3, decoration: const BoxDecoration(color: TColors.primary, shape: BoxShape.circle))
                                   ],
                                 ),
                               ),
@@ -444,36 +481,20 @@ class OrderDeliverablesScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
-                    // Order List
+                    // --- HIGH-DENSITY ORDER LIST ---
                     Obx(() {
                       if (controller.ordersForSelectedDate.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 40, bottom: 80),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade100, shape: BoxShape.circle),
-                                  child: Icon(Icons.done_all_rounded, size: 32, color: Colors.grey.shade400),
-                                ),
-                                const SizedBox(height: 16),
-                                Text("Schedule Clear", style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w800, fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text("No targets due for this date.", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        );
+                        return const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: Text("No targets for today", style: TextStyle(color: Colors.grey, fontSize: 12))));
                       }
 
-                      return ListView.builder(
+                      return ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 24).copyWith(bottom: 120),
+                        padding: const EdgeInsets.symmetric(horizontal: 24).copyWith(bottom: 100),
                         itemCount: controller.ordersForSelectedDate.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8), // Tighter spacing
                         itemBuilder: (context, index) {
                           var order = controller.ordersForSelectedDate[index];
                           Color statusColor = _getStatusColor(order.status);
@@ -481,89 +502,41 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           return GestureDetector(
                             onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
                             child: Container(
-                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF121212) : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
+                                color: isDark ? const Color(0xFF121212) : Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
-                                boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    border: Border(left: BorderSide(color: statusColor, width: 5)),
+                              child: Row(
+                                children: [
+                                  // Status Indicator Dot
+                                  Container(width: 4, height: 30, decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(2))),
+                                  const SizedBox(width: 12),
+
+                                  // Client & Product Info
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(order.clientName, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        Text("${order.quantity} Units • ${order.productName}", style: TextStyle(color: Colors.grey.shade500, fontSize: 10, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+
+                                  // Price & Status Label
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              order.clientName,
-                                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87),
-                                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              order.status.toUpperCase(),
-                                              style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)),
-                                            child: Icon(Icons.inventory_2_rounded, size: 14, color: Colors.grey.shade600),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  "${order.quantity} Units",
-                                                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12, fontWeight: FontWeight.w800),
-                                                ),
-                                                Text(
-                                                  order.productName,
-                                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w600),
-                                                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                "Value",
-                                                style: TextStyle(color: Colors.grey.shade500, fontSize: 10, fontWeight: FontWeight.w600),
-                                              ),
-                                              Text(
-                                                currencyFormat.format(order.totalAmount),
-                                                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14, fontWeight: FontWeight.w900),
-                                              ),
-                                            ],
-                                          )
-                                        ],
-                                      ),
+                                      Text(currencyFormat.format(order.totalAmount), style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13, fontWeight: FontWeight.w900)),
+                                      const SizedBox(height: 2),
+                                      Text(order.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.w900)),
                                     ],
                                   ),
-                                ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey.shade400),
+                                ],
                               ),
                             ),
                           );
