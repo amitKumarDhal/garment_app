@@ -24,23 +24,25 @@ class SalesManagerController extends GetxController {
 
   int get urgentDeliverablesCount {
     List<String> safeStatuses = [
-      'packed', 'packing', 'shipped', 'shipping',
-      'delivered', 'completed', 'rejected', 'deleted', 'cancelled'
+      'shipping', 'shipped', 'delivered', 'completed', 'rejected', 'deleted', 'cancelled'
     ];
 
-    DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    DateTime now = DateTime.now();
+    DateTime today = DateTime(now.year, now.month, now.day);
 
     return activeOrders.where((order) {
-      String status = (order.status).toLowerCase();
+      String status = (order.status).toLowerCase().trim();
+
+      // If the order is already in a "Safe" stage, ignore it
       if (safeStatuses.contains(status)) return false;
 
       DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
       int daysLeft = deadline.difference(today).inDays;
 
+      // Match the "At Risk" logic (3 days or less, including overdue)
       return daysLeft <= 3;
     }).length;
   }
-
   var managerName = 'Manager'.obs;
   var activeOrders = <OrderModel>[].obs;
   var completedOrders = <OrderModel>[].obs;
@@ -274,16 +276,35 @@ class SalesManagerController extends GetxController {
         String agentName = e.key;
         double currentSales = e.value;
 
+        // 1. Determine if they are a Manager based on our Map
         bool isSM = managerMap[agentName] == true;
-        double targetAmount = isSM ? 150000.0 : 100000.0;
+
+        // 2. Assign the Rank Label
+        // We force 'SM' if they are a manager, otherwise we calculate based on sales
+        String rankLabel = "JSA";
+        double targetAmount = 100000.0; // Default JSA Target
+
+        if (isSM) {
+          rankLabel = "SM";
+          targetAmount = 150000.0;
+        } else {
+          // Associate Logic
+          if (currentSales >= 200000) {
+            rankLabel = "SC";
+            targetAmount = 200000.0;
+          } else if (currentSales >= 150000) {
+            rankLabel = "SSA";
+            targetAmount = 150000.0;
+          } else if (currentSales >= 100000) {
+            rankLabel = "JSA"; // Or keep JSA as per your 1L target rule
+            targetAmount = 100000.0;
+          }
+        }
 
         double progress = currentSales / targetAmount;
         String greeting = "";
-
-        if (progress >= 1.5) greeting = "Unstoppable! 🚀";
-        else if (progress >= 1.0) greeting = "Target Smashed! 🏆";
+        if (progress >= 1.0) greeting = "Target Smashed! 🏆";
         else if (progress >= 0.8) greeting = "Almost there! 🔥";
-        else if (progress >= 0.5) greeting = "Halfway point 💪";
         else greeting = "Keep Pushing 📉";
 
         return {
@@ -294,6 +315,7 @@ class SalesManagerController extends GetxController {
           'greeting': greeting,
           'count': countMap[agentName] ?? 0,
           'isSM': isSM,
+          'rank': rankLabel, // ✅ THIS IS THE KEY FIELD THE UI NEEDS
         };
       }).toList();
     } catch (e) {

@@ -6,24 +6,21 @@ import 'package:get/get.dart';
 class LoginController extends GetxController {
   static LoginController get instance => Get.find();
 
-  // --- Controllers & Keys ---
   final email = TextEditingController();
   final password = TextEditingController();
   final loginFormKey = GlobalKey<FormState>();
 
-  // --- Observables ---
   final isLoading = false.obs;
   final hidePassword = true.obs;
   final selectedRole = 'Worker'.obs;
 
-  // --- Roles List (Must match database strings) ---
   final List<String> roles = [
     'Admin',
     'Sales Manager',
     'Shift Supervisor',
     'Unit Supervisor',
     'Worker',
-    'Sales Associate', // ✅ Updated Name
+    'Sales Associate',
   ];
 
   final Map<String, IconData> roleIcons = {
@@ -35,7 +32,6 @@ class LoginController extends GetxController {
     'Sales Associate': Icons.support_agent,
   };
 
-  // --- Login Logic ---
   Future<void> login() async {
     if (!loginFormKey.currentState!.validate()) return;
 
@@ -57,7 +53,10 @@ class LoginController extends GetxController {
       }
 
       if (userData != null) {
-        final String dbRole = (userData['role'] ?? userData['Role'] ?? 'Worker').toString().trim();
+        // ✅ MAGIC FIX: Convert all database keys to lowercase in memory
+        final safeData = userData.map((key, value) => MapEntry(key.toLowerCase(), value));
+
+        final String dbRole = (safeData['role'] ?? 'Worker').toString().trim();
         final String selectedDropdownRole = selectedRole.value.trim();
 
         bool isRoleMismatch = dbRole.toLowerCase() != selectedDropdownRole.toLowerCase();
@@ -84,6 +83,7 @@ class LoginController extends GetxController {
       isLoading.value = false;
     }
   }
+
   void _showError(String message) {
     Get.snackbar(
       "Access Denied",

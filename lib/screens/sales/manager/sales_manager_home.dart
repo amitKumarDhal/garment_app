@@ -50,13 +50,30 @@ class SalesManagerHome extends StatelessWidget {
                         fontWeight: FontWeight.bold
                     )
                 ),
-                Text(
-                    controller.managerName.value,
-                    style: TextStyle(
-                        color: isDark ? Colors.blue.shade200 : TColors.primary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700
-                    )
+                Row(
+                  children: [
+                    Text(
+                        controller.managerName.value,
+                        style: TextStyle(
+                            color: isDark ? Colors.blue.shade200 : TColors.primary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800
+                        )
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurpleAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.deepPurpleAccent.withValues(alpha: 0.5)),
+                      ),
+                      child: const Text(
+                        "SM",
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.deepPurpleAccent),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             )),
@@ -80,9 +97,9 @@ class SalesManagerHome extends StatelessWidget {
                     width: 40, height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark ? TColors.textWhite.withValues(alpha:0.1) : TColors.primary.withValues(alpha:0.1),
+                      color: isDark ? TColors.textWhite.withValues(alpha: 0.1) : TColors.primary.withValues(alpha: 0.1),
                       border: Border.all(
-                          color: isDark ? Colors.white.withValues(alpha:0.1) : TColors.primary.withValues(alpha:0.2),
+                          color: isDark ? Colors.white.withValues(alpha: 0.1) : TColors.primary.withValues(alpha: 0.2),
                           width: 1
                       ),
                     ),
@@ -188,7 +205,6 @@ class SalesManagerHome extends StatelessWidget {
                         end: Alignment.topCenter,
                         colors: [Color(0xFFFFB74D), Color(0xFFF57C00)]
                     ),
-                    // ✅ MODIFIED: Radius set to 22 for a slightly square, modern look
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -199,12 +215,11 @@ class SalesManagerHome extends StatelessWidget {
                     ],
                   ),
                   child: ClipRRect(
-                    // ✅ MODIFIED: Matches outer container radius
                     borderRadius: BorderRadius.circular(16),
                     child: Stack(
                       children: [
                         Positioned(
-                            top: -11, // Slightly adjusted for radius 22
+                            top: -11,
                             right: -11,
                             child: CircleAvatar(
                                 radius: 50,
@@ -276,12 +291,10 @@ class SalesManagerHome extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
 
               Row(
                 children: [
-                  // --- 1. TOTAL UNITS SOLD CARD ---
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -296,15 +309,12 @@ class SalesManagerHome extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          // Left Icon
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.12), shape: BoxShape.circle),
                             child: const Icon(Icons.inventory_2_rounded, color: Colors.blueAccent, size: 20),
                           ),
                           const SizedBox(width: 10),
-
-                          // Right Text Data
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,9 +343,8 @@ class SalesManagerHome extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(width: 12), // Space between the two cards
+                  const SizedBox(width: 12),
 
-                  // --- 2. ORDER DELIVERABLES CARD ---
                   Expanded(
                     child: GestureDetector(
                       onTap: () => Get.to(() => const OrderDeliverablesScreen()),
@@ -355,15 +364,12 @@ class SalesManagerHome extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            // Left Icon
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(color: Colors.purpleAccent.withValues(alpha: 0.2), shape: BoxShape.circle),
                               child: const Icon(Icons.calendar_month_rounded, color: Colors.purple, size: 20),
                             ),
                             const SizedBox(width: 10),
-
-                            // Right Text Data
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,6 +398,7 @@ class SalesManagerHome extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+
               Obx(() {
                 if (controller.deletionRequests.isEmpty) return const SizedBox.shrink();
 
@@ -400,35 +407,14 @@ class SalesManagerHome extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                            Icons.warning_amber_rounded,
-                            color: Colors.redAccent,
-                            size: 20
-                        ),
+                        const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
                         const SizedBox(width: 8),
-                        const Text(
-                            "Pending Deletions",
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.redAccent
-                            )
-                        ),
+                        const Text("Pending Deletions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.redAccent)),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(10)
-                          ),
-                          child: Text(
-                              controller.deletionRequests.length.toString(),
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold
-                              )
-                          ),
+                          decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(10)),
+                          child: Text(controller.deletionRequests.length.toString(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                         )
                       ],
                     ),
@@ -449,37 +435,24 @@ class SalesManagerHome extends StatelessWidget {
                 );
               }),
 
-              // --- 4. REQUIRES ACTION ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                      "Requires Action",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900
-                      )
-                  ),
+                  const Text("Requires Action", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                   TextButton(
                     onPressed: () => Get.to(() => const SalesManagerApprovals()),
-                    style: TextButton.styleFrom(
-                      // ✅ FIXED: Now it will be White in Dark Mode, and Primary Purple in Light Mode
-                        foregroundColor: isDark ? TColors.light : TColors.dark,
-                        padding: EdgeInsets.zero
-                    ),
+                    style: TextButton.styleFrom(foregroundColor: isDark ? TColors.light : TColors.dark, padding: EdgeInsets.zero),
                     child: const Row(
                       children: [
-                        Text(
-                            "See All",
-                            style: TextStyle(fontWeight: FontWeight.bold)
-                        ),
+                        Text("See All", style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(width: 4),
                         Icon(Icons.arrow_forward_rounded, size: 14),
                       ],
                     ),
                   ),
                 ],
-              ),              const SizedBox(height: 8),
+              ),
+              const SizedBox(height: 8),
               Obx(() {
                 if (controller.pendingOrders.isEmpty) {
                   return _buildEmptyState(isDark, "No pending orders", Icons.check_circle_outline);
@@ -498,17 +471,7 @@ class SalesManagerHome extends StatelessWidget {
               }),
               const SizedBox(height: 32),
 
-              // --- 5. TOP ASSOCIATES ---
-              Obx(() => Text(
-                  "Top Associates (${DateFormat('MMMM').format(controller.selectedMonth.value)})",
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900
-                  )
-              )),
-              const SizedBox(height: 16),
-
-              _buildTeamLeaderboard(isDark, controller),
+              _buildTopAssociatesLeaderboard(context, isDark, controller),
             ],
           ),
         ),
@@ -516,31 +479,225 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
+  Widget _buildTopAssociatesLeaderboard(BuildContext context, bool isDark, SalesManagerController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.bar_chart_rounded, color: Colors.orange, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Team Leaderboard",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
-  // --- RANK CALCULATION HELPERS ---
-  String _getRankBadge(double sales, bool isSM) {
-    if (isSM) {
-      if (sales >= 200000) return "SSM"; // Senior Sales Manager
-      return "SM";       // Sales Manager
-    } else {
-      if (sales >= 150000) return "SE";  // Sales Executive
-      if (sales >= 100000) return "SSA"; // Senior Sales Associate
-      if (sales >= 50000) return "SA";   // Sales Associate
-      return "JSA";      // Junior Sales Associate
-    }
+          Obx(() {
+            if (controller.topAgents.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 30),
+                  child: Text("No sales recorded this month.", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 100),
+              itemCount: controller.topAgents.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final agent = controller.topAgents[index];
+                int rankNum = index + 1;
+                final String name = agent['name'];
+                final String formattedAmt = agent['formatted'];
+                final double progress = agent['progress'];
+                final int ordersCount = agent['count'];
+
+                final String rankBadge = agent['rank'] ?? 'JSA';
+                final Color badgeColor = _getRankColor(rankBadge);
+
+                final double displayProgress = progress.clamp(0.0, 1.0);
+                String percentText = "${(progress * 100).toInt()}%";
+
+                List<Color> rankGradient;
+                Color rankBorderColor;
+                Color rankTextColor;
+
+                if (rankNum == 1) {
+                  rankGradient = [const Color(0xFFFFD700), const Color(0xFFF57F17)];
+                  rankBorderColor = const Color(0xFFFFD700).withValues(alpha: 0.5);
+                  rankTextColor = Colors.white;
+                } else if (rankNum == 2) {
+                  rankGradient = [const Color(0xFFB0BEC5), const Color(0xFF78909C)];
+                  rankBorderColor = const Color(0xFFB0BEC5).withValues(alpha: 0.5);
+                  rankTextColor = Colors.white;
+                } else if (rankNum == 3) {
+                  rankGradient = [const Color(0xFFD4A373), const Color(0xFF8D6E63)];
+                  rankBorderColor = const Color(0xFFD4A373).withValues(alpha: 0.5);
+                  rankTextColor = Colors.white;
+                } else {
+                  rankGradient = isDark ? [const Color(0xFF3A3A3C), const Color(0xFF2C2C2E)] : [const Color(0xFFE5E5EA), const Color(0xFFD1D1D6)];
+                  rankBorderColor = isDark ? Colors.white10 : Colors.black12;
+                  rankTextColor = isDark ? Colors.white : Colors.black87;
+                }
+
+                Color progressColor = progress >= 0.8 ? Colors.green : progress >= 0.5 ? Colors.amber : Colors.redAccent;
+
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: rankBorderColor, width: rankNum <= 3 ? 1.5 : 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 54, height: 54,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: rankGradient),
+                              boxShadow: [
+                                if (rankNum <= 3) BoxShadow(color: rankGradient.last.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                "#$rankNum",
+                                style: TextStyle(color: rankTextColor, fontSize: 18, fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        name,
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: badgeColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+                                      ),
+                                      child: Text(
+                                        rankBadge,
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: badgeColor),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      formattedAmt,
+                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87),
+                                    ),
+                                    Text(
+                                      "  •  $ordersCount Orders",
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: progressColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: progressColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              percentText,
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: progressColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      Stack(
+                        children: [
+                          Container(
+                            height: 6,
+                            width: double.infinity,
+                            decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade200, borderRadius: BorderRadius.circular(10)),
+                          ),
+                          LayoutBuilder(
+                              builder: (context, constraints) {
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 1000),
+                                  curve: Curves.easeOutCubic,
+                                  height: 6,
+                                  width: constraints.maxWidth * displayProgress,
+                                  decoration: BoxDecoration(
+                                      color: progressColor,
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(color: progressColor.withValues(alpha: 0.4), blurRadius: 4)
+                                      ]
+                                  ),
+                                );
+                              }
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   Color _getRankColor(String rank) {
-    switch (rank) {
-      case "SSM": return Colors.deepPurple;
-      case "SM": return Colors.purple;
-      case "SE": return Colors.teal;
+    switch (rank.toUpperCase()) {
+      case "SM": return Colors.blueAccent;
+      case "SC": return Colors.teal;
       case "SSA": return Colors.blue;
-      case "SA": return Colors.orange;
-      case "JSA": default: return Colors.blueGrey;
+      case "JSA":
+      default: return Colors.indigoAccent;
     }
   }
-  /// ✅ NEW: DELETION REQUEST CARD UI
+
   Widget _buildDeletionRequestCard(BuildContext context, OrderModel order, bool isDark, SalesManagerController controller) {
     return GestureDetector(
       onTap: () => _showDeletionDialog(context, order, controller),
@@ -560,46 +717,18 @@ class SalesManagerHome extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                    order.manualOrderNo ?? "Unknown",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: Colors.redAccent
-                    )
-                ),
-                const Icon(
-                    Icons.delete_sweep_rounded,
-                    color: Colors.redAccent,
-                    size: 18
-                ),
+                Text(order.manualOrderNo ?? "Unknown", style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.redAccent)),
+                const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 18),
               ],
             ),
-            Text(
-                order.clientName,
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis
-            ),
-            Text(
-                "By: ${order.marketingPersonName}",
-                style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis
-            ),
+            Text(order.clientName, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text("By: ${order.marketingPersonName}", style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
     );
   }
 
-  /// ✅ NEW: APPROVE/DENY DIALOG
-  /// ✅ FIXED: Wrapped buttons in Expanded to prevent layout crash
   void _showDeletionDialog(BuildContext context, OrderModel order, SalesManagerController controller) {
     Get.defaultDialog(
       title: "Deletion Request",
@@ -608,44 +737,22 @@ class SalesManagerHome extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(
           children: [
-            Text(
-              "${order.marketingPersonName} wants to delete order ${order.manualOrderNo} (${order.clientName}).",
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14),
-            ),
+            Text("${order.marketingPersonName} wants to delete order ${order.manualOrderNo} (${order.clientName}).", textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 20),
             Row(
               children: [
-                // ✅ Expanded 1: Deny Button
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      controller.denyDeletionRequest(order);
-                      Get.back();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade800,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
+                    onPressed: () { controller.denyDeletionRequest(order); Get.back(); },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade800, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(vertical: 12)),
                     child: const Text("Deny", style: TextStyle(color: Colors.white)),
                   ),
                 ),
-
-                const SizedBox(width: 12), // Space between buttons
-
-                // ✅ Expanded 2: Approve Button
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      controller.approveDeletionRequest(order);
-                      Get.back();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
+                    onPressed: () { controller.approveDeletionRequest(order); Get.back(); },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(vertical: 12)),
                     child: const Text("Approve", style: TextStyle(color: Colors.white)),
                   ),
                 ),
@@ -656,74 +763,41 @@ class SalesManagerHome extends StatelessWidget {
       ),
     );
   }
-  // --- COMPACT STAGES ---
+
   Widget _buildCompactStage(String label, int count) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-            count.toString(),
-            style: const TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-                fontWeight: FontWeight.w900
-            )
-        ),
-        Text(
-            label,
-            style: TextStyle(
-                color: Colors.black.withValues(alpha:0.6),
-                fontSize: 11,
-                fontWeight: FontWeight.w700
-            )
-        ),
+        Text(count.toString(), style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w900)),
+        Text(label, style: TextStyle(color: Colors.black.withValues(alpha:0.6), fontSize: 11, fontWeight: FontWeight.w700)),
       ],
     );
   }
 
   Widget _buildDivider() {
-    return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 15),
-        height: 20,
-        width: 1.5,
-        color: Colors.black12
-    );
+    return Container(margin: const EdgeInsets.symmetric(horizontal: 15), height: 20, width: 1.5, color: Colors.black12);
   }
 
-  // --- APP BAR ICON ---
   Widget _buildCircularAction(IconData icon, bool isDark, VoidCallback onTap, {int notificationCount = 0}) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
           margin: const EdgeInsets.only(right: 8),
-          width: 40,
-          height: 40,
+          width: 40, height: 40,
           decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isDark ? TColors.textWhite.withValues(alpha:0.08) : TColors.textSecondary.withValues(alpha:0.12),
-              border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03),
-                  width: 0.5
-              )
+              border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03), width: 0.5)
           ),
           child: Material(
               color: Colors.transparent,
-              child: InkWell(
-                  borderRadius: BorderRadius.circular(50),
-                  onTap: onTap,
-                  child: Icon(
-                      icon,
-                      size: 18,
-                      color: isDark ? TColors.textWhite : TColors.textPrimary
-                  )
-              )
+              child: InkWell(borderRadius: BorderRadius.circular(50), onTap: onTap, child: Icon(icon, size: 18, color: isDark ? TColors.textWhite : TColors.textPrimary))
           ),
         ),
         if (notificationCount > 0)
           Positioned(
-            right: 2,
-            top: 2,
+            right: 2, top: 2,
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 700),
@@ -731,32 +805,9 @@ class SalesManagerHome extends StatelessWidget {
               builder: (context, value, child) => Transform.scale(scale: value, child: child),
               child: Container(
                 padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: isDark ? TColors.dark : Colors.white,
-                        width: 1.5
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.red.withValues(alpha:0.4),
-                          blurRadius: 6,
-                          spreadRadius: 1
-                      )
-                    ]
-                ),
+                decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.all(color: isDark ? TColors.dark : Colors.white, width: 1.5), boxShadow: [BoxShadow(color: Colors.red.withValues(alpha:0.4), blurRadius: 6, spreadRadius: 1)]),
                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: Center(
-                    child: Text(
-                        notificationCount > 9 ? '9+' : notificationCount.toString(),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold
-                        )
-                    )
-                ),
+                child: Center(child: Text(notificationCount > 9 ? '9+' : notificationCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
               ),
             ),
           ),
@@ -764,7 +815,6 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
-  // --- HORIZONTAL PENDING ORDER CARD ---
   Widget _buildHorizontalPendingOrderCard(BuildContext context, OrderModel order, bool isDark) {
     return Container(
       width: 280,
@@ -772,17 +822,8 @@ class SalesManagerHome extends StatelessWidget {
       decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            if (!isDark) BoxShadow(
-                color: Colors.black.withValues(alpha:0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 4)
-            )
-          ],
-          border: Border.all(
-              color: isDark ? Colors.white10 : Colors.grey.shade200,
-              width: 1
-          )
+          boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.04), blurRadius: 8, offset: const Offset(0, 4))],
+          border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1)
       ),
       child: Material(
         color: Colors.transparent,
@@ -803,44 +844,13 @@ class SalesManagerHome extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                              order.clientName,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: isDark ? Colors.white : Colors.black87
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis
-                          ),
+                          Text(order.clientName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 4),
-                          Text(
-                              "${order.quantity} Items • ${order.productName}",
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500]
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis
-                          ),
+                          Text("${order.quantity} Items • ${order.productName}", style: TextStyle(fontSize: 12, color: Colors.grey[500]), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
-                    Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                            color: Colors.orange.withValues(alpha:0.1),
-                            borderRadius: BorderRadius.circular(8)
-                        ),
-                        child: const Text(
-                            "NEW",
-                            style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold
-                            )
-                        )
-                    ),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.orange.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8)), child: const Text("NEW", style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold))),
                   ],
                 ),
                 Row(
@@ -850,35 +860,11 @@ class SalesManagerHome extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                            "Amount",
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[500]
-                            )
-                        ),
-                        Text(
-                            "₹${order.totalAmount.toStringAsFixed(0)}",
-                            style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 18,
-                                color: isDark ? Colors.white : Colors.black87
-                            )
-                        ),
+                        Text("Amount", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                        Text("₹${order.totalAmount.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
                       ],
                     ),
-                    Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                            color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.04),
-                            shape: BoxShape.circle
-                        ),
-                        child: Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 16,
-                            color: isDark ? Colors.white : Colors.black
-                        )
-                    ),
+                    Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.04), shape: BoxShape.circle), child: Icon(Icons.arrow_forward_rounded, size: 16, color: isDark ? Colors.white : Colors.black)),
                   ],
                 ),
               ],
@@ -889,300 +875,63 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
-  // --- LEADERBOARD ---
-  Widget _buildTeamLeaderboard(bool isDark, SalesManagerController controller) {
-    return Obx(() {
-      if (controller.isLoading.value && controller.topAgents.isEmpty) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (controller.topAgents.isEmpty) {
-        return _buildEmptyState(isDark, "No approved sales yet this month.", Icons.bar_chart);
-      }
-
-      return Column(
-        children: controller.topAgents.asMap().entries.map((entry) {
-          int index = entry.key;
-          var agent = entry.value;
-          int rank = index + 1;
-          double rawAmount = (agent['amount'] is num) ? (agent['amount'] as num).toDouble() : 0.0;
-          int orderCount = agent['count'] ?? 0;
-          String exactAmountDisplay = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(rawAmount);
-          double progress = agent['progress'] ?? 0.0;
-          String percentText = "${(progress * 100).toStringAsFixed(0)}%";
-
-          // Checks if the user is a Sales Manager
-          bool isSM = agent['isSM'] == true;
-
-          List<Color> rankGradient;
-          Color rankBorder;
-          Color textColor;
-
-          if (rank == 1) {
-            rankGradient = [const Color(0xFFFFD700), const Color(0xFFFFA000)];
-            rankBorder = const Color(0xFFFFD700);
-            textColor = Colors.white;
-          } else if (rank == 2) {
-            rankGradient = [const Color(0xFFB0BEC5), const Color(0xFF607D8B)];
-            rankBorder = const Color(0xFFCFD8DC);
-            textColor = Colors.white;
-          } else if (rank == 3) {
-            rankGradient = [const Color(0xFFCA8E5B), const Color(0xFF8D6E63)];
-            rankBorder = const Color(0xFFBCAAA4);
-            textColor = Colors.white;
-          } else {
-            rankGradient = isDark ? [const Color(0xFF3A3A3C), const Color(0xFF2C2C2E)] : [const Color(0xFFE5E5EA), const Color(0xFFD1D1D6)];
-            rankBorder = Colors.transparent;
-            textColor = isDark ? Colors.white : Colors.black87;
-          }
-
-          Color progressColor = progress >= 1.0 ? Colors.purpleAccent : progress >= 0.8 ? Colors.green : progress >= 0.5 ? Colors.amber : Colors.redAccent;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  if (!isDark) BoxShadow(
-                      color: Colors.black.withValues(alpha:0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3)
-                  )
-                ],
-                border: rank <= 3 ? Border.all(color: rankBorder.withValues(alpha:0.5), width: 1.5) : null
-            ),
-            child: Row(
-              children: [
-                Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: rankGradient
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                              color: rankGradient.last.withValues(alpha:0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3)
-                          )
-                        ]
-                    ),
-                    child: Center(
-                        child: Text(
-                            "#$rank",
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: textColor,
-                                shadows: [
-                                  Shadow(
-                                      color: Colors.black.withValues(alpha:0.25),
-                                      offset: const Offset(0, 1),
-                                      blurRadius: 2
-                                  )
-                                ]
-                            )
-                        )
-                    )
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // ✅ UPDATED: Wrapped Name in a Row to include the "SM" tag
-                          Row(
-                            children: [
-                              Text(
-                                  agent['name'] ?? "Unknown",
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: isDark ? Colors.white : Colors.black87
-                                  )
-                              ),
-                              if (isSM) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blueAccent.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
-                                  ),
-                                  child: const Text("SM", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
-                                ),
-                              ],
-                            ],
-                          ),
-                          Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                  color: progressColor.withValues(alpha:0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                      color: progressColor.withValues(alpha:0.2)
-                                  )
-                              ),
-                              child: Text(
-                                  percentText,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: progressColor
-                                  )
-                              )
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                              exactAmountDisplay,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                  color: isDark ? Colors.white : Colors.black87
-                              )
-                          ),
-                          const SizedBox(width: 8),
-                          Padding(
-                              padding: const EdgeInsets.only(bottom: 1),
-                              child: Text(
-                                  "•  $orderCount Orders",
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600
-                                  )
-                              )
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                              value: progress.clamp(0.0, 1.0),
-                              minHeight: 6,
-                              backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
-                              valueColor: AlwaysStoppedAnimation<Color>(progressColor)
-                          )
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      );
-    });
-  }
-  Widget _buildStatCard(BuildContext context, String title, String value, List<Color> gradientColors, IconData icon, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-            gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: gradientColors
-            ),
-            borderRadius: BorderRadius.circular(20)
+  Widget _buildStatCard(BuildContext context, String title, String value, List<Color> gradientColors, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: gradientColors,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle
-                ),
-                child: Icon(
-                    icon,
-                    color: Colors.black,
-                    size: 16
-                )
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top Icon Circle
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.black, size: 16),
+          ),
+          const SizedBox(height: 16),
+          // Main Value
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+              letterSpacing: -0.5,
             ),
-            const SizedBox(height: 16),
-            Text(
-                value,
-                style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black,
-                    letterSpacing: -0.5
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          // Title Label (Removed the Row and the Arrow Icon)
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                    child: Text(
-                        title,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis
-                    )
-                ),
-                Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black45, width: 1.0)
-                    ),
-                    child: const Icon(
-                        Icons.arrow_outward_rounded,
-                        color: Colors.black,
-                        size: 10
-                    )
-                ),
-              ],
-            ),
-          ],
-        ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
-
   Widget _buildEmptyState(bool isDark, String message, IconData icon) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-          color: isDark ? Colors.white10 : Colors.white,
-          borderRadius: BorderRadius.circular(16)
-      ),
-      child: Column(
-          children: [
-            Icon(icon, size: 40, color: Colors.grey[300]),
-            const SizedBox(height: 8),
-            Text(message, style: const TextStyle(color: Colors.grey))
-          ]
-      ),
+      decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.white, borderRadius: BorderRadius.circular(16)),
+      child: Column(children: [Icon(icon, size: 40, color: Colors.grey[300]), const SizedBox(height: 8), Text(message, style: const TextStyle(color: Colors.grey))]),
     );
   }
 
@@ -1202,30 +951,9 @@ class SalesManagerHome extends StatelessWidget {
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                      icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 18,
-                          color: isDark ? Colors.white : Colors.black
-                      ),
-                      onPressed: () => setState(() => selectedYear--)
-                  ),
-                  Text(
-                      selectedYear.toString(),
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          color: isDark ? Colors.white : Colors.black
-                      )
-                  ),
-                  IconButton(
-                      icon: Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 18,
-                          color: isDark ? Colors.white : Colors.black
-                      ),
-                      onPressed: selectedYear < DateTime.now().year ? () => setState(() => selectedYear++) : null
-                  ),
+                  IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white : Colors.black), onPressed: () => setState(() => selectedYear--)),
+                  Text(selectedYear.toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: isDark ? Colors.white : Colors.black)),
+                  IconButton(icon: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: isDark ? Colors.white : Colors.black), onPressed: selectedYear < DateTime.now().year ? () => setState(() => selectedYear++) : null),
                 ],
               ),
               content: SizedBox(
@@ -1234,12 +962,7 @@ class SalesManagerHome extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: 12,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 1.5,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12
-                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.5, mainAxisSpacing: 12, crossAxisSpacing: 12),
                   itemBuilder: (context, index) {
                     final monthNum = index + 1;
                     final isSelected = monthNum == controller.selectedMonth.value.month && selectedYear == controller.selectedMonth.value.year;
@@ -1252,21 +975,9 @@ class SalesManagerHome extends StatelessWidget {
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        decoration: BoxDecoration(
-                            color: isSelected ? TColors.primary : isDark ? Colors.white10 : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: isSelected ? TColors.primary : Colors.transparent
-                            )
-                        ),
+                        decoration: BoxDecoration(color: isSelected ? TColors.primary : isDark ? Colors.white10 : Colors.grey[100], borderRadius: BorderRadius.circular(12), border: Border.all(color: isSelected ? TColors.primary : Colors.transparent)),
                         alignment: Alignment.center,
-                        child: Text(
-                            months[index],
-                            style: TextStyle(
-                                color: isFuture ? Colors.grey.withValues(alpha:0.5) : isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500
-                            )
-                        ),
+                        child: Text(months[index], style: TextStyle(color: isFuture ? Colors.grey.withValues(alpha:0.5) : isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
                       ),
                     );
                   },

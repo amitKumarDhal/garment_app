@@ -12,6 +12,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(DeliverablesController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
@@ -44,12 +45,12 @@ class OrderDeliverablesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 2. ACTIONABLE SUMMARY CARDS ---
+              // --- 1. ACTIONABLE SUMMARY CARDS ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: IntrinsicHeight(
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch, // Makes both cards equal height
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // --- Card 1: Pre-Stitching Breakdown ---
                       Expanded(
@@ -58,7 +59,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           int orders = controller.notStitchedOrders.length;
                           final pipeline = controller.stageUnitBreakdown;
 
-                          // ✅ Filter only the pre-stitching stages for the breakdown
                           final preStitchStages = pipeline.where((s) =>
                               ['Approved', 'Cutting', 'Printing', 'Printed'].contains(s['name'])
                           ).toList();
@@ -74,7 +74,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Top Header & Icon
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -87,7 +86,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                // Total Metric
                                 Text("$units", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, height: 1.1)),
                                 const SizedBox(height: 4),
                                 Text("Pre-Stitching", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
@@ -96,7 +94,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                 Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), height: 1),
                                 const SizedBox(height: 12),
 
-                                // ✅ Line by Line Status Breakdown
                                 ...preStitchStages.map((stage) {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 6),
@@ -130,7 +127,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           int orders = controller.readyForDispatchOrders.length;
                           final pipeline = controller.stageUnitBreakdown;
 
-                          // ✅ Filter the post-stitching stages to balance the UI and provide full tracking
                           final postStitchStages = pipeline.where((s) =>
                               ['Stitching', 'Stitched', 'Packing', 'Packed'].contains(s['name'])
                           ).toList();
@@ -149,7 +145,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Top Header & Icon
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -162,7 +157,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                // Total Metric
                                 Text("$units", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1)),
                                 const SizedBox(height: 4),
                                 const Text("Ready to Ship", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
@@ -171,7 +165,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                 Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
                                 const SizedBox(height: 12),
 
-                                // ✅ Line by Line Status Breakdown
                                 ...postStitchStages.map((stage) {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 6),
@@ -202,7 +195,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              // --- 3. CRITICAL ALERTS ---
+              // --- 2. CRITICAL ALERTS ---
               Obx(() {
                 if (controller.atRiskOrders.isEmpty) return const SizedBox.shrink();
 
@@ -220,13 +213,11 @@ class OrderDeliverablesScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // --- HEADER ---
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // ✅ FIX 1: Wrap Title in Expanded so it doesn't push the badge off-screen
                               Expanded(
                                 child: Row(
                                   children: [
@@ -247,7 +238,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 8), // Gap
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
@@ -264,7 +255,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                         ),
                         Divider(color: isDark ? Colors.white10 : Colors.red.withValues(alpha: 0.1), height: 1),
 
-                        // --- SCROLLABLE LIST ---
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxHeight: 280),
                           child: Scrollbar(
@@ -328,8 +318,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                                 ),
                                               ),
                                               const SizedBox(height: 6),
-                                              // ✅ FIX: Replaced Flexible with a standard Row,
-                                              // and wrapped ONLY the text inside an Expanded.
                                               Row(
                                                 children: [
                                                   Icon(Icons.inventory_2_outlined, size: 12, color: Colors.grey.shade500),
@@ -346,9 +334,9 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                               ),
                                             ],
                                           ),
-                                        ),                                        const SizedBox(width: 8),
+                                        ),
+                                        const SizedBox(width: 8),
 
-                                        // ✅ RIGHT PILL
                                         Builder(
                                             builder: (context) {
                                               String text = isPacked
@@ -384,7 +372,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           ),
                         ),
                         Divider(color: isDark ? Colors.white10 : Colors.red.withValues(alpha: 0.1), height: 1),
-                        // --- FOOTER ---
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Center(
@@ -400,109 +387,161 @@ class OrderDeliverablesScreen extends StatelessWidget {
                 );
               }),
 
-              /// --- 4. DELIVERY SCHEDULE (Compact Version) ---
+              const SizedBox(height: 24),
+
+              // =========================================================
+              // --- 3. THE DELIVERY SCHEDULE SECTION (RESTRUCTURED) ---
+              // =========================================================
+
+              // A. Section Heading
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  "Delivery Schedule",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // B. Scrollable Date Selector (Outside the card)
+              SizedBox(
+                height: 65,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24), // Matches external padding
+                  itemCount: 30,
+                  itemBuilder: (context, index) {
+                    // Starts from 3 days ago for historical checking
+                    DateTime date = DateTime.now().subtract(const Duration(days: 3)).add(Duration(days: index));
+                    bool isToday = date.day == DateTime.now().day && date.month == DateTime.now().month;
+
+                    return Obx(() {
+                      bool isSelected = controller.selectedDate.value.year == date.year &&
+                          controller.selectedDate.value.month == date.month &&
+                          controller.selectedDate.value.day == date.day;
+
+                      return GestureDetector(
+                        onTap: () => controller.selectDate(date),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 48, // Slightly wider for better touch target
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? TColors.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.grey.shade300),
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                            boxShadow: [
+                              if (!isDark && isSelected)
+                                BoxShadow(color: TColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                DateFormat('EEE').format(date).toUpperCase(),
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isSelected ? Colors.white.withValues(alpha: 0.9) : Colors.grey.shade500),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                DateFormat('dd').format(date),
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87)),
+                              ),
+                              if (isToday && !isSelected)
+                                Container(margin: const EdgeInsets.only(top: 4), width: 4, height: 4, decoration: const BoxDecoration(color: TColors.primary, shape: BoxShape.circle))
+                            ],
+                          ),
+                        ),
+                      );
+                    });
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // C. The Details Card (Changes based on selection)
               Container(
                 width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 24),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
-                  border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.transparent)),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300),
+                  boxShadow: [
+                    if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- SLIM HEADER ---
+                    // Dynamic Header for the selected date
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Obx(() => Text(
                             DateFormat('EEEE, dd MMM').format(controller.selectedDate.value),
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
                           )),
-                          Obx(() => Text(
-                            "${controller.ordersForSelectedDate.length} Targets",
-                            style: TextStyle(color: TColors.primary, fontWeight: FontWeight.w800, fontSize: 11),
+                          Obx(() => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: TColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              "${controller.ordersForSelectedDate.length} Targets",
+                              style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900, fontSize: 10),
+                            ),
                           ))
                         ],
                       ),
                     ),
 
-                    // --- COMPACT DATE SELECTOR ---
-                    SizedBox(
-                      height: 65, // Reduced from 80
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        itemCount: 30,
-                        itemBuilder: (context, index) {
-                          DateTime date = DateTime.now().subtract(const Duration(days: 3)).add(Duration(days: index));
-                          bool isToday = date.day == DateTime.now().day && date.month == DateTime.now().month;
+                    Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey.shade200),
 
-                          return Obx(() {
-                            bool isSelected = controller.selectedDate.value.year == date.year &&
-                                controller.selectedDate.value.month == date.month &&
-                                controller.selectedDate.value.day == date.day;
-
-                            return GestureDetector(
-                              onTap: () => controller.selectDate(date),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 45, // Narrower pills
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? TColors.primary : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.grey.shade200),
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      DateFormat('EEE').format(date).toUpperCase(),
-                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isSelected ? Colors.white70 : Colors.grey),
-                                    ),
-                                    Text(
-                                      DateFormat('dd').format(date),
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87)),
-                                    ),
-                                    if (isToday && !isSelected)
-                                      Container(margin: const EdgeInsets.only(top: 2), width: 3, height: 3, decoration: const BoxDecoration(color: TColors.primary, shape: BoxShape.circle))
-                                  ],
-                                ),
-                              ),
-                            );
-                          });
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // --- HIGH-DENSITY ORDER LIST ---
+                    // Order List
                     Obx(() {
                       if (controller.ordersForSelectedDate.isEmpty) {
-                        return const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: Text("No targets for today", style: TextStyle(color: Colors.grey, fontSize: 12))));
+                        return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 50),
+                            child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.check_circle_outline_rounded, color: Colors.grey.shade300, size: 40),
+                                    const SizedBox(height: 8),
+                                    Text("No targets for this date", style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ],
+                                )
+                            )
+                        );
                       }
 
                       return ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 24).copyWith(bottom: 100),
+                        padding: const EdgeInsets.all(16),
                         itemCount: controller.ordersForSelectedDate.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8), // Tighter spacing
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           var order = controller.ordersForSelectedDate[index];
                           Color statusColor = _getStatusColor(order.status);
+                          String formattedAmt = currencyFormat.format(order.totalAmount);
 
                           return GestureDetector(
                             onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                               decoration: BoxDecoration(
                                 color: isDark ? const Color(0xFF121212) : Colors.grey.shade50,
                                 borderRadius: BorderRadius.circular(12),
@@ -510,28 +549,47 @@ class OrderDeliverablesScreen extends StatelessWidget {
                               ),
                               child: Row(
                                 children: [
-                                  // Status Indicator Dot
-                                  Container(width: 4, height: 30, decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(2))),
+                                  Container(width: 4, height: 36, decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(2))),
                                   const SizedBox(width: 12),
 
-                                  // Client & Product Info
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(order.clientName, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                        Text("${order.quantity} Units • ${order.productName}", style: TextStyle(color: Colors.grey.shade500, fontSize: 10, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                                          textBaseline: TextBaseline.alphabetic,
+                                          children: [
+                                            Text(
+                                                order.manualOrderNo ?? "Unknown",
+                                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                  order.clientName,
+                                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                                  maxLines: 1, overflow: TextOverflow.ellipsis
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                            "${order.quantity} Units • ${order.productName}",
+                                            style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w500),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis
+                                        ),
                                       ],
                                     ),
                                   ),
 
-                                  // Price & Status Label
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      Text(currencyFormat.format(order.totalAmount), style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13, fontWeight: FontWeight.w900)),
-                                      const SizedBox(height: 2),
-                                      Text(order.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.w900)),
+                                      Text(formattedAmt, style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13, fontWeight: FontWeight.w900)),
+                                      const SizedBox(height: 4),
+                                      Text(order.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                                     ],
                                   ),
                                   const SizedBox(width: 4),
@@ -546,6 +604,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
