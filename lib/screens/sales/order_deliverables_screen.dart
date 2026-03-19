@@ -59,8 +59,9 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           int orders = controller.notStitchedOrders.length;
                           final pipeline = controller.stageUnitBreakdown;
 
+                          // ✅ UPDATED: Included new fabric and cutting stages
                           final preStitchStages = pipeline.where((s) =>
-                              ['Approved', 'Cutting', 'Printing', 'Printed'].contains(s['name'])
+                              ['Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done', 'Printing', 'Printed'].contains(s['name'])
                           ).toList();
 
                           return Container(
@@ -612,21 +613,26 @@ class OrderDeliverablesScreen extends StatelessWidget {
     );
   }
 
+  // ✅ UPDATED: Added new stages
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
+      case 'fab purchased': return Colors.pink;
+      case 'fab ready': return Colors.lightGreen;
       case 'cutting': return Colors.orange;
+      case 'cutting done': return Colors.deepOrange;
       case 'printing': return Colors.indigo;
       case 'printed': return Colors.cyan;
       case 'stitching': return Colors.amber;
       case 'stitched': return Colors.brown;
-      case 'packing':
-      case 'packed': return Colors.purple;
+      case 'packing': return Colors.purple;
+      case 'packed': return Colors.deepPurple;
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;
       case 'completed': return Colors.green;
       case 'rejected': return Colors.red;
+      case 'pending': return const Color(0xFFFFC107);
       default: return Colors.grey;
     }
   }

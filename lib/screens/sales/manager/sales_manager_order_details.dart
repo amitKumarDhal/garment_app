@@ -299,7 +299,22 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         child: const Text("REJECT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800, letterSpacing: 1)),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
+                    // ✅ HISTORY BUTTON
+                    Container(
+                      height: 52,
+                      width: 52,
+                      decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? Colors.transparent : Colors.grey.shade300)
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.history_rounded, color: isDark ? Colors.white : Colors.black87, size: 22),
+                        onPressed: () => _showHistoryDialog(context, currentOrder, isDark),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => _confirmAction("Approve", Colors.green, () async {
@@ -331,28 +346,51 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      DropdownButtonFormField<String>(
-                        initialValue: controller.productionStages.contains(displayStatus) ? displayStatus : null,
-                        icon: const Icon(Icons.swap_vert_rounded, color: Colors.grey),
-                        decoration: InputDecoration(
-                          labelText: "Current Stage",
-                          labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600),
-                          filled: true,
-                          fillColor: isDark ? Colors.black.withValues(alpha:0.2) : Colors.grey.shade50,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 1.5)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        ),
-                        style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
-                        items: controller.productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
-                        onChanged: (newValue) {
-                          if (newValue != null) {
-                            HapticFeedback.lightImpact();
-                            setState(() => displayStatus = newValue);
-                            controller.updateOrderStatus(currentOrder.id!, newValue);
-                          }
-                        },
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: controller.productionStages.contains(displayStatus) ? displayStatus : null,
+                              icon: const Icon(Icons.swap_vert_rounded, color: Colors.grey),
+                              decoration: InputDecoration(
+                                labelText: "Current Stage",
+                                labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600),
+                                filled: true,
+                                fillColor: isDark ? Colors.black.withValues(alpha:0.2) : Colors.grey.shade50,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 1.5)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              ),
+                              style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
+                              items: controller.productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
+                              onChanged: (newValue) {
+                                if (newValue != null) {
+                                  HapticFeedback.lightImpact();
+                                  _confirmAction("Move to $newValue", Colors.blue, () async {
+                                    setState(() => displayStatus = newValue);
+                                    await controller.updateOrderStatus(currentOrder.id!, newValue);
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // ✅ HISTORY BUTTON NEXT TO DROPDOWN
+                          Container(
+                            height: 52,
+                            width: 52,
+                            decoration: BoxDecoration(
+                                color: isDark ? Colors.white10 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: isDark ? Colors.transparent : Colors.grey.shade300)
+                            ),
+                            child: IconButton(
+                              icon: Icon(Icons.history_rounded, color: isDark ? Colors.white : Colors.black87, size: 22),
+                              onPressed: () => _showHistoryDialog(context, currentOrder, isDark),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -375,13 +413,32 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   ),
                 ),
               ] else ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
-                  child: Center(
-                    child: Text("Order is ${displayStatus.toUpperCase()}.", style: TextStyle(color: isDark ? Colors.redAccent : Colors.red, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                  ),
+                Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
+                      child: Center(
+                        child: Text("Order is ${displayStatus.toUpperCase()}.", style: TextStyle(color: isDark ? Colors.redAccent : Colors.red, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // ✅ FULL WIDTH HISTORY BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showHistoryDialog(context, currentOrder, isDark),
+                        icon: const Icon(Icons.history_rounded, size: 18),
+                        label: const Text("VIEW ORDER HISTORY", style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: BorderSide(color: Colors.grey.shade400),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                        ),
+                      ),
+                    )
+                  ],
                 ),
               ],
 
@@ -510,15 +567,131 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
+  // --- NEW: HISTORY TIMELINE BOTTOM SHEET ---
+  void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark) {
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (context) {
+          // Reverse the history list so the newest updates are at the top
+          List<dynamic> history = List.from(order.stageHistory.reversed);
+
+          return FractionallySizedBox(
+            heightFactor: 0.6, // Takes up 60% of screen height
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Stage History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                        child: Text(order.manualOrderNo ?? "Unknown ID", style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900, fontSize: 12)),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  if (history.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Text("No updates have been made yet.", style: TextStyle(color: Colors.grey.shade500)),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          var event = history[index];
+
+                          // Safely parse timestamp
+                          DateTime time = DateTime.now();
+                          if (event['timestamp'] != null) {
+                            time = (event['timestamp'] as Timestamp).toDate();
+                          }
+
+                          String stage = event['stage'] ?? 'Unknown Stage';
+                          String updater = event['updatedBy'] ?? 'System';
+                          Color color = _getStatusColor(stage);
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Timeline Dot & Line
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: 14, height: 14,
+                                      decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.3), width: 3)),
+                                    ),
+                                    if (index != history.length - 1) // Don't draw line after last item
+                                      Container(width: 2, height: 40, color: isDark ? Colors.white10 : Colors.grey.shade200)
+                                  ],
+                                ),
+                                const SizedBox(width: 16),
+
+                                // Event Data
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(stage, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.person_rounded, size: 12, color: Colors.grey.shade500),
+                                          const SizedBox(width: 4),
+                                          Text("Updated by $updater", style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                ),
+
+                                // Time Data
+                                Text(
+                                    DateFormat('dd MMM\nhh:mm a').format(time),
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, height: 1.3)
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                ],
+              ),
+            ),
+          );
+        }
+    );
+  }
+
+  // ✅ UPDATED TO 14 STAGES
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
+      case 'fab purchased': return Colors.pink;
+      case 'fab ready': return Colors.lightGreen;
       case 'cutting': return Colors.orange;
+      case 'cutting done': return Colors.deepOrange;
       case 'printing': return Colors.indigo;
       case 'printed': return Colors.cyan;
       case 'stitching': return Colors.amber;
       case 'stitched': return Colors.brown;
-      case 'packed': return Colors.purple;
+      case 'packing': return Colors.purple;
+      case 'packed': return Colors.deepPurple;
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;

@@ -12,6 +12,10 @@ import '../../controllers/admin/worker_report_controller.dart';
 import '../../screens/sales/manager/sales_manager_dashboard.dart';
 import '../../screens/auth/status_check_screen.dart';
 
+import '../../controllers/production/unit_supervisor_controller.dart';
+import '../../controllers/production/stock_summary_controller.dart';
+import '../../controllers/production/stock_in_out_controller.dart';
+
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();
 
@@ -102,6 +106,10 @@ class AuthenticationRepository extends GetxController {
       if (Get.isRegistered<InventoryController>()) Get.delete<InventoryController>(force: true);
       if (Get.isRegistered<AdminController>()) Get.delete<AdminController>(force: true);
       if (Get.isRegistered<WorkerReportController>()) Get.delete<WorkerReportController>(force: true);
+
+      if (Get.isRegistered<UnitSupervisorController>()) Get.delete<UnitSupervisorController>(force: true);
+      if (Get.isRegistered<StockSummaryController>()) Get.delete<StockSummaryController>(force: true);
+      if (Get.isRegistered<StockInOutController>()) Get.delete<StockInOutController>(force: true);
 
       await Future.delayed(const Duration(milliseconds: 500));
       await _auth.signOut();

@@ -23,8 +23,8 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
         elevation: 0,
         centerTitle: false,
-        automaticallyImplyLeading: false, // ✅ Ensures no default back arrow appears
-        titleSpacing: 20, // ✅ Gives the title nice padding from the left edge
+        automaticallyImplyLeading: false,
+        titleSpacing: 20,
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         title: Text(
           "My Ledger",
@@ -45,7 +45,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
             decoration: BoxDecoration(color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9)),
             child: Column(
               children: [
-                // Search Bar
                 TextField(
                   onChanged: (val) => controller.searchOrders(val),
                   style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w600),
@@ -65,9 +64,9 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Scrollable Status Chips
+                // ✅ ALL 14 STAGES ADDED TO CHIPS
                 SizedBox(
-                  height: 36,
+                  height: 40,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -75,11 +74,18 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       _buildFilterChip(controller, "All", isDark),
                       _buildFilterChip(controller, "Pending", isDark),
                       _buildFilterChip(controller, "Approved", isDark),
+                      _buildFilterChip(controller, "Fab Purchased", isDark),
+                      _buildFilterChip(controller, "Fab Ready", isDark),
                       _buildFilterChip(controller, "Cutting", isDark),
-                      _buildFilterChip(controller, "Stitching", isDark),
+                      _buildFilterChip(controller, "Cutting Done", isDark),
                       _buildFilterChip(controller, "Printing", isDark),
+                      _buildFilterChip(controller, "Printed", isDark),
+                      _buildFilterChip(controller, "Stitching", isDark),
+                      _buildFilterChip(controller, "Stitched", isDark),
                       _buildFilterChip(controller, "Packing", isDark),
+                      _buildFilterChip(controller, "Packed", isDark),
                       _buildFilterChip(controller, "Shipping", isDark),
+                      _buildFilterChip(controller, "Shipped", isDark),
                       _buildFilterChip(controller, "Delivered", isDark),
                       _buildFilterChip(controller, "Rejected", isDark),
                       _buildFilterChip(controller, "Trash", isDark),
@@ -167,20 +173,17 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     });
   }
 
-  // ✅ UPGRADED CARD DESIGN (Matches Sales Manager exactly)
   Widget _buildHistoryCard(BuildContext context, OrderModel order, bool isDark) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     Color statusColor = _getStatusColor(order.status);
     bool isDeleted = order.toJson()['isDeleted'] == true;
 
-    // Dynamic Math logic for units and price
     int totalUnits = order.quantity;
     if (order.products.isNotEmpty) {
       totalUnits = order.products.fold(0, (sum, item) => sum + (int.tryParse(item['qty']?.toString() ?? '0') ?? 0));
     }
     double unitPrice = totalUnits > 0 ? (order.totalAmount / totalUnits) : 0.0;
 
-    // Smart Product Summary
     String productSummary = "No Items";
     if (order.products.isNotEmpty) {
       String firstItem = order.products.first['productName'] ?? "Unknown Item";
@@ -210,7 +213,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- SOFT DELETED BADGE ---
             if (isDeleted) ...[
               Row(
                 children: [
@@ -225,7 +227,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               const SizedBox(height: 8),
             ],
 
-            // --- TOP ROW: Order No & Status ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -255,7 +256,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // --- Client & Product ---
             Text(
               order.clientName,
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)),
@@ -266,7 +266,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // --- Associate & Date ---
             Row(
               children: [
                 Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey.shade500),
@@ -284,7 +283,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
 
             const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
 
-            // --- BOTTOM ROW: Math & Total ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -304,7 +302,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: Payment Dialog for Associate
   void _showPaymentDialog(BuildContext context, OrderModel order, SalesHistoryController controller) {
     final TextEditingController amountController = TextEditingController(text: order.balanceDue.toStringAsFixed(0));
 
@@ -333,7 +330,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
         onPressed: () {
           double amount = double.tryParse(amountController.text) ?? 0.0;
           if (amount > 0) {
-            Get.back(); // Close dialog
+            Get.back();
             HapticFeedback.mediumImpact();
             controller.recordPayment(order, amount);
           }
@@ -345,13 +342,18 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ PREMIUM BOTTOM SHEET (Itemized Details)
   void _showOrderDetails(BuildContext context, OrderModel order, bool isDark) {
     bool isDeleted = order.toJson()['isDeleted'] == true;
 
-    final lockedStatuses = ['shipping', 'shipped', 'delivered', 'rejected'];
+    // ✅ UPDATED: Sales can now edit up until the fabric is actually cut.
+    final lockedStatuses = [
+      'cutting', 'cutting done',
+      'printing', 'printed', 'stitching', 'stitched',
+      'packing', 'packed', 'shipping', 'shipped', 'delivered', 'rejected'
+    ];
+
     final bool isLocked = lockedStatuses.contains(order.status.toLowerCase()) || isDeleted;
-    final bool canRequestDelete = !lockedStatuses.contains(order.status.toLowerCase()) && !isDeleted;
+    final bool canRequestDelete = !isLocked && !isDeleted;
 
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
@@ -374,46 +376,34 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 24),
 
-              // ✅ HEADER WITH DYNAMIC DELETION UI
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text("Ledger Details", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5)),
 
                   if (isDeleted)
-                    Tooltip(
-                        message: "This order has been deleted.",
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                          child: const Text("Deleted", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
-                        )
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Text("Deleted", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                     )
                   else if (order.isDeleteRequested)
-                    Tooltip(
-                        message: "Deletion Pending Manager Approval",
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                          child: const Text("Pending Deletion", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
-                        )
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Text("Pending Deletion", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
                     )
                   else if (canRequestDelete)
                       IconButton(
                         onPressed: () => _confirmDelete(context, order),
                         icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                        tooltip: "Request Deletion",
                       )
                     else
-                      Tooltip(
-                          message: "Cannot edit/delete shipping or completed orders",
-                          child: Icon(Icons.lock_outline_rounded, color: Colors.grey.shade400, size: 20)
-                      ),
+                      Icon(Icons.lock_outline_rounded, color: Colors.grey.shade400, size: 20),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // ROOT DETAILS
               _modalRow("Order Number", order.manualOrderNo ?? "N/A", isDark, isBold: true, valueColor: TColors.primary),
               _modalRow("Client Name", order.clientName, isDark, isBold: true),
               _modalRow("Organization", order.organization ?? "N/A", isDark),
@@ -425,7 +415,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               Text("ITEMIZED PRODUCTS", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey.shade500, fontSize: 11, letterSpacing: 1)),
               const SizedBox(height: 12),
 
-              // DYNAMIC PRODUCTS LIST
               ...order.products.map((item) {
                 double iPrice = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
                 int iQty = int.tryParse(item['qty']?.toString() ?? '0') ?? 0;
@@ -465,7 +454,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               _modalRow("Grand Total", currency.format(order.totalAmount), isDark, isBold: true),
               const SizedBox(height: 8),
 
-              // ✅ DYNAMIC BALANCE DUE / FULLY PAID BADGE
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -481,16 +469,14 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // ✅ NEW: ASSOCIATE PAYMENT BUTTONS (Only show if balance > 0)
               if (order.balanceDue > 0 && !isDeleted) ...[
                 Row(
                   children: [
-                    // Button 1: Partial Payment
                     Expanded(
                       flex: 1,
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pop(context); // Close bottom sheet
+                          Navigator.pop(context);
                           _showPaymentDialog(context, order, Get.find<SalesHistoryController>());
                         },
                         icon: const Icon(Icons.edit_note_rounded, size: 18),
@@ -502,12 +488,11 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Button 2: Mark Fully Paid (One-Tap Action)
                     Expanded(
                       flex: 1,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.pop(context); // Close bottom sheet
+                          Navigator.pop(context);
                           HapticFeedback.heavyImpact();
                           Get.find<SalesHistoryController>().recordPayment(order, order.balanceDue);
                         },
@@ -526,7 +511,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
-              // ✅ PAYMENT HISTORY TIMELINE FOR ASSOCIATE
               if (order.paymentHistory.isNotEmpty) ...[
                 Text("PAYMENT HISTORY", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey.shade500, fontSize: 11, letterSpacing: 1)),
                 const SizedBox(height: 12),
@@ -572,7 +556,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 const SizedBox(height: 32),
               ],
 
-              // ACTION BUTTONS
               Row(
                 children: [
                   Expanded(
@@ -580,15 +563,9 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       onPressed: isLocked
                           ? null
                           : () async {
-                        Navigator.pop(context); // 1. Close the bottom sheet
-
-                        // ✅ CRITICAL FIX TO PREVENT CRASH: Destroy old form memory
+                        Navigator.pop(context);
                         Get.delete<MarketingUploadController>();
-
-                        // 2. Go to the Edit screen and WAIT until the user comes back
                         await Get.to(() => MarketingUploadScreen(existingOrder: order));
-
-                        // 3. Refresh the history screen when we get back
                         Get.find<SalesHistoryController>().fetchHistory();
                       },
                       icon: Icon(isLocked ? Icons.lock_outline_rounded : Icons.edit_rounded, size: 18),
@@ -666,19 +643,28 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
+  // ✅ UPDATED COLOR MAP FOR AGENT
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return const Color(0xFF4CAF50);
-      case 'cutting': return const Color(0xFF2196F3);
-      case 'stitching': return const Color(0xFF3F51B5);
-      case 'printing': return const Color(0xFF9C27B0);
-      case 'packing': return const Color(0xFFFF9800);
-      case 'shipping': return const Color(0xFF009688);
-      case 'delivered': return const Color(0xFF13D421);
-      case 'rejected': return const Color(0xFFF44336);
+      case 'approved': return Colors.blue;
+      case 'fab purchased': return Colors.pink;
+      case 'fab ready': return Colors.lightGreen;
+      case 'cutting': return Colors.orange;
+      case 'cutting done': return Colors.deepOrange;
+      case 'printing': return Colors.indigo;
+      case 'printed': return Colors.cyan;
+      case 'stitching': return Colors.amber;
+      case 'stitched': return Colors.brown;
+      case 'packing': return Colors.purple;
+      case 'packed': return Colors.deepPurple;
+      case 'shipping':
+      case 'shipped': return Colors.teal;
+      case 'delivered': return Colors.green;
+      case 'completed': return Colors.green;
+      case 'rejected': return Colors.red;
       case 'pending': return const Color(0xFFFFC107);
       case 'placed': return const Color(0xFFFFC107);
-      default: return Colors.blueGrey;
+      default: return Colors.grey;
     }
   }
 }

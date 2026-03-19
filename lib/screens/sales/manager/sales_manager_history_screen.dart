@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../controllers/sales/sales_manager_history_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
@@ -118,24 +120,29 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                         physics: const BouncingScrollPhysics(),
                         child: Obx(
                               () => Row(
-                                children: [
-                                  _buildFilterChip(controller, "All", isDark),      // 👈 NEW: Shows everything
-                                  _buildFilterChip(controller, "All NDO", isDark),  // 👈 Existing: Shows active production
-                                  _buildFilterChip(controller, "Delivered", isDark),
-                                  _buildFilterChip(controller, "Pending", isDark),
-                                  _buildFilterChip(controller, "Approved", isDark),
-                                  _buildFilterChip(controller, "Cutting", isDark),
-                                  _buildFilterChip(controller, "Printing", isDark),
-                                  _buildFilterChip(controller, "Printed", isDark),
-                                  _buildFilterChip(controller, "Stitching", isDark),
-                                  _buildFilterChip(controller, "Stitched", isDark),
-                                  _buildFilterChip(controller, "Packing", isDark),
-                                  _buildFilterChip(controller, "Packed", isDark),
-                                  _buildFilterChip(controller, "Shipping", isDark),
-                                  _buildFilterChip(controller, "Rejected", isDark),
-                                  _buildFilterChip(controller, "Trash", isDark),
-                                ],
-                              ),                        ),
+                            children: [
+                              _buildFilterChip(controller, "All", isDark),
+                              _buildFilterChip(controller, "All NDO", isDark),
+                              _buildFilterChip(controller, "Delivered", isDark),
+                              _buildFilterChip(controller, "Pending", isDark),
+                              _buildFilterChip(controller, "Approved", isDark),
+                              _buildFilterChip(controller, "Fab Purchased", isDark),
+                              _buildFilterChip(controller, "Fab Ready", isDark),
+                              _buildFilterChip(controller, "Cutting", isDark),
+                              _buildFilterChip(controller, "Cutting Done", isDark),
+                              _buildFilterChip(controller, "Printing", isDark),
+                              _buildFilterChip(controller, "Printed", isDark),
+                              _buildFilterChip(controller, "Stitching", isDark),
+                              _buildFilterChip(controller, "Stitched", isDark),
+                              _buildFilterChip(controller, "Packing", isDark),
+                              _buildFilterChip(controller, "Packed", isDark),
+                              _buildFilterChip(controller, "Shipping", isDark), // ✅ Added
+                              _buildFilterChip(controller, "Shipped", isDark),  // ✅ Added
+                              _buildFilterChip(controller, "Rejected", isDark),
+                              _buildFilterChip(controller, "Trash", isDark),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -144,47 +151,74 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 2. ORDERS LIST ---
+          // --- 2. ORDERS LIST WITH REFRESH INDICATOR ---
           Expanded(
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
+            child: RefreshIndicator(
+              color: TColors.primary,
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              // ✅ Call the controller to refetch data forcefully
+              onRefresh: () async {
+                HapticFeedback.lightImpact();
+                // Check if the method is named fetchOrderHistory or similar in your specific controller
+                // If the specific history controller doesn't have a fetch method,
+                // we tell the main SalesManagerController to refresh.
+                try {
+                  final mainController = Get.find<SalesManagerController>();
+                  mainController.fetchOrderHistory();
+                  mainController.fetchPendingOrders();
+                  await Future.delayed(const Duration(milliseconds: 800));
+                } catch (e) {
+                  // Fallback if main controller isn't registered for some reason
+                  await Future.delayed(const Duration(milliseconds: 500));
+                }
+              },
+              child: Obx(() {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (controller.displayedOrders.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                if (controller.displayedOrders.isEmpty) {
+                  // ✅ Wrap empty state in ListView so pull-to-refresh still works
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05), shape: BoxShape.circle),
-                        child: Icon(Icons.search_off_rounded, size: 48, color: isDark ? Colors.white54 : Colors.grey),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05), shape: BoxShape.circle),
+                              child: Icon(Icons.search_off_rounded, size: 48, color: isDark ? Colors.white54 : Colors.grey),
+                            ),
+                            const SizedBox(height: 16),
+                            Text("No orders match your criteria.", style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      Text("No orders match your criteria.", style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade600, fontWeight: FontWeight.w600)),
                     ],
-                  ),
-                );
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 40, top: 0),
-                physics: const BouncingScrollPhysics(),
-                itemCount: controller.displayedOrders.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final order = controller.displayedOrders[index];
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Get.to(() => SalesManagerOrderDetails(order: order));
-                    },
-                    child: _buildRedesignedOrderCard(context, order, isDark),
                   );
-                },
-              );
-            }),
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 40, top: 0),
+                  physics: const AlwaysScrollableScrollPhysics(), // ✅ Required for pull-to-refresh
+                  itemCount: controller.displayedOrders.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final order = controller.displayedOrders[index];
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Get.to(() => SalesManagerOrderDetails(order: order));
+                      },
+                      child: _buildRedesignedOrderCard(context, order, isDark),
+                    );
+                  },
+                );
+              }),
+            ),
           ),
         ],
       ),
@@ -195,30 +229,90 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
   Widget _buildFilterChip(SalesManagerHistoryController controller, String label, bool isDark) {
     bool isSelected = controller.currentFilter.value == label;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        controller.filterByStatus(label);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? TColors.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-          boxShadow: isSelected ? [BoxShadow(color: TColors.primary.withValues(alpha:0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-            fontSize: 11,
-            letterSpacing: 0.5,
+
+    // Determine the base color for the chip
+    Color baseColor = TColors.primary;
+    if (label == 'All NDO') baseColor = Colors.deepOrange;
+    else if (label != 'All' && label != 'Trash') baseColor = _getStatusColor(label);
+    else if (label == 'Trash') baseColor = Colors.red;
+
+    // CALCULATE COUNT FOR THIS SPECIFIC STAGE
+    int count = 0;
+    List<OrderModel> baseList = controller.allOrders;
+
+    if (label == 'All') {
+      count = baseList.length;
+    } else if (label == 'All NDO') {
+      count = baseList.where((o) {
+        String s = o.status.toLowerCase();
+        return s != 'shipped' && s != 'delivered' && s != 'completed';
+      }).length;
+    } else if (label == 'Trash') {
+      count = baseList.where((o) => o.isDeleted || o.status.toLowerCase() == 'deleted').length;
+    } else {
+      count = baseList.where((o) => o.status.toLowerCase() == label.toLowerCase()).length;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8, top: 8),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              controller.filterByStatus(label);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? baseColor : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: isSelected ? baseColor : (isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
+                boxShadow: isSelected ? [BoxShadow(color: baseColor.withValues(alpha:0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
           ),
-        ),
+
+          if (count > 0)
+            Positioned(
+              top: -6,
+              right: -6,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                    color: isSelected ? Colors.white : baseColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+                        width: 2
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
+                    ]
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    color: isSelected ? baseColor : Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -257,9 +351,28 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                   style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 10),
                 ),
               ),
-              Text(
-                order.status.toUpperCase(),
-                style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 0.5),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showHistoryDialog(context, order, isDark);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white10 : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.history_rounded, size: 14, color: isDark ? Colors.white70 : Colors.black54),
+                    ),
+                  ),
+                  Text(
+                    order.status.toUpperCase(),
+                    style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 0.5),
+                  ),
+                ],
               ),
             ],
           ),
@@ -316,11 +429,117 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED: Matches exact color mapping
+  void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark) {
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (context) {
+          List<dynamic> history = List.from(order.stageHistory.reversed);
+
+          return FractionallySizedBox(
+            heightFactor: 0.6,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Stage History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                        child: Text(order.manualOrderNo ?? "Unknown ID", style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900, fontSize: 12)),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  if (history.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Text("No updates have been made yet.", style: TextStyle(color: Colors.grey.shade500)),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          var event = history[index];
+
+                          DateTime time = DateTime.now();
+                          if (event['timestamp'] != null) {
+                            time = (event['timestamp'] as Timestamp).toDate();
+                          }
+
+                          String stage = event['stage'] ?? 'Unknown Stage';
+                          String updater = event['updatedBy'] ?? 'System';
+                          Color color = _getStatusColor(stage);
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: 14, height: 14,
+                                      decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.3), width: 3)),
+                                    ),
+                                    if (index != history.length - 1)
+                                      Container(width: 2, height: 40, color: isDark ? Colors.white10 : Colors.grey.shade200)
+                                  ],
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(stage, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.person_rounded, size: 12, color: Colors.grey.shade500),
+                                          const SizedBox(width: 4),
+                                          Text("Updated by $updater", style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                    DateFormat('dd MMM\nhh:mm a').format(time),
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, height: 1.3)
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                ],
+              ),
+            ),
+          );
+        }
+    );
+  }
+
+  // ✅ 14-Stage Color Map
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
+      case 'fab purchased': return Colors.pink;
+      case 'fab ready': return Colors.lightGreen;
       case 'cutting': return Colors.orange;
+      case 'cutting done': return Colors.deepOrange;
       case 'printing': return Colors.indigo;
       case 'printed': return Colors.cyan;
       case 'stitching': return Colors.amber;

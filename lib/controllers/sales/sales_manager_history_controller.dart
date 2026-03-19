@@ -7,20 +7,14 @@ import '../../data/models/order_model.dart';
 class SalesManagerHistoryController extends GetxController {
   final _db = FirebaseFirestore.instance;
 
-  // Stream Subscription to manage the listener
   StreamSubscription<QuerySnapshot>? _listener;
 
   var isLoading = true.obs;
-  var allOrders = <OrderModel>[]; // Master list
-  var displayedOrders = <OrderModel>[].obs; // Filtered list for UI
+  var allOrders = <OrderModel>[];
+  var displayedOrders = <OrderModel>[].obs;
 
-  // ✅ CHANGED DEFAULT FILTER TO "All NDO"
   var currentFilter = "All NDO".obs;
-
-  // Store selected date range
   Rx<DateTimeRange?> selectedDateRange = Rx<DateTimeRange?>(null);
-
-  // Store search query for real-time persistence
   var searchQuery = "".obs;
 
   @override
@@ -32,48 +26,44 @@ class SalesManagerHistoryController extends GetxController {
     fetchAllOrders();
   }
 
-  // Cancel stream when controller is closed (Logout)
   @override
   void onClose() {
-    _listener?.cancel(); // Stops listening to Firebase
+    _listener?.cancel();
     super.onClose();
   }
 
-  // --- Fetch EVERYONE'S Orders (REAL-TIME + SAFE CLEANUP) ---
   void fetchAllOrders() {
     isLoading.value = true;
 
-    // Assign to _listener so we can cancel it later
     _listener = _db.collection('orders')
         .orderBy('orderDate', descending: true)
-        .limit(100)
-        .snapshots() // Listen for changes
+        .limit(150) // ✅ Increased limit slightly for Master Ledger
+        .snapshots()
         .listen((snapshot) {
 
       allOrders = snapshot.docs
           .map((doc) => OrderModel.fromSnapshot(doc))
           .toList();
 
-      // Re-apply filters automatically whenever data changes
       applyFilter();
-
       isLoading.value = false;
     }, onError: (e) {
-      print("Stream error or stopped: $e");
+      debugPrint("Stream error: $e");
       isLoading.value = false;
     });
   }
 
-  // Method to Pick Date Range
   Future<void> pickDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2023),
       lastDate: DateTime.now(),
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: Colors.purple,
+          data: isDark ? ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(primary: Colors.purpleAccent),
+          ) : ThemeData.light().copyWith(
             colorScheme: const ColorScheme.light(primary: Colors.purple),
           ),
           child: child!,
@@ -87,50 +77,45 @@ class SalesManagerHistoryController extends GetxController {
     }
   }
 
-  // Clear Date Filter
   void clearDateFilter() {
     selectedDateRange.value = null;
     applyFilter();
   }
 
-  // --- Filter Logic ---
   void filterByStatus(String status) {
     currentFilter.value = status;
     applyFilter();
   }
 
   void searchOrders(String query) {
-    searchQuery.value = query; // Update the class variable
+    searchQuery.value = query;
     applyFilter();
   }
 
-  // --- Main Filter Engine ---
   void applyFilter() {
     List<OrderModel> temp = allOrders;
 
     // --- 1. Filter by Status Tab ---
     if (currentFilter.value == "Trash") {
-      // Show ONLY items marked as deleted
       temp = temp.where((o) => o.isDeleted == true).toList();
     }
     else if (currentFilter.value == "All") {
-      // ✅ NEW: Show every single order that isn't deleted (Delivered, Rejected, etc.)
       temp = temp.where((o) => o.isDeleted != true).toList();
     }
     else if (currentFilter.value == "All NDO") {
-      // ✅ Existing: Show only active production (Exclude terminal states)
-      List<String> terminalStatuses = ['delivered', 'completed', 'rejected', 'cancelled'];
+      // ✅ "All NDO" shows everything EXCEPT Terminal States
+      // Note: 'Shipped' and 'Shipping' are NOT terminal, so they stay visible here.
+      List<String> terminalStatuses = ['delivered', 'completed', 'rejected', 'cancelled', 'deleted'];
 
       temp = temp.where((o) {
-        bool isDeleted = o.isDeleted == true;
-        String status = o.status.toLowerCase();
-        return !isDeleted && !terminalStatuses.contains(status);
+        String status = o.status.toLowerCase().trim();
+        return !o.isDeleted && !terminalStatuses.contains(status);
       }).toList();
     }
     else {
-      // Show specific status but EXCLUDE deleted items
+      // ✅ Handles specific clicks on "Shipping", "Shipped", etc.
       temp = temp.where((o) =>
-      o.status.toLowerCase() == currentFilter.value.toLowerCase() &&
+      o.status.toLowerCase().trim() == currentFilter.value.toLowerCase().trim() &&
           o.isDeleted != true
       ).toList();
     }
@@ -138,9 +123,7 @@ class SalesManagerHistoryController extends GetxController {
     // --- 2. Filter by Date Range ---
     if (selectedDateRange.value != null) {
       DateTime start = selectedDateRange.value!.start;
-      DateTime end = selectedDateRange.value!.end
-          .add(const Duration(days: 1))
-          .subtract(const Duration(seconds: 1));
+      DateTime end = selectedDateRange.value!.end.add(const Duration(days: 1));
 
       temp = temp.where((o) {
         return o.orderDate.isAfter(start) && o.orderDate.isBefore(end);
@@ -149,7 +132,7 @@ class SalesManagerHistoryController extends GetxController {
 
     // --- 3. Filter by Search Text ---
     if (searchQuery.value.isNotEmpty) {
-      String lowerQuery = searchQuery.value.toLowerCase();
+      String lowerQuery = searchQuery.value.toLowerCase().trim();
       temp = temp.where((o) {
         bool matchBasic = o.clientName.toLowerCase().contains(lowerQuery) ||
             o.marketingPersonName.toLowerCase().contains(lowerQuery) ||
@@ -166,4 +149,5 @@ class SalesManagerHistoryController extends GetxController {
     }
 
     displayedOrders.assignAll(temp);
-  }}
+  }
+}

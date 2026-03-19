@@ -7,17 +7,21 @@ class OrderStatusTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ UPDATED: The full 10-step timeline (including Placed)
+    // ✅ UPDATED: The full 15-step timeline (Placed + 14 Production Stages)
     final steps = [
       'Placed',
       'Approved',
+      'Fab Purchased',
+      'Fab Ready',
       'Cutting',
+      'Cutting Done',
       'Printing',
       'Printed',
       'Stitching',
       'Stitched',
       'Packing',
       'Packed',
+      'Shipping',
       'Shipped',
       'Delivered'
     ];
@@ -38,7 +42,7 @@ class OrderStatusTimeline extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha:0.1),
+            color: Colors.red.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.red),
           ),

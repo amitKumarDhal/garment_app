@@ -10,10 +10,11 @@ class SalesManagerController extends GetxController {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ✅ Centralized master list of production stages
+  // ✅ Centralized master list of production stages (UPDATED TO 14 STAGES)
   final List<String> productionStages = [
-    'Approved', 'Cutting', 'Printing', 'Printed',
-    'Stitching', 'Stitched', 'Packing', 'Packed', 'Shipping', 'Shipped', 'Delivered'
+    'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
+    'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
+    'Shipping', 'Shipped', 'Delivered'
   ];
 
   // --- Observables ---
@@ -128,10 +129,11 @@ class SalesManagerController extends GetxController {
   void fetchOrderHistory() {
     if (FirebaseAuth.instance.currentUser == null) return;
 
+    // ✅ UPDATED QUERY: Included the new stages so they appear in Active Orders
     _db.collection('orders')
         .where('status', whereIn: [
-      'Approved', 'Cutting', 'Printing', 'Printed',
-      'Stitching', 'Stitched', 'Packed', 'Packing', 'Shipping'
+      'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
+      'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed', 'Shipping'
     ])
         .orderBy('orderDate', descending: true)
         .snapshots()
@@ -142,7 +144,7 @@ class SalesManagerController extends GetxController {
     });
 
     _db.collection('orders')
-        .where('status', whereIn: ['Delivered', 'Rejected'])
+        .where('status', whereIn: ['Shipped', 'Delivered', 'Rejected']) // Include shipped here if you want it considered completed
         .orderBy('orderDate', descending: true)
         .limit(50)
         .snapshots()
@@ -216,7 +218,7 @@ class SalesManagerController extends GetxController {
           .where('orderDate', isLessThanOrEqualTo: endOfMonth)
           .get();
 
-      // ✅ BUG FIXED: Added 'pending' and 'placed' so they don't inflate the stats
+      // BUG FIXED: Added 'pending' and 'placed' so they don't inflate the stats
       List<String> excludedStatuses = ['rejected', 'cancelled', 'pending', 'placed'];
 
       int validOrderCount = 0;
@@ -244,10 +246,11 @@ class SalesManagerController extends GetxController {
           }
           unitsCount += orderQty;
 
+          // ✅ UPDATED: Included new stages in Revenue Statuses
           List<String> revenueStatuses = [
-            'approved', 'cutting', 'printing', 'printed',
-            'stitching', 'stitched', 'packed', 'packing',
-            'shipped', 'shipping', 'delivered'
+            'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+            'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
+            'shipping', 'shipped', 'delivered', 'completed'
           ];
 
           if (revenueStatuses.contains(status)) {
@@ -315,13 +318,14 @@ class SalesManagerController extends GetxController {
           'greeting': greeting,
           'count': countMap[agentName] ?? 0,
           'isSM': isSM,
-          'rank': rankLabel, // ✅ THIS IS THE KEY FIELD THE UI NEEDS
+          'rank': rankLabel, // THIS IS THE KEY FIELD THE UI NEEDS
         };
       }).toList();
     } catch (e) {
       print("❌ STATS ERROR: $e");
     }
   }
+
   /// --- ACTIONS ---
   Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
@@ -335,26 +339,38 @@ class SalesManagerController extends GetxController {
     await _updateStatus(orderId, newStatus, Colors.blue);
   }
 
+  // UPDATED WITH HISTORY LOGGING
   Future<void> _updateStatus(String orderId, String newStatus, Color color) async {
     try {
       final orderDoc = await _db.collection('orders').doc(orderId).get();
       final associateId = orderDoc.data()?['marketingPersonId'] ?? '';
       final orderNo = orderDoc.data()?['manualOrderNo'] ?? orderId;
 
+      // 1. CREATE THE HISTORY EVENT
+      final historyEvent = {
+        'stage': newStatus,
+        'updatedBy': managerName.value,
+        'timestamp': Timestamp.now(),
+      };
+
+      // 2. UPDATE STATUS AND APPEND TO HISTORY ARRAY
       await _db.collection('orders').doc(orderId).update({
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastUpdatedBy': managerName.value,
+        'stageHistory': FieldValue.arrayUnion([historyEvent]),
       });
 
       if (associateId.isNotEmpty) {
         String emoji = "🔄";
         if (newStatus == 'Approved') emoji = "✅";
         if (newStatus == 'Rejected') emoji = "❌";
-        if (newStatus == 'Cutting' || newStatus == 'Stitching') emoji = "✂️";
+        if (newStatus == 'Cutting' || newStatus == 'Stitching' || newStatus == 'Cutting Done') emoji = "✂️";
         if (newStatus == 'Printing' || newStatus == 'Printed') emoji = "🖨️";
         if (newStatus == 'Packed' || newStatus == 'Packing') emoji = "📦";
         if (newStatus == 'Shipping' || newStatus == 'Shipped') emoji = "🚚";
         if (newStatus == 'Delivered') emoji = "🎉";
+        if (newStatus == 'Fab Purchased' || newStatus == 'Fab Ready') emoji = "🧵";
 
         await _db.collection('notifications').add({
           'targetUserId': associateId,
@@ -437,12 +453,21 @@ class SalesManagerController extends GetxController {
     }
   }
 
+  // UPDATED WITH HISTORY LOGGING
   Future<void> approveOrderWithMargin(String orderId, double marginAmount, double totalAmount) async {
     try {
+      final historyEvent = {
+        'stage': 'Approved',
+        'updatedBy': managerName.value,
+        'timestamp': Timestamp.now(),
+      };
+
       await _db.collection('orders').doc(orderId).update({
         'status': 'Approved',
         'effectiveRevenue': marginAmount,
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastUpdatedBy': managerName.value,
+        'stageHistory': FieldValue.arrayUnion([historyEvent]),
       });
 
       fetchMonthlyStats();

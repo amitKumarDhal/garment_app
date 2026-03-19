@@ -14,10 +14,12 @@ import '../screens/floor_management/supervisor_menu_screen.dart';
 import '../screens/floor_management/factory_stock_summary_screen.dart';
 
 // --- IMPORTS: Production (Unit Supervisor) ---
+import '../screens/production/stock_summary_screen.dart';
 import '../screens/production/unit_supervisor_home.dart';
+import '../screens/production/unit_supervisor_orders_screen.dart';
+import '../screens/production/stock_in_out_screen.dart';
 
 // --- IMPORTS: Sales & Sales Manager ---
-import '../screens/production/unit_supervisor_orders_screen.dart';
 import '../screens/sales/sales_dashboard.dart';
 import '../screens/sales/sales_order_history_screen.dart';
 import '../screens/floor_management/marketing_upload_screen.dart';
@@ -49,7 +51,6 @@ class NavigationController extends GetxController {
 
     if (user != null) {
       try {
-        // ✅ BUG FIX: Check users collection first, then id_requests!
         DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
 
         if (!doc.exists) {
@@ -58,7 +59,6 @@ class NavigationController extends GetxController {
 
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
-          // ✅ MAGIC FIX: Safe Lowercase Map
           final safeData = data.map((key, value) => MapEntry(key.toLowerCase(), value));
 
           String role = (safeData['role'] ?? 'Worker').toString().trim();
@@ -81,7 +81,6 @@ class NavigationController extends GetxController {
     screens.clear();
     navItems.clear();
 
-    // Make role lowercase so 'Unit Supervisor', 'UNIT SUPERVISOR', and 'unit supervisor' all match
     String cleanRole = role.trim().toLowerCase();
 
     if (cleanRole == 'admin') {
@@ -134,19 +133,35 @@ class NavigationController extends GetxController {
         const NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
       ]);
     }
-    // ✅ SAFE UNIT SUPERVISOR CHECK
+    // ✅ UPDATED UNIT SUPERVISOR BLOCK
     else if (cleanRole == 'unit supervisor') {
       screens.addAll([
         const UnitSupervisorHome(),
         const UnitSupervisorOrdersScreen(),
-        // const InventoryScreen(),
-        const ProfileScreen(),
+        const StockInOutScreen(),       // Tab 3: Stock I/O
+        const StockSummaryScreen(),     // Tab 4: Stock Summary
       ]);
       navItems.addAll([
-        const NavigationDestination(icon: Icon(Icons.engineering_outlined), label: 'Floor'),
-        const NavigationDestination(icon: Icon(Icons.view_list_rounded), label: 'Orders'), // ✅ Added Bottom Nav Item
-        // const NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Materials'),
-        const NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
+        const NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard_rounded, color: TColors.primary),
+            label: 'Home'
+        ),
+        const NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore_rounded, color: TColors.primary),
+            label: 'Explorer'
+        ),
+        const NavigationDestination(
+            icon: Icon(Icons.swap_horizontal_circle_outlined),
+            selectedIcon: Icon(Icons.swap_horizontal_circle, color: TColors.primary),
+            label: 'Stock I/O'
+        ),
+        const NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined), // ✅ Changed to a chart icon to match "Summary"
+            selectedIcon: Icon(Icons.bar_chart_rounded, color: TColors.primary),
+            label: 'Summary' // ✅ Changed label from "Dispatch" to "Summary"
+        ),
       ]);
     }
     else {

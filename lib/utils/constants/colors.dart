@@ -6,9 +6,9 @@ class TColors {
   // --- 🌟 NEXT-GEN EXECUTIVE THEME COLORS ---
 
   // App Basic Colors
-  static const Color primary = Color(0xFF6A1B9A); // Deep Premium Purple
+  static const Color primary = Color(0xFF818CF8); // Premium Purple
   static const Color secondary = Color(0xFF3949AB); // Deep Indigo
-  static const Color accent = Color(0xFF9C27B0); // Vibrant Purple Accent
+  static const Color accent = Color(0xFF00D2FF); // Vibrant Purple Accent
 
   // Premium Gradients (Used in Cards & Buttons)
   static const Color gradientStart = Color(0xFF5E35B1); // Deep Purple

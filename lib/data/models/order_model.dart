@@ -15,6 +15,7 @@ class OrderModel {
 
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? lastUpdatedBy; // ✅ ADDED FOR TRACKING WHO UPDATED
   final String? marketingPersonId;
   final String? neckType;
   final String? productType;
@@ -56,6 +57,9 @@ class OrderModel {
   // NEW PAYMENT HISTORY LOG
   final List<dynamic> paymentHistory;
 
+  // ✅ NEW STAGE UPDATE HISTORY LOG
+  final List<dynamic> stageHistory;
+
   // Automatically formats the deliveryDate into a readable deadline string
   String get deadline => DateFormat('dd-MM-yyyy').format(deliveryDate);
 
@@ -82,6 +86,7 @@ class OrderModel {
     this.sizeDescription,
     this.createdAt,
     this.updatedAt,
+    this.lastUpdatedBy, // ✅ ADDED FOR TRACKING WHO UPDATED
     this.marketingPersonId,
     this.shippingCharge = 0.0,
     this.advanceAmount = 0.0,
@@ -94,6 +99,7 @@ class OrderModel {
     this.isDeleteRequested = false,
     this.isDeleted = false,
     this.paymentHistory = const [],
+    this.stageHistory = const [], // ✅ INITIALIZED
     this.neckType = 'Not Specified',
     this.productType = 'Not Specified',
   });
@@ -109,6 +115,7 @@ class OrderModel {
       "state": state,     // ✅ ADDED
       "createdAt": createdAt ?? FieldValue.serverTimestamp(),
       "updatedAt": updatedAt,
+      "lastUpdatedBy": lastUpdatedBy, // ✅ ADDED FOR TRACKING WHO UPDATED
       "marketingPersonId": marketingPersonId,
 
       // Root legacy fields
@@ -144,6 +151,10 @@ class OrderModel {
 
       // SAVE PAYMENT HISTORY
       "paymentHistory": paymentHistory,
+
+      // ✅ SAVE STAGE HISTORY
+      "stageHistory": stageHistory,
+
       "neckType": neckType,
       "productType": productType,
     };
@@ -195,6 +206,7 @@ class OrderModel {
       priority: data['priority'] ?? 'Medium',
       createdAt: _parseTimestampNullable(data['createdAt']),
       updatedAt: _parseTimestampNullable(data['updatedAt']),
+      lastUpdatedBy: data['lastUpdatedBy'], // ✅ ADDED FOR TRACKING WHO UPDATED
       marketingPersonId: data['marketingPersonId'],
       orderDate: _parseTimestamp(data['orderDate']),
       deliveryDate: _parseTimestamp(data['deliveryDate']),
@@ -220,6 +232,10 @@ class OrderModel {
 
       // FETCH PAYMENT HISTORY SAFELY
       paymentHistory: data['paymentHistory'] ?? [],
+
+      // ✅ FETCH STAGE HISTORY SAFELY
+      stageHistory: data['stageHistory'] ?? [],
+
       neckType: data['neckType'] ?? 'Not Specified',
       productType: data['productType'] ?? 'Not Specified',
     );

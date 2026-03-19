@@ -191,11 +191,10 @@ class SalesAgentController extends GetxController {
 
       // ✅ UPDATED: Added new granular statuses so orders don't disappear from agent's dashboard
       List<String> validStatuses = [
-        'approved', 'cutting', 'printing', 'printed',
-        'stitching', 'stitched', 'packing', 'packed',
+        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'shipping', 'shipped', 'delivered', 'completed'
       ];
-
       // --- CALCULATE PREVIOUS MONTH ---
       double prevTotalNet = 0.0;
       hasPrevMonthData.value = prevSnap.docs.isNotEmpty;
@@ -279,11 +278,10 @@ class SalesAgentController extends GetxController {
 
       // ✅ UPDATED & CLEANED: Added new granular statuses. Only lowercase needed since we convert the data string to lowercase below.
       List<String> revenueStatuses = [
-        'approved', 'cutting', 'printing', 'printed',
-        'stitching', 'stitched', 'packing', 'packed',
+        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'shipping', 'shipped', 'delivered', 'completed'
       ];
-
       final snapshot = await _db
           .collection('orders')
           .where('orderDate', isGreaterThanOrEqualTo: start)
@@ -398,42 +396,87 @@ class SalesAgentController extends GetxController {
 
   // --- REQUEST DELETE ORDER LOGIC ---
   Future<void> deleteOrder(String orderId, String currentStatus) async {
-    final lockedStatuses = ['shipping', 'shipped', 'delivered', 'completed'];
+    // ✅ UPDATED: Added new 14-stage logic for locking deletions
+    // It is usually safe to delete if it's just 'Approved' or 'Fab Purchased'.
+    // Once 'Fab Ready' or 'Cutting' starts, the agent should be locked out.
+    final lockedStatuses = [
+      'fab ready',
+      'cutting',
+      'cutting done',
+      'printing',
+      'printed',
+      'stitching',
+      'stitched',
+      'packing',
+      'packed',
+      'shipping',
+      'shipped',
+      'delivered',
+      'completed'
+    ];
 
-    if (lockedStatuses.contains(currentStatus.toLowerCase())) {
-      Get.snackbar("Action Denied", "Orders in '$currentStatus' phase cannot be deleted.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
+    if (lockedStatuses.contains(currentStatus.toLowerCase().trim())) {
+      Get.snackbar(
+          "Action Denied",
+          "Production has already started ($currentStatus). Deletion is no longer possible.",
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+          colorText: Colors.red,
+          snackPosition: SnackPosition.BOTTOM
+      );
       return;
     }
 
     try {
       isLoading.value = true;
+
+      // 1. Flag the order in Firestore
       await _db.collection('orders').doc(orderId).update({
         'isDeleteRequested': true,
         'deleteRequestedAt': FieldValue.serverTimestamp(),
       });
 
+      // 2. Notify all Sales Managers
       try {
-        final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+        final managerSnapshot = await _db.collection('users')
+            .where('Role', isEqualTo: 'Sales Manager')
+            .get();
+
         for (var managerDoc in managerSnapshot.docs) {
           await _db.collection('notifications').add({
             'targetUserId': managerDoc.id,
             'title': 'Deletion Request 🗑️',
-            'message': '${agentName.value} requested to delete an order.',
+            'message': '${agentName.value} requested to delete order ID: $orderId',
+            'type': 'OrderApproval', // ✅ Ensuring the NotificationController routes this to the right screen
+            'orderId': orderId,
             'timestamp': FieldValue.serverTimestamp(),
             'isRead': false,
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        debugPrint("Notification failed: $e");
+      }
 
+      // 3. Refresh Local Data
       await fetchAgentStats();
-      Get.snackbar("Request Sent", "Deletion request sent to manager for approval.", backgroundColor: Colors.orange.withValues(alpha: 0.1), colorText: Colors.orange);
+
+      Get.snackbar(
+          "Request Sent",
+          "Deletion request sent to manager for approval.",
+          backgroundColor: Colors.orange.withValues(alpha: 0.1),
+          colorText: Colors.orange,
+          snackPosition: SnackPosition.BOTTOM
+      );
     } catch (e) {
-      Get.snackbar("Error", "Could not send deletion request: $e", backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
+      Get.snackbar(
+          "Error",
+          "Could not send deletion request: $e",
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
+          colorText: Colors.red
+      );
     } finally {
       isLoading.value = false;
     }
   }
-
   double _parseAmount(dynamic value) {
     if (value == null) return 0.0;
     if (value is int) return value.toDouble();
