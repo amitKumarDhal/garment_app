@@ -1,4 +1,4 @@
-import 'dart:async'; // ✅ 1. ADDED THIS IMPORT FOR STREAMS
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -14,7 +14,6 @@ class UnitSupervisorController extends GetxController {
   var supervisorName = 'Supervisor'.obs;
   var isLoading = true.obs;
 
-  // ✅ 2. ADDED THIS VARIABLE TO TRACK THE LIVE STREAM
   StreamSubscription? _ordersSubscription;
 
   final List<String> factoryStages = [
@@ -43,10 +42,9 @@ class UnitSupervisorController extends GetxController {
   void onInit() {
     super.onInit();
     fetchSupervisorProfile();
-    fetchActiveFactoryOrders();
+    fetchActiveOrders(); // ✅ Renamed to match the UI's Pull-to-Refresh
   }
 
-  // ✅ 3. ADDED onClose TO KILL THE STREAM WHEN YOU LOG OUT
   @override
   void onClose() {
     _ordersSubscription?.cancel();
@@ -68,25 +66,39 @@ class UnitSupervisorController extends GetxController {
     }
   }
 
-  void fetchActiveFactoryOrders() {
+  // ✅ UPGRADED: Returns a Future for Pull-to-Refresh & prevents stream memory leaks
+  Future<void> fetchActiveOrders() async {
     if (FirebaseAuth.instance.currentUser == null) return;
-    isLoading.value = true;
 
-    // ✅ 4. ATTACH THE LISTENER TO THE VARIABLE
+    // Cancel the old stream if the user pulls to refresh
+    await _ordersSubscription?.cancel();
+
+    isLoading.value = true;
+    Completer<void> completer = Completer<void>();
+
     _ordersSubscription = _db.collection('orders')
         .where('status', whereIn: factoryStages)
         .orderBy('deliveryDate', descending: false)
         .snapshots()
         .listen((snapshot) {
+
       final validDocs = snapshot.docs.where((doc) => doc.data()['isDeleted'] != true);
       activeOrders.value = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       isLoading.value = false;
+
+      // Stop the Pull-to-Refresh spinner once the data arrives
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     }, onError: (e) {
       // Ignore errors if the user simply logged out
       if (FirebaseAuth.instance.currentUser == null) return;
       debugPrint("Error fetching factory orders: $e");
       isLoading.value = false;
+      if (!completer.isCompleted) completer.complete();
     });
+
+    return completer.future;
   }
 
   Future<void> updateProductionStage(String orderId, String currentStatus, String newStatus, {String remark = ""}) async {
@@ -123,9 +135,11 @@ class UnitSupervisorController extends GetxController {
           'isRead': false,
         });
       }
-      Get.snackbar("Success", "Moved to $newStatus", backgroundColor: Colors.green.withValues(alpha:0.1), colorText: Colors.green);
+
+      // ✅ UPGRADED: Uses TColors for Snackbars
+      Get.snackbar("Success", "Moved to $newStatus", backgroundColor: TColors.success.withValues(alpha:0.1), colorText: TColors.success);
     } catch (e) {
-      Get.snackbar("Error", "Failed: $e", backgroundColor: Colors.red.withValues(alpha:0.1), colorText: Colors.red);
+      Get.snackbar("Error", "Failed: $e", backgroundColor: TColors.error.withValues(alpha:0.1), colorText: TColors.error);
     }
   }
 
@@ -148,8 +162,8 @@ class UnitSupervisorController extends GetxController {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: isDark
-                ? ColorScheme.dark(primary: TColors.primary, onPrimary: Colors.white, surface: const Color(0xFF1E1E1E), onSurface: Colors.white)
-                : ColorScheme.light(primary: TColors.primary, onPrimary: Colors.white, surface: Colors.white, onSurface: Colors.black87),
+                ? const ColorScheme.dark(primary: TColors.primary, onPrimary: Colors.white, surface: TColors.darkCard, onSurface: Colors.white)
+                : const ColorScheme.light(primary: TColors.primary, onPrimary: Colors.white, surface: Colors.white, onSurface: TColors.textPrimary),
           ),
           child: child!,
         );
@@ -202,20 +216,21 @@ class UnitSupervisorController extends GetxController {
   void updateSearchQuery(String query) => searchQuery.value = query;
 
   List<Map<String, dynamic>> get stageUnitBreakdown {
+    // ✅ UPGRADED: Uses TColors to match the Dashboard Pipeline UI perfectly
     final stages = [
-      {'name': 'Approved', 'icon': Icons.thumb_up_alt_outlined, 'color': Colors.blue},
-      {'name': 'Fab Purchased', 'icon': Icons.shopping_cart_outlined, 'color': Colors.pink},
-      {'name': 'Fab Ready', 'icon': Icons.inventory_outlined, 'color': Colors.lightGreen},
-      {'name': 'Cutting', 'icon': Icons.content_cut_rounded, 'color': Colors.orange},
+      {'name': 'Approved', 'icon': Icons.thumb_up_alt_outlined, 'color': TColors.electricBlue},
+      {'name': 'Fab Purchased', 'icon': Icons.shopping_cart_outlined, 'color': TColors.neonPink},
+      {'name': 'Fab Ready', 'icon': Icons.inventory_outlined, 'color': TColors.brightMint},
+      {'name': 'Cutting', 'icon': Icons.content_cut_rounded, 'color': TColors.cutting},
       {'name': 'Cutting Done', 'icon': Icons.cut_outlined, 'color': Colors.deepOrange},
-      {'name': 'Printing', 'icon': Icons.print_outlined, 'color': Colors.indigo},
+      {'name': 'Printing', 'icon': Icons.print_outlined, 'color': TColors.printing},
       {'name': 'Printed', 'icon': Icons.format_paint_outlined, 'color': Colors.cyan},
-      {'name': 'Stitching', 'icon': Icons.precision_manufacturing_outlined, 'color': Colors.amber},
+      {'name': 'Stitching', 'icon': Icons.precision_manufacturing_outlined, 'color': TColors.stitching},
       {'name': 'Stitched', 'icon': Icons.checkroom_outlined, 'color': Colors.brown},
-      {'name': 'Packing', 'icon': Icons.inventory_2_outlined, 'color': Colors.purple},
+      {'name': 'Packing', 'icon': Icons.inventory_2_outlined, 'color': TColors.packing},
       {'name': 'Packed', 'icon': Icons.all_inbox_rounded, 'color': Colors.deepPurple},
-      {'name': 'Shipping', 'icon': Icons.local_shipping_outlined, 'color': Colors.teal},
-      {'name': 'Delivered', 'icon': Icons.task_alt_rounded, 'color': Colors.green},
+      {'name': 'Shipping', 'icon': Icons.local_shipping_outlined, 'color': TColors.shipping},
+      {'name': 'Delivered', 'icon': Icons.task_alt_rounded, 'color': TColors.delivered},
     ];
 
     return stages.map((stage) {

@@ -55,6 +55,8 @@ dependencies:
   google_nav_bar: ^5.0.7
   curved_navigation_bar: ^1.0.6
   dot_navigation_bar: ^1.0.2
+  http: ^1.6.0
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

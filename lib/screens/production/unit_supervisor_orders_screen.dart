@@ -14,7 +14,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [color.withValues(alpha: 0.6), color],
+      colors: [color.withValues(alpha: 0.8), color],
     );
   }
 
@@ -33,20 +33,21 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(UnitSupervisorController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = TColors.getAdaptiveTextColor(context);
 
     final List<String> displayStages = ['All', 'All NSO', ...controller.factoryStages];
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+      backgroundColor: isDark ? TColors.dark : TColors.light,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
         titleSpacing: 24,
         automaticallyImplyLeading: false,
         title: Text(
           "Stage Explorer",
-          style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: -0.5),
+          style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5),
         ),
       ),
       body: Column(
@@ -62,13 +63,13 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
               ),
               child: TextField(
                 onChanged: (value) => controller.updateSearchQuery(value),
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
+                style: TextStyle(color: textColor, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: "Search by Order ID, Client, or Product...",
-                  hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400),
+                  hintStyle: const TextStyle(color: TColors.textSecondary, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search_rounded, color: TColors.textSecondary),
                   filled: true,
-                  fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  fillColor: isDark ? TColors.darkCard : Colors.white,
                   contentPadding: const EdgeInsets.symmetric(vertical: 0),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -150,7 +151,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                   color: isSelected ? Colors.white : baseColor,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9), width: 2),
+                                  border: Border.all(color: isDark ? TColors.dark : TColors.light, width: 2),
                                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))]
                               ),
                               child: Text(
@@ -178,6 +179,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   return s != 'shipped' && s != 'delivered' && s != 'completed';
                 }).toList();
 
+                // Search override for 'All NSO'
                 if (controller.searchQuery.value.isNotEmpty) {
                   String query = controller.searchQuery.value.toLowerCase();
                   ordersToDisplay = ordersToDisplay.where((o) {
@@ -190,13 +192,13 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
               }
 
               if (ordersToDisplay.isEmpty) {
-                return Center(
+                return const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search_off_rounded, size: 60, color: Colors.grey.shade300),
-                      const SizedBox(height: 16),
-                      Text("No matches found", style: TextStyle(color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w600)),
+                      Icon(Icons.search_off_rounded, size: 60, color: TColors.textSecondary),
+                      SizedBox(height: 16),
+                      Text("No matches found", style: TextStyle(color: TColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 );
@@ -230,14 +232,14 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   bool isDueToday = daysLeft == 0;
                   bool isDone = ['delivered', 'completed'].contains(order.status.toLowerCase());
 
-                  Color urgencyColor = isDone ? Colors.green : (isOverdue ? Colors.redAccent : (isDueToday ? Colors.orange : Colors.grey.shade600));
+                  Color urgencyColor = isDone ? TColors.success : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary));
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      color: isDark ? TColors.darkCard : Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
+                      border: Border.all(color: TColors.getBorderColor(context)),
                       boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5))],
                     ),
                     child: Column(
@@ -253,7 +255,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                       order.manualOrderNo ?? "ID: ${order.id?.substring(0,6)}",
-                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)
+                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor)
                                   ),
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -272,7 +274,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                         Text(
                                           "Updated ${DateFormat('dd MMM, hh:mm a').format(order.updatedAt!)}\nby ${order.lastUpdatedBy ?? 'System'}",
                                           textAlign: TextAlign.right,
-                                          style: TextStyle(fontSize: 8.5, color: Colors.grey.shade500, fontStyle: FontStyle.italic, height: 1.2),
+                                          style: const TextStyle(fontSize: 8.5, color: TColors.textSecondary, fontStyle: FontStyle.italic, height: 1.2),
                                         ),
                                       ]
                                     ],
@@ -280,11 +282,11 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName),
+                              _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName, textColor),
                               const SizedBox(height: 6),
-                              _buildInfoRow(isDark, Icons.category_outlined, "Product", order.productName),
+                              _buildInfoRow(isDark, Icons.category_outlined, "Product", order.productName, textColor),
                               const SizedBox(height: 6),
-                              _buildInfoRow(isDark, Icons.layers_outlined, "Quantity", "${order.quantity} Units"),
+                              _buildInfoRow(isDark, Icons.layers_outlined, "Quantity", "${order.quantity} Units", textColor),
                               const SizedBox(height: 16),
 
                               // --- ACTION & HISTORY BUTTONS ---
@@ -301,15 +303,15 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                         color: Colors.transparent,
                                         child: InkWell(
                                           borderRadius: BorderRadius.circular(12),
-                                          onTap: () => _showUpdateStageDialog(context, order, controller, isDark),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
+                                          onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(vertical: 14),
                                             child: Row(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                const Icon(Icons.edit_road_rounded, size: 16, color: Colors.white),
-                                                const SizedBox(width: 8),
-                                                const Text("UPDATE STAGE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
+                                                Icon(Icons.edit_road_rounded, size: 16, color: Colors.white),
+                                                SizedBox(width: 8),
+                                                Text("UPDATE STAGE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
                                               ],
                                             ),
                                           ),
@@ -324,11 +326,11 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                     decoration: BoxDecoration(
                                         color: isDark ? Colors.white10 : Colors.grey.shade100,
                                         borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: isDark ? Colors.transparent : Colors.grey.shade300)
+                                        border: Border.all(color: TColors.getBorderColor(context))
                                     ),
                                     child: IconButton(
-                                      icon: Icon(Icons.history_rounded, color: isDark ? Colors.white : Colors.black87, size: 20),
-                                      onPressed: () => _showHistoryDialog(context, order, isDark),
+                                      icon: Icon(Icons.history_rounded, color: textColor, size: 20),
+                                      onPressed: () => _showHistoryDialog(context, order, isDark, textColor),
                                     ),
                                   ),
                                 ],
@@ -367,7 +369,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(bool isDark, IconData icon, String label, String value) {
+  Widget _buildInfoRow(bool isDark, IconData icon, String label, String value, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -375,14 +377,14 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 14, color: Colors.grey.shade500),
+            child: Icon(icon, size: 14, color: TColors.textSecondary),
           ),
           const SizedBox(width: 8),
-          Text("$label: ", style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w500)),
+          Text("$label: ", style: const TextStyle(color: TColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w700),
               softWrap: true,
             ),
           ),
@@ -391,42 +393,39 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark) {
+  // --- NEW UPDATED DIALOG ---
+  void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
     showModalBottomSheet(
         context: context,
-        isScrollControlled: true, // Required for DraggableScrollableSheet
-        backgroundColor: Colors.transparent, // Transparent so the sheet handles the background
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
         builder: (context) {
-          // ✅ DRAGGABLE SCROLLABLE SHEET: Starts at 75%, expands to 90%, scrollable content
           return DraggableScrollableSheet(
-            initialChildSize: 0.75, // Starts at 3/4 of the screen height
-            minChildSize: 0.4,
-            maxChildSize: 0.90, // Can be dragged up to 90% of screen height
+            initialChildSize: 0.80, // Increased initial size to accommodate larger mockup
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
             expand: false,
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  color: isDark ? TColors.darkCard : TColors.lightCard,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom, // Avoids keyboard
-                  left: 24, right: 24, top: 16,
-                ),
+                padding: const EdgeInsets.only(left: 24, right: 24, top: 16),
                 child: SingleChildScrollView(
-                  controller: scrollController, // Important: pass the scrollController
+                  controller: scrollController,
                   physics: const BouncingScrollPhysics(),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start, // ✅ Changed to Start for Top-Left alignment
                     children: [
                       // --- DRAG HANDLE ---
                       Center(
                         child: Container(
                           width: 40, height: 4,
-                          margin: const EdgeInsets.only(bottom: 20),
+                          margin: const EdgeInsets.only(bottom: 24),
                           decoration: BoxDecoration(
                               color: isDark ? Colors.white24 : Colors.grey.shade300,
                               borderRadius: BorderRadius.circular(10)
@@ -434,52 +433,80 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // --- 1. HEADER ROW: MOCKUP & ORDER ID ---
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 70, height: 70,
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image_not_supported_outlined, color: Colors.grey.shade400, size: 20),
-                                const SizedBox(height: 4),
-                                Text("Mockup\n(Soon)", textAlign: TextAlign.center, style: TextStyle(fontSize: 9, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Text(
-                              "Order: ${order.manualOrderNo ?? order.id?.substring(0,6)}",
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)
-                          ),
-                        ],
+                      // --- 1. ORDER ID (CENTERED) ---
+                      Center( // ✅ Added Center to grab it to the middle
+                        child: Text(
+                            "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
+                            style: TextStyle(
+                                fontSize: 18, // Adjusted for a balanced centered look
+                                fontWeight: FontWeight.w900,
+                                color: textColor, // ✅ Using the adaptive text color
+                                letterSpacing: -0.5
+                            )
+                        ),
                       ),
                       const SizedBox(height: 16),
 
-                      // --- 2. DETAILS BELOW HEADER ---
-                      _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName),
-                      _buildInfoRow(isDark, Icons.category_rounded, "Product", "${order.productName} (${order.quantity} pcs)"),
-                      _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", "Mixed/Standard"),
-
-                      const SizedBox(height: 20),
-                      const Divider(),
-                      const SizedBox(height: 16),
-
-                      // --- 3. HORIZONTAL TIME TRACKER ---
-                      Text("Stage Progression Time", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 12),
-                      _buildHorizontalTimeline(order, isDark),
+                      // --- 2. BIG MOCKUP (BELOW ID) ---
+                      Container(
+                        width: 450, // ✅ Increased size
+                        height: 350, // ✅ Increased size
+                        decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : TColors.light,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
+                            boxShadow: [
+                              if(!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))
+                            ]
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.image_not_supported_outlined, color: TColors.textSecondary.withValues(alpha: 0.5), size: 40),
+                            const SizedBox(height: 8),
+                            Text(
+                                "Mockup Rendering\nAvailable Soon",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: TColors.textSecondary,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.2
+                                )
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 24),
 
-                      // --- 4. UPDATE STAGE SELECTION ---
-                      Text("Update Stage To:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                      // --- 3. ORDER DETAILS CARD ---
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                            color: isDark ? Colors.black26 : TColors.light,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: TColors.getBorderColor(context))
+                        ),
+                        child: Column(
+                          children: [
+                            _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName, textColor),
+                            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                            _buildInfoRow(isDark, Icons.category_rounded, "Product", "${order.productName} (${order.quantity} pcs)", textColor),
+                            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                            _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", "Mixed/Standard", textColor),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // --- 4. STAGE PROGRESSION ---
+                      Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
+                      const SizedBox(height: 12),
+                      _buildHorizontalTimeline(order, isDark, textColor),
+                      const SizedBox(height: 24),
+
+                      // --- 5. UPDATE STAGE SELECTION ---
+                      Text("Update Stage To:", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 10,
@@ -490,73 +517,32 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                           return GestureDetector(
                             onTap: isCurrent ? null : () {
                               Get.back();
-                              Get.defaultDialog(
-                                title: "Confirm Update",
-                                titleStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87),
-                                backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                content: Column(
-                                  children: [
-                                    Text('Changing status to', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-                                    const SizedBox(height: 8),
-                                    Text('"$stage"', style: TextStyle(color: TColors.primary, fontSize: 18, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                cancel: OutlinedButton(
-                                  onPressed: () => Get.back(),
-                                  style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5))),
-                                  child: const Text("No", style: TextStyle(color: Colors.redAccent)),
-                                ),
-                                confirm: ElevatedButton(
-                                  onPressed: () {
-                                    Get.back();
-                                    controller.updateProductionStage(order.id!, order.status, stage, remark: remarkController.text.trim());
-                                  },
-                                  style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
-                                  child: const Text("Confirm", style: TextStyle(color: Colors.white)),
-                                ),
-                              );
+                              _showConfirmationDialog(order, stage, controller, remarkController, isDark, textColor);
                             },
                             child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                 decoration: BoxDecoration(
                                     gradient: isCurrent ? _buildSolidGradient(TColors.primary) : null,
-                                    color: isCurrent ? null : (isDark ? Colors.white10 : Colors.grey.shade100),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: isCurrent ? null : Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300)
+                                    color: isCurrent ? null : (isDark ? Colors.white10 : Colors.white),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: isCurrent ? null : Border.all(color: TColors.getBorderColor(context)),
+                                    boxShadow: [
+                                      if (!isCurrent && !isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2))
+                                    ]
                                 ),
                                 child: Text(
                                     stage,
                                     style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: isCurrent ? Colors.white : (isDark ? Colors.grey.shade300 : Colors.black87)
+                                        fontSize: 13,
+                                        fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w700,
+                                        color: isCurrent ? Colors.white : (isDark ? Colors.white70 : Colors.black87)
                                     )
                                 )
                             ),
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 32),
-
-                      // --- 5. REMARK TEXT FIELD (AT THE BOTTOM) ---
-                      Text("Add Remark (Optional)", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: remarkController,
-                        style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: "E.g., Fabric received, starting cut...",
-                          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                          filled: true,
-                          fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05))),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 1.5)),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -566,10 +552,114 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         }
     );
   }
+  // --- NEW CONFIRMATION DIALOG W/ REMARKS ---
+  void _showConfirmationDialog(OrderModel order, String stage, UnitSupervisorController controller, TextEditingController remarkController, bool isDark, Color textColor) {
+    remarkController.clear();
 
-  Widget _buildHorizontalTimeline(OrderModel order, bool isDark) {
+    Get.dialog(
+      Dialog(
+        backgroundColor: isDark ? TColors.darkCard : TColors.lightCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40), // Shrinks dialog width
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20), // Reduced from 24
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Smaller Icon Header
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.published_with_changes_rounded, color: TColors.primary, size: 24),
+                ),
+                const SizedBox(height: 12),
+
+                Text("Confirm Update", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: textColor)),
+                const SizedBox(height: 4),
+
+                RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                        style: const TextStyle(color: TColors.textSecondary, fontSize: 13, height: 1.3),
+                        children: [
+                          const TextSpan(text: "Change status to "),
+                          TextSpan(text: '"$stage"', style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.bold)),
+                        ]
+                    )
+                ),
+                const SizedBox(height: 16),
+
+                // Remark TextField (Minimized to 2 lines)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text("Remark (Optional)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: remarkController,
+                  maxLines: 2, // Reduced from 3
+                  style: TextStyle(color: textColor, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: "E.g., Fabric received...",
+                    hintStyle: const TextStyle(color: TColors.textSecondary, fontSize: 12),
+                    filled: true,
+                    fillColor: isDark ? Colors.black26 : TColors.light,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 1.2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Compact Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: TColors.textSecondary.withValues(alpha: 0.2)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text("Cancel", style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Get.back();
+                          controller.updateProductionStage(order.id!, order.status, stage, remark: remarkController.text.trim());
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: TColors.primary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text("Confirm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+  }
+  Widget _buildHorizontalTimeline(OrderModel order, bool isDark, Color textColor) {
     if (order.stageHistory.isEmpty) {
-      return Text("No progression history available yet.", style: TextStyle(color: Colors.grey.shade500, fontSize: 12));
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: isDark ? Colors.black26 : TColors.light, borderRadius: BorderRadius.circular(12)),
+        child: const Text("No progression history available yet.", style: TextStyle(color: TColors.textSecondary, fontSize: 12)),
+      );
     }
 
     List<dynamic> history = List.from(order.stageHistory);
@@ -617,7 +707,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                     child: Icon(Icons.check_circle_rounded, color: stageColor, size: 14),
                   ),
                   const SizedBox(height: 4),
-                  Text(currentStage, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87)),
+                  Text(currentStage, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor.withValues(alpha: 0.8))),
                 ],
               ),
 
@@ -630,7 +720,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                     children: [
                       Text(
                           timeTakenStr,
-                          style: TextStyle(fontSize: 9, color: isDark ? Colors.cyanAccent : Colors.cyan.shade700, fontWeight: FontWeight.bold)
+                          style: TextStyle(fontSize: 9, color: TColors.primary.withValues(alpha: 0.8), fontWeight: FontWeight.bold)
                       ),
                       Container(height: 2, color: isDark ? Colors.white24 : Colors.grey.shade300),
                     ],
@@ -643,11 +733,11 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark) {
+  void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark, Color textColor) {
     showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: isDark ? TColors.darkCard : TColors.lightCard,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (context) {
           List<dynamic> history = List.from(order.stageHistory.reversed);
@@ -662,7 +752,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("Stage History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+                      Text("Stage History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textColor)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
@@ -673,7 +763,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   if (history.isEmpty)
-                    Expanded(child: Center(child: Text("No updates have been made yet.", style: TextStyle(color: Colors.grey.shade500))))
+                    const Expanded(child: Center(child: Text("No updates have been made yet.", style: TextStyle(color: TColors.textSecondary))))
                   else
                     Expanded(
                       child: ListView.builder(
@@ -708,13 +798,13 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(stage, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                                      Text(stage, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textColor)),
                                       const SizedBox(height: 4),
                                       Row(
                                         children: [
-                                          Icon(Icons.person_rounded, size: 12, color: Colors.grey.shade500),
+                                          const Icon(Icons.person_rounded, size: 12, color: TColors.textSecondary),
                                           const SizedBox(width: 4),
-                                          Text("Updated by $updater", style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                                          Text("Updated by $updater", style: const TextStyle(fontSize: 12, color: TColors.textSecondary, fontWeight: FontWeight.w500)),
                                         ],
                                       )
                                     ],
@@ -723,7 +813,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                 Text(
                                     DateFormat('dd MMM\nhh:mm a').format(time),
                                     textAlign: TextAlign.right,
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, height: 1.3)
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: TColors.textSecondary, height: 1.3)
                                 )
                               ],
                             ),
@@ -741,24 +831,24 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return Colors.blue;
-      case 'fab purchased': return Colors.pink;
-      case 'fab ready': return Colors.lightGreen;
-      case 'cutting': return Colors.orange;
+      case 'approved': return TColors.electricBlue;
+      case 'fab purchased': return TColors.neonPink;
+      case 'fab ready': return TColors.brightMint;
+      case 'cutting': return TColors.cutting;
       case 'cutting done': return Colors.deepOrange;
-      case 'printing': return Colors.indigo;
+      case 'printing': return TColors.printing;
       case 'printed': return Colors.cyan;
-      case 'stitching': return Colors.amber;
+      case 'stitching': return TColors.stitching;
       case 'stitched': return Colors.brown;
-      case 'packing': return Colors.purple;
+      case 'packing': return TColors.packing;
       case 'packed': return Colors.deepPurple;
       case 'shipping':
-      case 'shipped': return Colors.teal;
-      case 'delivered': return Colors.green;
-      case 'completed': return Colors.green;
-      case 'rejected': return Colors.red;
-      case 'pending': return const Color(0xFFFFC107);
-      default: return Colors.grey;
+      case 'shipped': return TColors.shipping;
+      case 'delivered': return TColors.delivered;
+      case 'completed': return TColors.success;
+      case 'rejected': return TColors.error;
+      case 'pending': return TColors.warning;
+      default: return TColors.textSecondary;
     }
   }
 }
