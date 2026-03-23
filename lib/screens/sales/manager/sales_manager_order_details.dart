@@ -1,8 +1,14 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http; // ✅ For downloading the image
+import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
+import 'package:gal/gal.dart'; // ✅ For saving to gallery
+import 'package:cached_network_image/cached_network_image.dart'; // ✅ Imported for image caching
+
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
@@ -42,6 +48,65 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
       }
     } catch (e) {
       Get.snackbar("Error", "Could not refresh order details.");
+    }
+  }
+
+  // ✅ NEW: FULL SCREEN IMAGE VIEWER
+  void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
+    Get.to(
+          () => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          iconTheme: const IconThemeData(color: Colors.white),
+          elevation: 0,
+          title: Text("Order $orderNo", style: const TextStyle(color: Colors.white, fontSize: 16)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download_rounded, color: Colors.white),
+              tooltip: 'Save to Gallery',
+              onPressed: () => _downloadAndSaveImage(imageUrl, orderNo),
+            ),
+          ],
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 1,
+            maxScale: 4,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
+              errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.white, size: 50),
+            ),
+          ),
+        ),
+      ),
+      transition: Transition.fadeIn,
+    );
+  }
+
+  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
+  Future<void> _downloadAndSaveImage(String url, String orderNo) async {
+    try {
+      Get.snackbar("Downloading...", "Saving mockup to your gallery.",
+          backgroundColor: Colors.black87, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+      final response = await http.get(Uri.parse(url));
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/mockup_$orderNo.jpg');
+      await file.writeAsBytes(response.bodyBytes);
+
+      await Gal.putImage(file.path);
+
+      Get.snackbar("Success!", "Image saved to your photo gallery.",
+          backgroundColor: Colors.green.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+    } catch (e) {
+      Get.snackbar("Error", "Could not save image: $e",
+          backgroundColor: Colors.red.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
     }
   }
 
@@ -109,6 +174,44 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+
+              // --- 0. DESIGN MOCKUP SECTION ---
+              if (currentOrder.mockupUrl != null && currentOrder.mockupUrl!.isNotEmpty) ...[
+                _buildSectionTitle("Design Mockup", Icons.palette_outlined, isDark),
+                Center(
+                  child: GestureDetector(
+                    onTap: () => _showFullScreenImage(context, currentOrder.mockupUrl!, currentOrder.manualOrderNo ?? "Unknown"),
+                    child: Container(
+                      width: double.infinity,
+                      height: 250,
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.black38 : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: isDark ? Colors.white24 : Colors.black12, width: 1.5),
+                      ),
+                      child: CachedNetworkImage(
+                        imageUrl: currentOrder.mockupUrl!,
+                        fit: BoxFit.contain, // Show actual size
+                        placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
+                        errorWidget: (context, url, error) => Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.broken_image_rounded, color: TColors.error.withValues(alpha: 0.5), size: 40),
+                            const SizedBox(height: 8),
+                            const Text("Image Error", style: TextStyle(color: TColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8.0, bottom: 28.0),
+                  child: Center(child: Text("Tap image to view full screen & download", style: TextStyle(fontSize: 10, color: TColors.textSecondary, fontStyle: FontStyle.italic))),
+                ),
+              ],
+
               // --- 1. KEY INFO CARD ---
               _buildSectionTitle("Client & Delivery Info", Icons.business_center_outlined, isDark),
               _buildCard(isDark, [
@@ -119,6 +222,13 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                 _buildDetailRow(Icons.phone_outlined, "Phone", currentOrder.clientPhone ?? "N/A", isDark),
                 _buildDivider(isDark),
                 _buildDetailRow(Icons.location_on_outlined, "Address", currentOrder.clientAddress ?? "N/A", isDark),
+
+                // ✅ NEW: ADDED PINCODE & STATE
+                if ((currentOrder.state != null && currentOrder.state!.isNotEmpty) || (currentOrder.pincode != null && currentOrder.pincode!.isNotEmpty)) ...[
+                  _buildDivider(isDark),
+                  _buildDetailRow(Icons.map_outlined, "State & PIN", "${currentOrder.state ?? 'N/A'} - ${currentOrder.pincode ?? 'N/A'}", isDark),
+                ],
+
                 _buildDivider(isDark),
                 _buildDetailRow(Icons.calendar_month_rounded, "Deadline", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate), isDark, color: Colors.redAccent),
               ]),
@@ -136,6 +246,10 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   double iPrice = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
                   int iQty = int.tryParse(item['qty']?.toString() ?? '0') ?? 0;
                   double iTotal = double.tryParse(item['total']?.toString() ?? '0') ?? (iPrice * iQty);
+
+                  // Extract new fields
+                  String neck = item['neckType'] ?? 'Not Specified';
+                  String type = item['productType'] ?? 'Not Specified';
 
                   return Container(
                     padding: const EdgeInsets.all(16),
@@ -156,6 +270,18 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                           ],
                         ),
                         const SizedBox(height: 8),
+
+                        // ✅ NEW: SHOWING CATEGORY & NECK TYPE
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                          child: Text(
+                              "Type: $type  |  Neck: $neck",
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: TColors.primary)
+                          ),
+                        ),
+
                         Row(
                           children: [
                             Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.grey.withValues(alpha:0.1), borderRadius: BorderRadius.circular(4)), child: Text(item['productCode'] ?? "NO SKU", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey.shade600))),
@@ -300,7 +426,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // ✅ HISTORY BUTTON
                     Container(
                       height: 52,
                       width: 52,
@@ -332,7 +457,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                     ),
                   ],
                 ),
-                // ✅ PULLS STAGES FROM CONTROLLER
               ] else if (controller.productionStages.contains(displayStatus)) ...[
                 _buildSectionTitle("Pipeline Management", Icons.timeline_rounded, isDark),
                 Container(
@@ -376,7 +500,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // ✅ HISTORY BUTTON NEXT TO DROPDOWN
                           Container(
                             height: 52,
                             width: 52,
@@ -424,7 +547,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // ✅ FULL WIDTH HISTORY BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -567,7 +689,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
-  // --- NEW: HISTORY TIMELINE BOTTOM SHEET ---
   void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark) {
     showModalBottomSheet(
         context: context,
@@ -575,11 +696,10 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (context) {
-          // Reverse the history list so the newest updates are at the top
           List<dynamic> history = List.from(order.stageHistory.reversed);
 
           return FractionallySizedBox(
-            heightFactor: 0.6, // Takes up 60% of screen height
+            heightFactor: 0.6,
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -611,13 +731,10 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         itemCount: history.length,
                         itemBuilder: (context, index) {
                           var event = history[index];
-
-                          // Safely parse timestamp
                           DateTime time = DateTime.now();
                           if (event['timestamp'] != null) {
                             time = (event['timestamp'] as Timestamp).toDate();
                           }
-
                           String stage = event['stage'] ?? 'Unknown Stage';
                           String updater = event['updatedBy'] ?? 'System';
                           Color color = _getStatusColor(stage);
@@ -627,20 +744,17 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Timeline Dot & Line
                                 Column(
                                   children: [
                                     Container(
                                       width: 14, height: 14,
                                       decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.3), width: 3)),
                                     ),
-                                    if (index != history.length - 1) // Don't draw line after last item
+                                    if (index != history.length - 1)
                                       Container(width: 2, height: 40, color: isDark ? Colors.white10 : Colors.grey.shade200)
                                   ],
                                 ),
                                 const SizedBox(width: 16),
-
-                                // Event Data
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,8 +771,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                                     ],
                                   ),
                                 ),
-
-                                // Time Data
                                 Text(
                                     DateFormat('dd MMM\nhh:mm a').format(time),
                                     textAlign: TextAlign.right,
@@ -678,7 +790,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
-  // ✅ UPDATED TO 14 STAGES
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;

@@ -5,6 +5,7 @@ import '../../data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/widgets/custom_text_field.dart';
 import '../../controllers/floor_management/marketing_upload_controller.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MarketingUploadScreen extends StatefulWidget {
   // ✅ OPTIONAL PARAMETER: If passed, the screen enters Edit Mode
@@ -479,61 +480,105 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
 
   // ✅ "COMING SOON" PLACEHOLDER
   Widget _buildImagePicker(bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E).withValues(alpha:0.5) : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.shade300,
-          width: 1.5,
+    return Obx(() {
+      final bool hasImage = controller.uploadedMockupUrl.value.isNotEmpty;
+
+      return GestureDetector(
+        onTap: controller.isUploadingMockup.value
+            ? null // Disable tap while uploading
+            : () => controller.pickAndUploadMockup(),
+        child: Container(
+          width: double.infinity,
+          height: 200, // Fixed height for a consistent look
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2C2C2E).withValues(alpha: 0.5) : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: hasImage ? TColors.primary : (isDark ? Colors.white10 : Colors.grey.shade300),
+              width: hasImage ? 2.0 : 1.5,
+            ),
+          ),
+          child: controller.isUploadingMockup.value
+              ? const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: TColors.primary),
+                SizedBox(height: 16),
+                Text("Uploading to Cloud...", style: TextStyle(color: TColors.textSecondary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          )
+              : hasImage
+              ? Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: controller.uploadedMockupUrl.value,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+              ),
+              // Add a subtle gradient overlay to make the change button readable
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
+                  ),
+                ),
+              ),
+              const Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.edit_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text("Tap to Change Mockup", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
+          )
+              : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: TColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_photo_alternate_rounded, size: 28, color: TColors.primary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Upload Design Mockup",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Tap to select an image from your gallery",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.auto_awesome_rounded, size: 28, color: Colors.amber),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Mockup Uploads",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "We are currently upgrading our cloud storage. This feature is coming soon!",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              "COMING SOON",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1),
-            ),
-          ),
-        ],
-      ),
-    );
+      );
+    });
   }
 
   // ✅ UPDATED SUMMARY: Locks "Advance" in Edit Mode

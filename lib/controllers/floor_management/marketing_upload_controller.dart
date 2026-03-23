@@ -1,11 +1,13 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../data/models/order_model.dart';
+import '../../utils/constants/colors.dart';
 
 // ✅ Helper Class for Dynamic Items
 class OrderItemForm {
@@ -16,7 +18,6 @@ class OrderItemForm {
   final orderValue = TextEditingController();
   final gstInfo = TextEditingController();
 
-  // ✅ Item-specific dropdowns
   final selectedNeckType = Rx<String?>(null);
   final selectedProductType = Rx<String?>(null);
 
@@ -62,22 +63,19 @@ class MarketingUploadController extends GetxController {
     'Specific Event Use'
   ];
 
-  // ✅ DYNAMIC ITEM LIST
   final items = <OrderItemForm>[].obs;
-
   final isLoading = false.obs;
   DateTime? _selectedDeadline;
 
   final isEditing = false.obs;
   String? editingOrderId;
 
-  // Memory variables to prevent overwriting the creator's name
   String? originalMarketingPersonName;
   String? originalMarketingPersonId;
 
-  // IMAGE OBSERVABLES
-  final RxString selectedImagePath = ''.obs;
-  final RxString existingImageUrl = ''.obs;
+  // ✅ NEW IMAGE OBSERVABLES (Matches UI exactly)
+  final RxString uploadedMockupUrl = ''.obs;
+  final RxBool isUploadingMockup = false.obs;
 
   // Observables for Financials
   final RxDouble subTotal = 0.0.obs;
@@ -94,18 +92,16 @@ class MarketingUploadController extends GetxController {
     shippingCharge.addListener(_calculateTotal);
     advanceAmount.addListener(_calculateTotal);
 
-    // ✅ PIN Code Listener for Auto-fetch
     pincode.addListener(() {
       String pin = pincode.text.trim();
       if (pin.length == 6) {
         _fetchStateFromPincode(pin);
       } else if (pin.length < 6) {
-        selectedState.value = ""; // Clear state if pin is incomplete
+        selectedState.value = "";
       }
     });
   }
 
-  // ✅ Free API to fetch State from PIN Code
   Future<void> _fetchStateFromPincode(String pin) async {
     try {
       final response = await GetConnect().get('https://api.postalpincode.in/pincode/$pin');
@@ -113,11 +109,10 @@ class MarketingUploadController extends GetxController {
       if (response.body != null &&
           response.body is List &&
           response.body[0]['Status'] == 'Success') {
-
         final String fetchedState = response.body[0]['PostOffice'][0]['State'];
         selectedState.value = fetchedState;
       } else {
-        selectedState.value = ""; // Invalid PIN
+        selectedState.value = "";
       }
     } catch (e) {
       debugPrint("PIN fetch error: $e");
@@ -203,12 +198,12 @@ class MarketingUploadController extends GetxController {
     shippingCharge.text = order.shippingCharge.toString();
     advanceAmount.text = "0";
 
-    // ✅ Load location data if editing
     final orderJson = order.toJson();
     pincode.text = orderJson['pincode'] ?? "";
     selectedState.value = orderJson['state'] ?? "";
 
-    existingImageUrl.value = orderJson['designMockupUrl'] ?? '';
+    // ✅ Load existing URL into the new variable
+    uploadedMockupUrl.value = order.mockupUrl ?? orderJson['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
     if (_selectedDeadline != null) {
@@ -225,7 +220,6 @@ class MarketingUploadController extends GetxController {
       itemForm.orderValue.text = (prod['price'] ?? 0.0).toStringAsFixed(2);
       itemForm.gstInfo.text = (prod['gstPercentage'] ?? 0.0).toString();
 
-      // ✅ Load per-item dropdowns
       itemForm.selectedNeckType.value = prod['neckType'];
       itemForm.selectedProductType.value = prod['productType'];
 
@@ -283,44 +277,57 @@ class MarketingUploadController extends GetxController {
     return months[month - 1];
   }
 
-  Future<void> pickImage() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+  // ✅ NEW: CLOUDINARY UPLOAD LOGIC
+  Future<void> pickAndUploadMockup() async {
+    final ImagePicker picker = ImagePicker();
 
-      if (image != null) {
-        selectedImagePath.value = image.path;
-        existingImageUrl.value = '';
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+
+    if (image == null) return;
+
+    try {
+      isUploadingMockup.value = true;
+
+      const String cloudName = "dt2yfdelm";
+      const String uploadPreset = "yoobbel_mockups";
+
+      var uri = Uri.parse("https://api.cloudinary.com/v1_1/$cloudName/image/upload");
+      var request = http.MultipartRequest("POST", uri);
+
+      request.fields['upload_preset'] = uploadPreset;
+      request.files.add(await http.MultipartFile.fromPath('file', image.path));
+
+      var response = await request.send();
+
+      if (response.statusCode == 200) {
+        var responseData = await response.stream.toBytes();
+        var result = json.decode(String.fromCharCodes(responseData));
+
+        uploadedMockupUrl.value = result['secure_url'];
+
+        Get.snackbar(
+          "Success",
+          "Mockup uploaded successfully!",
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
+          colorText: Colors.green,
+        );
+      } else {
+        Get.snackbar("Upload Failed", "Could not upload to Cloudinary.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent);
       }
     } catch (e) {
-      Get.snackbar("Error", "Could not pick image: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
-    }
-  }
-
-  void removeImage() {
-    selectedImagePath.value = '';
-    existingImageUrl.value = '';
-  }
-
-  Future<String?> _uploadImageToStorage() async {
-    if (selectedImagePath.value.isEmpty) return null;
-    try {
-      File file = File(selectedImagePath.value);
-      String fileName = 'mockups/${DateTime.now().millisecondsSinceEpoch}_${orderNo.text}.jpg';
-      Reference ref = FirebaseStorage.instance.ref().child(fileName);
-
-      await ref.putFile(file);
-      String downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      throw Exception("Image upload failed: $e");
+      Get.snackbar("Error", "Something went wrong: $e", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent);
+    } finally {
+      isUploadingMockup.value = false;
     }
   }
 
   void submitOrder() async {
     if (!uploadFormKey.currentState!.validate()) return;
     if (_selectedDeadline == null) {
-      Get.snackbar("Missing Date", "Please select a delivery deadline.");
+      Get.snackbar("Missing Date", "Please select a delivery deadline.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent);
       return;
     }
 
@@ -338,11 +345,6 @@ class MarketingUploadController extends GetxController {
             agentName = userDoc.data()?['name'] ?? user.displayName ?? "Agent";
           }
         } catch (e) {}
-      }
-
-      String? finalImageUrl = existingImageUrl.value;
-      if (selectedImagePath.value.isNotEmpty) {
-        finalImageUrl = await _uploadImageToStorage();
       }
 
       List<Map<String, dynamic>> productsList = [];
@@ -370,8 +372,6 @@ class MarketingUploadController extends GetxController {
           "price": price,
           "gstPercentage": gst,
           "total": itemTotal,
-
-          // ✅ Save Per-Item specifications
           "neckType": item.selectedNeckType.value ?? 'Not Specified',
           "productType": item.selectedProductType.value ?? 'Not Specified',
         });
@@ -385,17 +385,13 @@ class MarketingUploadController extends GetxController {
         "clientPhone": phone.text.trim(),
         "organization": organization.text.trim(),
         "clientAddress": address.text.trim(),
-
-        // ✅ Save Location details
         "pincode": pincode.text.trim(),
         "state": selectedState.value,
-
         "productCode": items.first.productCode.text.trim(),
         "productDetails": rootProductName,
         "productName": rootProductName,
         "quantity": totalQty,
         "gstPercentage": avgGst,
-
         "priority": "Medium",
         "deliveryDate": Timestamp.fromDate(_selectedDeadline!),
         "shippingCharge": double.tryParse(shippingCharge.text.trim()) ?? 0.0,
@@ -404,7 +400,8 @@ class MarketingUploadController extends GetxController {
         "marketingPersonId": userId,
         "products": productsList,
 
-        if (finalImageUrl != null && finalImageUrl.isNotEmpty) "designMockupUrl": finalImageUrl,
+        // ✅ IMPORTANT: Attaching the uploaded Cloudinary URL
+        "mockupUrl": uploadedMockupUrl.value.isEmpty ? null : uploadedMockupUrl.value,
       };
 
       if (isEditing.value && editingOrderId != null) {
@@ -512,7 +509,6 @@ class MarketingUploadController extends GetxController {
     shippingCharge.clear();
     advanceAmount.clear();
 
-    // ✅ Clear location variables
     pincode.clear();
     selectedState.value = "";
 
@@ -520,8 +516,11 @@ class MarketingUploadController extends GetxController {
     addNewItem();
 
     _selectedDeadline = null;
-    selectedImagePath.value = '';
-    existingImageUrl.value = '';
+
+    // ✅ Clear mockup variables
+    uploadedMockupUrl.value = '';
+    isUploadingMockup.value = false;
+
     subTotal.value = 0.0;
     taxAmount.value = 0.0;
     grandTotal.value = 0.0;

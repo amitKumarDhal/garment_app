@@ -396,9 +396,6 @@ class SalesAgentController extends GetxController {
 
   // --- REQUEST DELETE ORDER LOGIC ---
   Future<void> deleteOrder(String orderId, String currentStatus) async {
-    // ✅ UPDATED: Added new 14-stage logic for locking deletions
-    // It is usually safe to delete if it's just 'Approved' or 'Fab Purchased'.
-    // Once 'Fab Ready' or 'Cutting' starts, the agent should be locked out.
     final lockedStatuses = [
       'fab ready',
       'cutting',

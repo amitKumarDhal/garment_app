@@ -1,8 +1,14 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http; // ✅ For downloading the image
+import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
+import 'package:gal/gal.dart'; // ✅ For saving to gallery
+import 'package:cached_network_image/cached_network_image.dart'; // ✅ Imported for image caching
+
 import '../../controllers/floor_management/marketing_upload_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../controllers/sales/sales_history_controller.dart';
@@ -342,10 +348,68 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
+  // ✅ NEW: FULL SCREEN IMAGE VIEWER
+  void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
+    Get.to(
+          () => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          iconTheme: const IconThemeData(color: Colors.white),
+          elevation: 0,
+          title: Text("Order $orderNo", style: const TextStyle(color: Colors.white, fontSize: 16)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download_rounded, color: Colors.white),
+              tooltip: 'Save to Gallery',
+              onPressed: () => _downloadAndSaveImage(imageUrl, orderNo),
+            ),
+          ],
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 1,
+            maxScale: 4,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
+              errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.white, size: 50),
+            ),
+          ),
+        ),
+      ),
+      transition: Transition.fadeIn,
+    );
+  }
+
+  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
+  Future<void> _downloadAndSaveImage(String url, String orderNo) async {
+    try {
+      Get.snackbar("Downloading...", "Saving mockup to your gallery.",
+          backgroundColor: Colors.black87, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+      final response = await http.get(Uri.parse(url));
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/mockup_$orderNo.jpg');
+      await file.writeAsBytes(response.bodyBytes);
+
+      await Gal.putImage(file.path);
+
+      Get.snackbar("Success!", "Image saved to your photo gallery.",
+          backgroundColor: Colors.green.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+    } catch (e) {
+      Get.snackbar("Error", "Could not save image: $e",
+          backgroundColor: Colors.red.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+    }
+  }
+
   void _showOrderDetails(BuildContext context, OrderModel order, bool isDark) {
     bool isDeleted = order.toJson()['isDeleted'] == true;
 
-    // ✅ UPDATED: Sales can now edit up until the fabric is actually cut.
     final lockedStatuses = [
       'cutting', 'cutting done',
       'printing', 'printed', 'stitching', 'stitched',
@@ -404,12 +468,55 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              // --- ✅ NEW: CLICKABLE ACTUAL SIZE MOCKUP (Top of Details) ---
+              if (order.mockupUrl != null && order.mockupUrl!.isNotEmpty) ...[
+                Center(
+                  child: GestureDetector(
+                    onTap: () => _showFullScreenImage(context, order.mockupUrl!, order.manualOrderNo ?? "Unknown"),
+                    child: Container(
+                      width: double.infinity,
+                      height: 250,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.black38 : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
+                      ),
+                      child: CachedNetworkImage(
+                        imageUrl: order.mockupUrl!,
+                        fit: BoxFit.contain, // Actual size, no crop
+                        placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
+                        errorWidget: (context, url, error) => Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.broken_image_rounded, color: TColors.error.withValues(alpha: 0.5), size: 40),
+                            const SizedBox(height: 8),
+                            const Text("Image Error", style: TextStyle(color: TColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 24.0),
+                      child: Text("Tap image to view full screen & download", style: TextStyle(fontSize: 10, color: TColors.textSecondary, fontStyle: FontStyle.italic)),
+                    )
+                ),
+              ],
+
               _modalRow("Order Number", order.manualOrderNo ?? "N/A", isDark, isBold: true, valueColor: TColors.primary),
               _modalRow("Client Name", order.clientName, isDark, isBold: true),
               _modalRow("Organization", order.organization ?? "N/A", isDark),
               _modalRow("Phone", order.clientPhone ?? "N/A", isDark),
               _modalRow("Deadline", DateFormat('MMM dd, yyyy').format(order.deliveryDate), isDark),
               _modalRow("Status", isDeleted ? "DELETED" : order.status.toUpperCase(), isDark, isStatus: true, overrideColor: isDeleted ? Colors.grey : null),
+
+              // ✅ NEW: SHOW LOCATION (State + PIN)
+              if ((order.state != null && order.state!.isNotEmpty) || (order.pincode != null && order.pincode!.isNotEmpty))
+                _modalRow("State / PIN", "${order.state ?? 'N/A'} - ${order.pincode ?? 'N/A'}", isDark),
 
               const SizedBox(height: 24),
               Text("ITEMIZED PRODUCTS", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey.shade500, fontSize: 11, letterSpacing: 1)),
@@ -419,6 +526,10 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 double iPrice = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
                 int iQty = int.tryParse(item['qty']?.toString() ?? '0') ?? 0;
                 double iTotal = double.tryParse(item['total']?.toString() ?? '0') ?? (iPrice * iQty);
+
+                String neck = item['neckType'] ?? 'Not Specified';
+                String type = item['productType'] ?? 'Not Specified';
+                String sizes = item['sizeDescription']?.toString() ?? 'Not Specified';
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -434,7 +545,25 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(item['productName'] ?? "Unknown", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
+
+                            // ✅ NEW: SHOWING CATEGORY & NECK TYPE
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              margin: const EdgeInsets.only(bottom: 4),
+                              decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                              child: Text(
+                                  "Type: $type | Neck: $neck",
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: TColors.primary)
+                              ),
+                            ),
+
+                            if (sizes.trim().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text("Sizes: $sizes", style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
+                              ),
+
                             Text("${item['qty']} Units × ${currency.format(iPrice)}", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
                           ],
                         ),

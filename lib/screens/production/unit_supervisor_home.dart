@@ -1,7 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http; // ✅ For downloading the image
+import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
+import 'package:gal/gal.dart'; // ✅ For saving to gallery
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../controllers/production/unit_supervisor_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../data/models/order_model.dart';
@@ -10,7 +17,6 @@ import '../profile/profile_screen.dart';
 class UnitSupervisorHome extends StatelessWidget {
   const UnitSupervisorHome({super.key});
 
-  // Helper method for dynamic greeting
   String _getGreeting() {
     var hour = DateTime.now().hour;
     if (hour < 12) {
@@ -22,13 +28,42 @@ class UnitSupervisorHome extends StatelessWidget {
     }
   }
 
-  // --- GRADIENT HELPER ---
   LinearGradient _buildSolidGradient(Color color) {
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [color.withValues(alpha: 0.8), color],
     );
+  }
+
+  LinearGradient _buildFadedGradient(Color color, bool isDark) {
+    return LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        color.withValues(alpha: isDark ? 0.2 : 0.15),
+        color.withValues(alpha: isDark ? 0.05 : 0.05),
+      ],
+    );
+  }
+
+  // --- HELPER METHOD TO GET ACTUAL SIZES ---
+  String _getFormattedSizes(OrderModel order) {
+    List<String> sizes = [];
+    if (order.products.isNotEmpty) {
+      for (var p in order.products) {
+        if (p['sizeDescription'] != null && p['sizeDescription'].toString().trim().isNotEmpty) {
+          sizes.add(p['sizeDescription'].toString().trim());
+        }
+      }
+    }
+    if (sizes.isNotEmpty) {
+      return sizes.join(" | ");
+    } else if (order.sizeDescription != null && order.sizeDescription!.trim().isNotEmpty) {
+      return order.sizeDescription!;
+    } else {
+      return "Not Specified";
+    }
   }
 
   @override
@@ -74,9 +109,7 @@ class UnitSupervisorHome extends StatelessWidget {
             )),
             actions: [
               GestureDetector(
-                onTap: () {
-                  // TODO: Add navigation to notifications screen
-                },
+                onTap: () {},
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -132,13 +165,12 @@ class UnitSupervisorHome extends StatelessWidget {
             .toList();
 
         floorOrders.sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
-
         DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
         return RefreshIndicator(
           color: TColors.primary,
           backgroundColor: isDark ? TColors.darkCard : Colors.white,
-          onRefresh: () async => controller.fetchActiveOrders(), // Uses new Future method
+          onRefresh: () async => controller.fetchActiveOrders(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 100),
@@ -146,7 +178,7 @@ class UnitSupervisorHome extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
 
-                // --- STAGE BREAKDOWN PIPELINE (COMPACT) ---
+                // --- STAGE BREAKDOWN PIPELINE ---
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 10),
                   child: Row(
@@ -224,14 +256,8 @@ class UnitSupervisorHome extends StatelessWidget {
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: TColors.error,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  "${floorOrders.length} IN QUEUE",
-                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
-                                ),
+                                decoration: BoxDecoration(color: TColors.error, borderRadius: BorderRadius.circular(6)),
+                                child: Text("${floorOrders.length} IN QUEUE", style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
                               ),
                             ],
                           ),
@@ -241,12 +267,7 @@ class UnitSupervisorHome extends StatelessWidget {
                         if (floorOrders.isEmpty)
                           const Padding(
                             padding: EdgeInsets.all(40),
-                            child: Center(
-                              child: Text(
-                                "Floor is clear!",
-                                style: TextStyle(color: TColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                            ),
+                            child: Center(child: Text("Floor is clear!", style: TextStyle(color: TColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600))),
                           )
                         else
                           ConstrainedBox(
@@ -257,12 +278,7 @@ class UnitSupervisorHome extends StatelessWidget {
                                 physics: const BouncingScrollPhysics(),
                                 shrinkWrap: true,
                                 itemCount: floorOrders.length,
-                                separatorBuilder: (context, index) => Divider(
-                                  color: isDark ? Colors.white10 : TColors.error.withValues(alpha: 0.05),
-                                  height: 1,
-                                  indent: 16,
-                                  endIndent: 16,
-                                ),
+                                separatorBuilder: (context, index) => Divider(color: isDark ? Colors.white10 : TColors.error.withValues(alpha: 0.05), height: 1, indent: 16, endIndent: 16),
                                 itemBuilder: (context, index) {
                                   var order = floorOrders[index];
                                   DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
@@ -272,25 +288,18 @@ class UnitSupervisorHome extends StatelessWidget {
                                   bool isDueToday = daysLeft == 0;
                                   bool isPacked = order.status.toLowerCase() == 'packed';
 
-                                  Color alertColor = isPacked
-                                      ? TColors.success
-                                      : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber));
+                                  Color alertColor = isPacked ? TColors.success : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber));
 
                                   return GestureDetector(
-                                    // ✅ CALLING THE NEW UPGRADED DIALOG HERE
+                                    // ✅ TAPPING RISK ORDER OPENS IMAGE DIALOG
                                     onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
                                     behavior: HitTestBehavior.opaque,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                       child: Row(
                                         children: [
-                                          Container(
-                                            width: 3,
-                                            height: 32,
-                                            decoration: BoxDecoration(color: alertColor, borderRadius: BorderRadius.circular(2)),
-                                          ),
+                                          Container(width: 3, height: 32, decoration: BoxDecoration(color: alertColor, borderRadius: BorderRadius.circular(2))),
                                           const SizedBox(width: 12),
-
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,14 +310,8 @@ class UnitSupervisorHome extends StatelessWidget {
                                                   text: TextSpan(
                                                     style: const TextStyle(fontFamily: 'Urbanist'),
                                                     children: [
-                                                      TextSpan(
-                                                        text: "${order.manualOrderNo ?? order.id?.substring(0,5)} ",
-                                                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: textColor),
-                                                      ),
-                                                      TextSpan(
-                                                        text: "• ${order.clientName}",
-                                                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: TColors.textSecondary),
-                                                      ),
+                                                      TextSpan(text: "${order.manualOrderNo ?? order.id?.substring(0,5)} ", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: textColor)),
+                                                      TextSpan(text: "• ${order.clientName}", style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: TColors.textSecondary)),
                                                     ],
                                                   ),
                                                 ),
@@ -317,21 +320,13 @@ class UnitSupervisorHome extends StatelessWidget {
                                                   children: [
                                                     const Icon(Icons.inventory_2_outlined, size: 12, color: TColors.textSecondary),
                                                     const SizedBox(width: 4),
-                                                    Expanded(
-                                                      child: Text(
-                                                        "${order.quantity} Units stuck in ${order.status.toUpperCase()}",
-                                                        style: const TextStyle(fontSize: 11, color: TColors.textSecondary, fontWeight: FontWeight.w500),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
+                                                    Expanded(child: Text("${order.quantity} Units stuck in ${order.status.toUpperCase()}", style: const TextStyle(fontSize: 11, color: TColors.textSecondary, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
                                                   ],
                                                 ),
                                               ],
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-
                                           Builder(
                                               builder: (context) {
                                                 String text = isPacked
@@ -341,15 +336,8 @@ class UnitSupervisorHome extends StatelessWidget {
                                                 if (isOverdue || isDueToday || isPacked) {
                                                   return Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: alertColor.withValues(alpha: 0.05),
-                                                      border: Border.all(color: alertColor.withValues(alpha: 0.5)),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: Text(
-                                                      text.toUpperCase(),
-                                                      style: TextStyle(color: alertColor, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                                    ),
+                                                    decoration: BoxDecoration(color: alertColor.withValues(alpha: 0.05), border: Border.all(color: alertColor.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(6)),
+                                                    child: Text(text.toUpperCase(), style: TextStyle(color: alertColor, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                                                   );
                                                 } else {
                                                   return Text(text, style: TextStyle(color: alertColor, fontSize: 10, fontWeight: FontWeight.w800));
@@ -367,15 +355,9 @@ class UnitSupervisorHome extends StatelessWidget {
                             ),
                           ),
                         Divider(color: isDark ? Colors.white10 : TColors.error.withValues(alpha: 0.1), height: 1),
-                        // --- FOOTER ---
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(
-                            child: Text(
-                              "Tap any order to update production status",
-                              style: TextStyle(color: TColors.textSecondary, fontSize: 10, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600),
-                            ),
-                          ),
+                          child: Center(child: Text("Tap any order to update production status", style: TextStyle(color: TColors.textSecondary, fontSize: 10, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600))),
                         ),
                       ],
                     ),
@@ -384,7 +366,7 @@ class UnitSupervisorHome extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // DATE WISE DELIVERABLES SCHEDULE WITH SCROLLABLE STRIP
+                // DATE WISE DELIVERABLES SCHEDULE
                 _buildDatewiseDeliverables(floorOrders, isDark, textColor, controller, today, context),
 
                 const SizedBox(height: 40),
@@ -444,9 +426,7 @@ class UnitSupervisorHome extends StatelessWidget {
                         border: Border.all(color: isSelected ? TColors.primary : TColors.getBorderColor(context)),
                         boxShadow: isSelected ? [BoxShadow(color: TColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
                       ),
-                      child: Center(
-                        child: Text("All", style: TextStyle(color: isSelected ? Colors.white : textColor, fontWeight: FontWeight.w900, fontSize: 13)),
-                      ),
+                      child: Center(child: Text("All", style: TextStyle(color: isSelected ? Colors.white : textColor, fontWeight: FontWeight.w900, fontSize: 13))),
                     ),
                   );
                 });
@@ -563,7 +543,7 @@ class UnitSupervisorHome extends StatelessWidget {
                           var o = dateOrders[index];
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            // ✅ CALLING THE NEW UPGRADED DIALOG HERE
+                            // ✅ TAPPING DELIVERABLE ORDER OPENS IMAGE DIALOG
                             onTap: () => _showUpdateStageDialog(context, o, controller, isDark, textColor),
                             title: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -591,7 +571,6 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  // --- COMPACT & INFORMATIVE STAGE MICRO-CARD ---
   Widget _buildCompactStageCard(bool isDark, Color textColor, String title, int unitCount, int orderCount, Color color, IconData icon) {
     bool isEmpty = unitCount == 0 && orderCount == 0;
     Color activeColor = isEmpty ? TColors.textSecondary : color;
@@ -681,7 +660,6 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  // --- HELPER FOR POPUP UI ---
   Widget _buildInfoRow(bool isDark, IconData icon, String label, String value, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -706,7 +684,7 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  // --- NEW UPDATED DIALOG (BIG MOCKUP & TOP LEFT ID) ---
+  // --- ✅ UPDATED DIALOG (CLICKABLE ACTUAL SIZE MOCKUP & NEW SIZES HELPER) ---
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
@@ -716,7 +694,7 @@ class UnitSupervisorHome extends StatelessWidget {
         backgroundColor: Colors.transparent,
         builder: (context) {
           return DraggableScrollableSheet(
-            initialChildSize: 0.80,
+            initialChildSize: 0.85,
             minChildSize: 0.5,
             maxChildSize: 0.95,
             expand: false,
@@ -732,62 +710,73 @@ class UnitSupervisorHome extends StatelessWidget {
                   physics: const BouncingScrollPhysics(),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start, // Top-Left alignment
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // --- DRAG HANDLE ---
                       Center(
                         child: Container(
                           width: 40, height: 4,
                           margin: const EdgeInsets.only(bottom: 24),
-                          decoration: BoxDecoration(
-                              color: isDark ? Colors.white24 : Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(10)
-                          ),
+                          decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
 
-                      // --- 1. ORDER ID (TOP LEFT) ---
-                      Text(
-                          "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
-                          style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: textColor,
-                              letterSpacing: -0.5
-                          )
+                      // --- 1. ORDER ID ---
+                      Center(
+                        child: Text(
+                            "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textColor, letterSpacing: -0.5)
+                        ),
                       ),
                       const SizedBox(height: 16),
 
-                      // --- 2. BIG MOCKUP (BELOW ID) ---
-                      Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.05) : TColors.light,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
-                            boxShadow: [
-                              if(!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))
-                            ]
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.image_not_supported_outlined, color: TColors.textSecondary.withValues(alpha: 0.5), size: 40),
-                            const SizedBox(height: 8),
-                            const Text(
-                                "Mockup Rendering\nAvailable Soon",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: TColors.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.2
-                                )
+                      // --- 2. CLICKABLE ACTUAL SIZE MOCKUP ---
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (order.mockupUrl != null && order.mockupUrl!.isNotEmpty) {
+                              _showFullScreenImage(context, order.mockupUrl!, order.manualOrderNo ?? "Unknown");
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            height: 280,
+                            clipBehavior: Clip.hardEdge,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.black38 : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
                             ),
-                          ],
+                            child: (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                              imageUrl: order.mockupUrl!,
+                              fit: BoxFit.contain, // ✅ ACTUAL SIZE (NO CROP)
+                              placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
+                              errorWidget: (context, url, error) => Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.broken_image_rounded, color: TColors.error.withValues(alpha: 0.5), size: 40),
+                                  const SizedBox(height: 8),
+                                  const Text("Image Error", style: TextStyle(color: TColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            )
+                                : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.image_not_supported_outlined, color: TColors.textSecondary.withValues(alpha: 0.5), size: 40),
+                                const SizedBox(height: 8),
+                                const Text("Waiting for Sales\nto upload mockup", textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: TColors.textSecondary, fontWeight: FontWeight.bold, height: 1.2)),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
+                      if (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8.0),
+                          child: Center(child: Text("Tap image to view full screen & download", style: TextStyle(fontSize: 10, color: TColors.textSecondary, fontStyle: FontStyle.italic))),
+                        ),
                       const SizedBox(height: 24),
 
                       // --- 3. ORDER DETAILS CARD ---
@@ -804,7 +793,9 @@ class UnitSupervisorHome extends StatelessWidget {
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                             _buildInfoRow(isDark, Icons.category_rounded, "Product", "${order.productName} (${order.quantity} pcs)", textColor),
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                            _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", "Mixed/Standard", textColor),
+
+                            // ✅ CALLING THE NEW HELPER HERE
+                            _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", _getFormattedSizes(order), textColor),
                           ],
                         ),
                       ),
@@ -862,6 +853,65 @@ class UnitSupervisorHome extends StatelessWidget {
           );
         }
     );
+  }
+
+  // ✅ NEW: FULL SCREEN IMAGE VIEWER
+  void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
+    Get.to(
+          () => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          iconTheme: const IconThemeData(color: Colors.white),
+          elevation: 0,
+          title: Text("Order $orderNo", style: const TextStyle(color: Colors.white, fontSize: 16)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download_rounded, color: Colors.white),
+              tooltip: 'Save to Gallery',
+              onPressed: () => _downloadAndSaveImage(imageUrl, orderNo),
+            ),
+          ],
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 1,
+            maxScale: 4, // Allow 4x zoom
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
+              errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.white, size: 50),
+            ),
+          ),
+        ),
+      ),
+      transition: Transition.fadeIn,
+    );
+  }
+
+  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
+  Future<void> _downloadAndSaveImage(String url, String orderNo) async {
+    try {
+      Get.snackbar("Downloading...", "Saving mockup to your gallery.",
+          backgroundColor: Colors.black87, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+      final response = await http.get(Uri.parse(url));
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/mockup_$orderNo.jpg');
+      await file.writeAsBytes(response.bodyBytes);
+
+      await Gal.putImage(file.path);
+
+      Get.snackbar("Success!", "Image saved to your photo gallery.",
+          backgroundColor: Colors.green.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+    } catch (e) {
+      Get.snackbar("Error", "Could not save image: $e",
+          backgroundColor: Colors.red.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+    }
   }
 
   // --- NEW COMPACT CONFIRMATION DIALOG W/ REMARKS ---

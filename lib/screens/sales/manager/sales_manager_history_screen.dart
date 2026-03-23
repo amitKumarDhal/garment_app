@@ -118,30 +118,29 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
-                        child: Obx(
-                              () => Row(
-                            children: [
-                              _buildFilterChip(controller, "All", isDark),
-                              _buildFilterChip(controller, "All NDO", isDark),
-                              _buildFilterChip(controller, "Delivered", isDark),
-                              _buildFilterChip(controller, "Pending", isDark),
-                              _buildFilterChip(controller, "Approved", isDark),
-                              _buildFilterChip(controller, "Fab Purchased", isDark),
-                              _buildFilterChip(controller, "Fab Ready", isDark),
-                              _buildFilterChip(controller, "Cutting", isDark),
-                              _buildFilterChip(controller, "Cutting Done", isDark),
-                              _buildFilterChip(controller, "Printing", isDark),
-                              _buildFilterChip(controller, "Printed", isDark),
-                              _buildFilterChip(controller, "Stitching", isDark),
-                              _buildFilterChip(controller, "Stitched", isDark),
-                              _buildFilterChip(controller, "Packing", isDark),
-                              _buildFilterChip(controller, "Packed", isDark),
-                              _buildFilterChip(controller, "Shipping", isDark), // ✅ Added
-                              _buildFilterChip(controller, "Shipped", isDark),  // ✅ Added
-                              _buildFilterChip(controller, "Rejected", isDark),
-                              _buildFilterChip(controller, "Trash", isDark),
-                            ],
-                          ),
+                        // ✅ REMOVED OBX FROM HERE (Moved to individual chips for better reactivity)
+                        child: Row(
+                          children: [
+                            _buildFilterChip(controller, "All", isDark),
+                            _buildFilterChip(controller, "All NDO", isDark),
+                            _buildFilterChip(controller, "Delivered", isDark),
+                            _buildFilterChip(controller, "Pending", isDark),
+                            _buildFilterChip(controller, "Approved", isDark),
+                            _buildFilterChip(controller, "Fab Purchased", isDark),
+                            _buildFilterChip(controller, "Fab Ready", isDark),
+                            _buildFilterChip(controller, "Cutting", isDark),
+                            _buildFilterChip(controller, "Cutting Done", isDark),
+                            _buildFilterChip(controller, "Printing", isDark),
+                            _buildFilterChip(controller, "Printed", isDark),
+                            _buildFilterChip(controller, "Stitching", isDark),
+                            _buildFilterChip(controller, "Stitched", isDark),
+                            _buildFilterChip(controller, "Packing", isDark),
+                            _buildFilterChip(controller, "Packed", isDark),
+                            _buildFilterChip(controller, "Shipping", isDark),
+                            _buildFilterChip(controller, "Shipped", isDark),
+                            _buildFilterChip(controller, "Rejected", isDark),
+                            _buildFilterChip(controller, "Trash", isDark),
+                          ],
                         ),
                       ),
                     ),
@@ -156,19 +155,14 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             child: RefreshIndicator(
               color: TColors.primary,
               backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              // ✅ Call the controller to refetch data forcefully
               onRefresh: () async {
                 HapticFeedback.lightImpact();
-                // Check if the method is named fetchOrderHistory or similar in your specific controller
-                // If the specific history controller doesn't have a fetch method,
-                // we tell the main SalesManagerController to refresh.
                 try {
                   final mainController = Get.find<SalesManagerController>();
                   mainController.fetchOrderHistory();
                   mainController.fetchPendingOrders();
                   await Future.delayed(const Duration(milliseconds: 800));
                 } catch (e) {
-                  // Fallback if main controller isn't registered for some reason
                   await Future.delayed(const Duration(milliseconds: 500));
                 }
               },
@@ -178,7 +172,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 }
 
                 if (controller.displayedOrders.isEmpty) {
-                  // ✅ Wrap empty state in ListView so pull-to-refresh still works
                   return ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
@@ -203,7 +196,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
                 return ListView.separated(
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 40, top: 0),
-                  physics: const AlwaysScrollableScrollPhysics(), // ✅ Required for pull-to-refresh
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: controller.displayedOrders.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
@@ -228,93 +221,94 @@ class SalesManagerHistoryScreen extends StatelessWidget {
   // --- UI Helpers ---
 
   Widget _buildFilterChip(SalesManagerHistoryController controller, String label, bool isDark) {
-    bool isSelected = controller.currentFilter.value == label;
+    // ✅ MOVED OBX HERE: Each chip now individually listens to data changes!
+    return Obx(() {
+      bool isSelected = controller.currentFilter.value == label;
 
-    // Determine the base color for the chip
-    Color baseColor = TColors.primary;
-    if (label == 'All NDO') baseColor = Colors.deepOrange;
-    else if (label != 'All' && label != 'Trash') baseColor = _getStatusColor(label);
-    else if (label == 'Trash') baseColor = Colors.red;
+      Color baseColor = TColors.primary;
+      if (label == 'All NDO') baseColor = Colors.deepOrange;
+      else if (label != 'All' && label != 'Trash') baseColor = _getStatusColor(label);
+      else if (label == 'Trash') baseColor = Colors.red;
 
-    // CALCULATE COUNT FOR THIS SPECIFIC STAGE
-    int count = 0;
-    List<OrderModel> baseList = controller.allOrders;
+      int count = 0;
+      List<OrderModel> baseList = controller.allOrders; // The RxList trigger
 
-    if (label == 'All') {
-      count = baseList.length;
-    } else if (label == 'All NDO') {
-      count = baseList.where((o) {
-        String s = o.status.toLowerCase();
-        return s != 'shipped' && s != 'delivered' && s != 'completed';
-      }).length;
-    } else if (label == 'Trash') {
-      count = baseList.where((o) => o.isDeleted || o.status.toLowerCase() == 'deleted').length;
-    } else {
-      count = baseList.where((o) => o.status.toLowerCase() == label.toLowerCase()).length;
-    }
+      if (label == 'All') {
+        count = baseList.length;
+      } else if (label == 'All NDO') {
+        count = baseList.where((o) {
+          String s = o.status.toLowerCase();
+          return s != 'shipped' && s != 'delivered' && s != 'completed';
+        }).length;
+      } else if (label == 'Trash') {
+        count = baseList.where((o) => o.isDeleted || o.status.toLowerCase() == 'deleted').length;
+      } else {
+        count = baseList.where((o) => o.status.toLowerCase() == label.toLowerCase()).length;
+      }
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 8, top: 8),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              controller.filterByStatus(label);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected ? baseColor : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isSelected ? baseColor : (isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-                boxShadow: isSelected ? [BoxShadow(color: baseColor.withValues(alpha:0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                  fontSize: 11,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ),
-
-          if (count > 0)
-            Positioned(
-              top: -6,
-              right: -6,
+      return Padding(
+        padding: const EdgeInsets.only(right: 8, top: 8),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                controller.filterByStatus(label);
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : baseColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
-                        width: 2
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
-                    ]
+                  color: isSelected ? baseColor : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isSelected ? baseColor : (isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
+                  boxShadow: isSelected ? [BoxShadow(color: baseColor.withValues(alpha:0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
                 ),
                 child: Text(
-                  count.toString(),
+                  label,
                   style: TextStyle(
-                    color: isSelected ? baseColor : Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
+                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                    fontSize: 11,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
             ),
-        ],
-      ),
-    );
+
+            if (count > 0)
+              Positioned(
+                top: -6,
+                right: -6,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: isSelected ? Colors.white : baseColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+                          width: 2
+                      ),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
+                      ]
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: TextStyle(
+                      color: isSelected ? baseColor : Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildRedesignedOrderCard(BuildContext context, OrderModel order, bool isDark) {
@@ -323,6 +317,14 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
     final int qty = order.quantity;
     final double unitPrice = qty > 0 ? (order.totalAmount / qty) : 0.0;
+
+    // ✅ SMART LOCATION FALLBACK
+    String displayLocation = "";
+    if (order.state != null && order.state!.isNotEmpty) {
+      displayLocation = order.state!;
+    } else if (order.clientAddress != null && order.clientAddress!.isNotEmpty) {
+      displayLocation = order.clientAddress!; // Fallback to full address for older orders
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -377,12 +379,34 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+
           Text(
             order.clientName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
           ),
+
+          // ✅ ALWAYS SHOWS LOCATION (Using State or Address fallback)
+          if (displayLocation.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 2),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on_rounded, size: 12, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      displayLocation,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           Text(
             order.productName,
             maxLines: 1,
@@ -532,7 +556,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ 14-Stage Color Map
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;

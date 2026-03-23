@@ -1,7 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http; // ✅ For downloading the image
+import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
+import 'package:gal/gal.dart'; // ✅ For saving to gallery
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../controllers/production/unit_supervisor_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../data/models/order_model.dart';
@@ -27,6 +34,25 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         color.withValues(alpha: isDark ? 0.05 : 0.05),
       ],
     );
+  }
+
+  // --- HELPER METHOD TO GET ACTUAL SIZES ---
+  String _getFormattedSizes(OrderModel order) {
+    List<String> sizes = [];
+    if (order.products.isNotEmpty) {
+      for (var p in order.products) {
+        if (p['sizeDescription'] != null && p['sizeDescription'].toString().trim().isNotEmpty) {
+          sizes.add(p['sizeDescription'].toString().trim());
+        }
+      }
+    }
+    if (sizes.isNotEmpty) {
+      return sizes.join(" | ");
+    } else if (order.sizeDescription != null && order.sizeDescription!.trim().isNotEmpty) {
+      return order.sizeDescription!;
+    } else {
+      return "Not Specified";
+    }
   }
 
   @override
@@ -179,7 +205,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   return s != 'shipped' && s != 'delivered' && s != 'completed';
                 }).toList();
 
-                // Search override for 'All NSO'
                 if (controller.searchQuery.value.isNotEmpty) {
                   String query = controller.searchQuery.value.toLowerCase();
                   ordersToDisplay = ordersToDisplay.where((o) {
@@ -191,176 +216,186 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 }
               }
 
-              if (ordersToDisplay.isEmpty) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off_rounded, size: 60, color: TColors.textSecondary),
-                      SizedBox(height: 16),
-                      Text("No matches found", style: TextStyle(color: TColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                );
-              }
-
-              var sortedOrders = List<OrderModel>.from(ordersToDisplay);
-
-              if (controller.selectedFilterStage.value == 'All') {
-                sortedOrders.sort((a, b) {
-                  String valA = a.manualOrderNo ?? a.id ?? "";
-                  String valB = b.manualOrderNo ?? b.id ?? "";
-                  return valB.compareTo(valA);
-                });
-              } else {
-                sortedOrders.sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
-              }
-
-              DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-
-              return ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-                itemCount: sortedOrders.length,
-                itemBuilder: (context, index) {
-                  var order = sortedOrders[index];
-                  Color statusColor = _getStatusColor(order.status);
-                  DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
-                  int daysLeft = deadline.difference(today).inDays;
-
-                  bool isOverdue = daysLeft < 0;
-                  bool isDueToday = daysLeft == 0;
-                  bool isDone = ['delivered', 'completed'].contains(order.status.toLowerCase());
-
-                  Color urgencyColor = isDone ? TColors.success : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary));
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: isDark ? TColors.darkCard : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: TColors.getBorderColor(context)),
-                      boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5))],
+              return RefreshIndicator(
+                color: TColors.primary,
+                backgroundColor: isDark ? TColors.darkCard : Colors.white,
+                onRefresh: () async {
+                  await controller.fetchActiveOrders();
+                },
+                child: ordersToDisplay.isEmpty
+                    ? SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off_rounded, size: 60, color: TColors.textSecondary),
+                          SizedBox(height: 16),
+                          Text("No matches found", style: TextStyle(color: TColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                      order.manualOrderNo ?? "ID: ${order.id?.substring(0,6)}",
-                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor)
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                            gradient: _buildFadedGradient(statusColor, isDark),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: statusColor.withValues(alpha: 0.3))
-                                        ),
-                                        child: Text(order.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
-                                      ),
-                                      if (order.updatedAt != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          "Updated ${DateFormat('dd MMM, hh:mm a').format(order.updatedAt!)}\nby ${order.lastUpdatedBy ?? 'System'}",
-                                          textAlign: TextAlign.right,
-                                          style: const TextStyle(fontSize: 8.5, color: TColors.textSecondary, fontStyle: FontStyle.italic, height: 1.2),
-                                        ),
-                                      ]
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName, textColor),
-                              const SizedBox(height: 6),
-                              _buildInfoRow(isDark, Icons.category_outlined, "Product", order.productName, textColor),
-                              const SizedBox(height: 6),
-                              _buildInfoRow(isDark, Icons.layers_outlined, "Quantity", "${order.quantity} Units", textColor),
-                              const SizedBox(height: 16),
+                  ),
+                )
+                    : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
+                  itemCount: ordersToDisplay.length,
+                  itemBuilder: (context, index) {
+                    var sortedOrders = List<OrderModel>.from(ordersToDisplay);
 
-                              // --- ACTION & HISTORY BUTTONS ---
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: _buildSolidGradient(TColors.primary),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [BoxShadow(color: TColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))],
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
+                    if (controller.selectedFilterStage.value == 'All') {
+                      sortedOrders.sort((a, b) {
+                        String valA = a.manualOrderNo ?? a.id ?? "";
+                        String valB = b.manualOrderNo ?? b.id ?? "";
+                        return valB.compareTo(valA);
+                      });
+                    } else {
+                      sortedOrders.sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
+                    }
+
+                    DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+                    var order = sortedOrders[index];
+                    Color statusColor = _getStatusColor(order.status);
+                    DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
+                    int daysLeft = deadline.difference(today).inDays;
+
+                    bool isOverdue = daysLeft < 0;
+                    bool isDueToday = daysLeft == 0;
+                    bool isDone = ['delivered', 'completed'].contains(order.status.toLowerCase());
+
+                    Color urgencyColor = isDone ? TColors.success : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary));
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? TColors.darkCard : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: TColors.getBorderColor(context)),
+                        boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5))],
+                      ),
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                        order.manualOrderNo ?? "ID: ${order.id?.substring(0,6)}",
+                                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor)
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                              gradient: _buildFadedGradient(statusColor, isDark),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: statusColor.withValues(alpha: 0.3))
+                                          ),
+                                          child: Text(order.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
+                                        ),
+                                        if (order.updatedAt != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "Updated ${DateFormat('dd MMM, hh:mm a').format(order.updatedAt!)}\nby ${order.lastUpdatedBy ?? 'System'}",
+                                            textAlign: TextAlign.right,
+                                            style: const TextStyle(fontSize: 8.5, color: TColors.textSecondary, fontStyle: FontStyle.italic, height: 1.2),
+                                          ),
+                                        ]
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName, textColor),
+                                const SizedBox(height: 6),
+                                _buildInfoRow(isDark, Icons.category_outlined, "Product", order.productName, textColor),
+                                const SizedBox(height: 6),
+                                _buildInfoRow(isDark, Icons.layers_outlined, "Quantity", "${order.quantity} Units", textColor),
+                                const SizedBox(height: 16),
+
+                                // --- ACTION & HISTORY BUTTONS ---
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: _buildSolidGradient(TColors.primary),
                                           borderRadius: BorderRadius.circular(12),
-                                          onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
-                                          child: const Padding(
-                                            padding: EdgeInsets.symmetric(vertical: 14),
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(Icons.edit_road_rounded, size: 16, color: Colors.white),
-                                                SizedBox(width: 8),
-                                                Text("UPDATE STAGE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
-                                              ],
+                                          boxShadow: [BoxShadow(color: TColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))],
+                                        ),
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            borderRadius: BorderRadius.circular(12),
+                                            onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(vertical: 14),
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.edit_road_rounded, size: 16, color: Colors.white),
+                                                  SizedBox(width: 8),
+                                                  Text("UPDATE STAGE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Container(
-                                    height: 46,
-                                    width: 46,
-                                    decoration: BoxDecoration(
-                                        color: isDark ? Colors.white10 : Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: TColors.getBorderColor(context))
+                                    const SizedBox(width: 12),
+                                    Container(
+                                      height: 46,
+                                      width: 46,
+                                      decoration: BoxDecoration(
+                                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: TColors.getBorderColor(context))
+                                      ),
+                                      child: IconButton(
+                                        icon: Icon(Icons.history_rounded, color: textColor, size: 20),
+                                        onPressed: () => _showHistoryDialog(context, order, isDark, textColor),
+                                      ),
                                     ),
-                                    child: IconButton(
-                                      icon: Icon(Icons.history_rounded, color: textColor, size: 20),
-                                      onPressed: () => _showHistoryDialog(context, order, isDark, textColor),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
 
-                        // FADED GRADIENT FOOTER
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            gradient: _buildFadedGradient(urgencyColor, isDark),
-                            borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
+                          // FADED GRADIENT FOOTER
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              gradient: _buildFadedGradient(urgencyColor, isDark),
+                              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.timer_outlined, size: 14, color: urgencyColor),
+                                const SizedBox(width: 8),
+                                Text("Target: ${DateFormat('dd MMM yyyy').format(deadline)}", style: TextStyle(color: urgencyColor, fontSize: 11, fontWeight: FontWeight.w700)),
+                                const Spacer(),
+                                Text(isOverdue ? "OVERDUE" : (isDueToday ? "DUE TODAY" : "ON TRACK"), style: TextStyle(color: urgencyColor, fontSize: 10, fontWeight: FontWeight.w900)),
+                              ],
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.timer_outlined, size: 14, color: urgencyColor),
-                              const SizedBox(width: 8),
-                              Text("Target: ${DateFormat('dd MMM yyyy').format(deadline)}", style: TextStyle(color: urgencyColor, fontSize: 11, fontWeight: FontWeight.w700)),
-                              const Spacer(),
-                              Text(isOverdue ? "OVERDUE" : (isDueToday ? "DUE TODAY" : "ON TRACK"), style: TextStyle(color: urgencyColor, fontSize: 10, fontWeight: FontWeight.w900)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               );
             }),
           ),
@@ -393,7 +428,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  // --- NEW UPDATED DIALOG ---
+  // --- UPDATED DIALOG (CLICKABLE ACTUAL SIZE MOCKUP) ---
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
@@ -403,7 +438,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         builder: (context) {
           return DraggableScrollableSheet(
-            initialChildSize: 0.80, // Increased initial size to accommodate larger mockup
+            initialChildSize: 0.85,
             minChildSize: 0.5,
             maxChildSize: 0.95,
             expand: false,
@@ -419,64 +454,74 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   physics: const BouncingScrollPhysics(),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start, // ✅ Changed to Start for Top-Left alignment
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // --- DRAG HANDLE ---
                       Center(
                         child: Container(
                           width: 40, height: 4,
                           margin: const EdgeInsets.only(bottom: 24),
-                          decoration: BoxDecoration(
-                              color: isDark ? Colors.white24 : Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(10)
-                          ),
+                          decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
 
-                      // --- 1. ORDER ID (CENTERED) ---
-                      Center( // ✅ Added Center to grab it to the middle
+                      // --- 1. ORDER ID ---
+                      Center(
                         child: Text(
                             "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
-                            style: TextStyle(
-                                fontSize: 18, // Adjusted for a balanced centered look
-                                fontWeight: FontWeight.w900,
-                                color: textColor, // ✅ Using the adaptive text color
-                                letterSpacing: -0.5
-                            )
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textColor, letterSpacing: -0.5)
                         ),
                       ),
                       const SizedBox(height: 16),
 
-                      // --- 2. BIG MOCKUP (BELOW ID) ---
-                      Container(
-                        width: 450, // ✅ Increased size
-                        height: 350, // ✅ Increased size
-                        decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.05) : TColors.light,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
-                            boxShadow: [
-                              if(!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))
-                            ]
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.image_not_supported_outlined, color: TColors.textSecondary.withValues(alpha: 0.5), size: 40),
-                            const SizedBox(height: 8),
-                            Text(
-                                "Mockup Rendering\nAvailable Soon",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: TColors.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.2
-                                )
+                      // --- 2. CLICKABLE ACTUAL SIZE MOCKUP ---
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (order.mockupUrl != null && order.mockupUrl!.isNotEmpty) {
+                              _showFullScreenImage(context, order.mockupUrl!, order.manualOrderNo ?? "Unknown");
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            height: 280,
+                            clipBehavior: Clip.hardEdge,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.black38 : Colors.grey.shade100, // Slightly darker background to frame actual size
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
                             ),
-                          ],
+                            // ✅ CHANGED to BoxFit.contain to show actual image size
+                            child: (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                              imageUrl: order.mockupUrl!,
+                              fit: BoxFit.contain, // Ensures NO ZOOM OR CROP
+                              placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
+                              errorWidget: (context, url, error) => Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.broken_image_rounded, color: TColors.error.withValues(alpha: 0.5), size: 40),
+                                  const SizedBox(height: 8),
+                                  const Text("Image Error", style: TextStyle(color: TColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            )
+                                : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.image_not_supported_outlined, color: TColors.textSecondary.withValues(alpha: 0.5), size: 40),
+                                const SizedBox(height: 8),
+                                const Text("Waiting for Sales\nto upload mockup", textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: TColors.textSecondary, fontWeight: FontWeight.bold, height: 1.2)),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
+                      if (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8.0),
+                          child: Center(child: Text("Tap image to view full screen & download", style: TextStyle(fontSize: 10, color: TColors.textSecondary, fontStyle: FontStyle.italic))),
+                        ),
                       const SizedBox(height: 24),
 
                       // --- 3. ORDER DETAILS CARD ---
@@ -493,7 +538,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                             _buildInfoRow(isDark, Icons.category_rounded, "Product", "${order.productName} (${order.quantity} pcs)", textColor),
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                            _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", "Mixed/Standard", textColor),
+                            _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", _getFormattedSizes(order), textColor),
                           ],
                         ),
                       ),
@@ -552,6 +597,73 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         }
     );
   }
+
+  // ✅ NEW: FULL SCREEN IMAGE VIEWER
+  void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
+    Get.to(
+          () => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          iconTheme: const IconThemeData(color: Colors.white),
+          elevation: 0,
+          title: Text("Order $orderNo", style: const TextStyle(color: Colors.white, fontSize: 16)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download_rounded, color: Colors.white),
+              tooltip: 'Save to Gallery',
+              onPressed: () => _downloadAndSaveImage(imageUrl, orderNo),
+            ),
+          ],
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 1,
+            maxScale: 4, // Allow 4x zoom
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
+              errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.white, size: 50),
+            ),
+          ),
+        ),
+      ),
+      transition: Transition.fadeIn,
+    );
+  }
+
+  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
+  Future<void> _downloadAndSaveImage(String url, String orderNo) async {
+    try {
+      Get.snackbar("Downloading...", "Saving mockup to your gallery.",
+          backgroundColor: Colors.black87, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+      // 1. Fetch the image bytes from the internet
+      final response = await http.get(Uri.parse(url));
+
+      // 2. Get a temporary directory to store it briefly
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/mockup_$orderNo.jpg');
+
+      // 3. Write bytes to the file
+      await file.writeAsBytes(response.bodyBytes);
+
+      // 4. Use Gal to save it securely to the phone's Photo Gallery
+      await Gal.putImage(file.path);
+
+      Get.snackbar("Success!", "Image saved to your photo gallery.",
+          backgroundColor: Colors.green.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+
+    } catch (e) {
+      Get.snackbar("Error", "Could not save image: $e",
+          backgroundColor: Colors.red.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+    }
+  }
+
+
   // --- NEW CONFIRMATION DIALOG W/ REMARKS ---
   void _showConfirmationDialog(OrderModel order, String stage, UnitSupervisorController controller, TextEditingController remarkController, bool isDark, Color textColor) {
     remarkController.clear();
@@ -560,14 +672,13 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
       Dialog(
         backgroundColor: isDark ? TColors.darkCard : TColors.lightCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 40), // Shrinks dialog width
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40),
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(20), // Reduced from 24
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Smaller Icon Header
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
@@ -590,7 +701,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // Remark TextField (Minimized to 2 lines)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text("Remark (Optional)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
@@ -598,7 +708,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 const SizedBox(height: 6),
                 TextField(
                   controller: remarkController,
-                  maxLines: 2, // Reduced from 3
+                  maxLines: 2,
                   style: TextStyle(color: textColor, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: "E.g., Fabric received...",
@@ -613,7 +723,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Compact Action Buttons
                 Row(
                   children: [
                     Expanded(
@@ -653,6 +762,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
       barrierDismissible: false,
     );
   }
+
   Widget _buildHorizontalTimeline(OrderModel order, bool isDark, Color textColor) {
     if (order.stageHistory.isEmpty) {
       return Container(
