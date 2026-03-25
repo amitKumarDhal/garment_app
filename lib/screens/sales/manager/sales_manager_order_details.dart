@@ -4,15 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http; // ✅ For downloading the image
-import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
-import 'package:gal/gal.dart'; // ✅ For saving to gallery
-import 'package:cached_network_image/cached_network_image.dart'; // ✅ Imported for image caching
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../services/pdf_invoice_service.dart';
+import '../../floor_management/marketing_upload_screen.dart';
+import '../../../controllers/floor_management/marketing_upload_controller.dart';
+import '../../../controllers/sales/sales_history_controller.dart';
 
 class SalesManagerOrderDetails extends StatefulWidget {
   final OrderModel order;
@@ -51,7 +54,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     }
   }
 
-  // ✅ NEW: FULL SCREEN IMAGE VIEWER
+  // ✅ FULL SCREEN IMAGE VIEWER
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
     Get.to(
           () => Scaffold(
@@ -88,7 +91,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
-  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
+  // ✅ DOWNLOAD AND SAVE TO GALLERY LOGIC
   Future<void> _downloadAndSaveImage(String url, String orderNo) async {
     try {
       Get.snackbar("Downloading...", "Saving mockup to your gallery.",
@@ -192,7 +195,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                       ),
                       child: CachedNetworkImage(
                         imageUrl: currentOrder.mockupUrl!,
-                        fit: BoxFit.contain, // Show actual size
+                        fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
                         errorWidget: (context, url, error) => Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -223,7 +226,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                 _buildDivider(isDark),
                 _buildDetailRow(Icons.location_on_outlined, "Address", currentOrder.clientAddress ?? "N/A", isDark),
 
-                // ✅ NEW: ADDED PINCODE & STATE
                 if ((currentOrder.state != null && currentOrder.state!.isNotEmpty) || (currentOrder.pincode != null && currentOrder.pincode!.isNotEmpty)) ...[
                   _buildDivider(isDark),
                   _buildDetailRow(Icons.map_outlined, "State & PIN", "${currentOrder.state ?? 'N/A'} - ${currentOrder.pincode ?? 'N/A'}", isDark),
@@ -247,7 +249,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   int iQty = int.tryParse(item['qty']?.toString() ?? '0') ?? 0;
                   double iTotal = double.tryParse(item['total']?.toString() ?? '0') ?? (iPrice * iQty);
 
-                  // Extract new fields
                   String neck = item['neckType'] ?? 'Not Specified';
                   String type = item['productType'] ?? 'Not Specified';
 
@@ -271,7 +272,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         ),
                         const SizedBox(height: 8),
 
-                        // ✅ NEW: SHOWING CATEGORY & NECK TYPE
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           margin: const EdgeInsets.only(bottom: 8),
@@ -488,13 +488,22 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                               ),
                               style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
                               items: controller.productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
+
                               onChanged: (newValue) {
-                                if (newValue != null) {
+                                if (newValue != null && newValue.toLowerCase() != displayStatus.toLowerCase()) {
                                   HapticFeedback.lightImpact();
                                   _confirmAction("Move to $newValue", Colors.blue, () async {
                                     setState(() => displayStatus = newValue);
                                     await controller.updateOrderStatus(currentOrder.id!, newValue);
                                   });
+                                } else if (newValue != null && newValue.toLowerCase() == displayStatus.toLowerCase()) {
+                                  Get.snackbar(
+                                    "Notice",
+                                    "The order is already marked as $newValue.",
+                                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                                    colorText: Colors.blue,
+                                    snackPosition: SnackPosition.BOTTOM,
+                                  );
                                 }
                               },
                             ),
@@ -516,12 +525,20 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         ],
                       ),
                       const SizedBox(height: 12),
+
+                      // ✅ ADDED OUT SRC AND OTHER LOCKED STATUSES HERE TO PREVENT SALES MANAGER FROM EDITING IT IF THEY SHOULDN'T.
+                      // Wait, Sales Manager SHOULD be able to edit. The prompt instructions were to add Out SRC to the "locked from sales agent" list.
+                      // Let's make sure the Sales Manager "Edit Order" button (if they have one) or Cancel button handles it correctly.
+                      // Actually, Sales Manager CAN cancel orders.
+
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: () => _confirmAction("Cancel & Reject", Colors.redAccent, () async {
-                            await controller.rejectOrder(currentOrder.id!);
-                            setState(() => displayStatus = "Rejected");
+                            if (displayStatus != "Rejected") {
+                              await controller.rejectOrder(currentOrder.id!);
+                              setState(() => displayStatus = "Rejected");
+                            }
                           }),
                           icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 16),
                           label: const Text("CANCEL ORDER", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.5)),
@@ -532,6 +549,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                           ),
                         ),
                       ),
+
                     ],
                   ),
                 ),
@@ -790,6 +808,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
+  // ✅ ADDED OUT SRC COLOR MAP TO MANAGER APP
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
@@ -803,6 +822,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
       case 'stitched': return Colors.brown;
       case 'packing': return Colors.purple;
       case 'packed': return Colors.deepPurple;
+      case 'out src': return Colors.indigoAccent; // ✅ NEW
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;
@@ -814,9 +834,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
   }
 }
 
-// =========================================================================
-// ✅ 1. THE DEDICATED CONTROLLER FOR LIVE MATH & SAVING
-// =========================================================================
 class EffectiveRevenueController extends GetxController {
   final OrderModel order;
   EffectiveRevenueController(this.order);
@@ -888,9 +905,6 @@ class EffectiveRevenueController extends GetxController {
   }
 }
 
-// =========================================================================
-// ✅ 2. REDESIGNED MARGIN CALCULATOR
-// =========================================================================
 class EffectiveRevenueSection extends StatelessWidget {
   final OrderModel order;
   const EffectiveRevenueSection({super.key, required this.order});

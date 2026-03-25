@@ -10,19 +10,21 @@ class SalesManagerHistoryController extends GetxController {
   StreamSubscription<QuerySnapshot>? _listener;
 
   var isLoading = true.obs;
-  var allOrders = <OrderModel>[];
+
+  // ✅ Kept your excellent fix: Reactive list
+  var allOrders = <OrderModel>[].obs;
   var displayedOrders = <OrderModel>[].obs;
 
   var currentFilter = "All NDO".obs;
-  Rx<DateTimeRange?> selectedDateRange = Rx<DateTimeRange?>(null);
   var searchQuery = "".obs;
 
   @override
   void onInit() {
     super.onInit();
-    if (Get.arguments != null && Get.arguments is String) {
-      currentFilter.value = Get.arguments;
-    }
+
+    // ✅ STRICT OVERRIDE: Always reset to "All NDO" when entering the screen
+    currentFilter.value = "All NDO";
+
     fetchAllOrders();
   }
 
@@ -35,51 +37,24 @@ class SalesManagerHistoryController extends GetxController {
   void fetchAllOrders() {
     isLoading.value = true;
 
-    _listener = _db.collection('orders')
+    _listener = _db
+        .collection('orders')
         .orderBy('orderDate', descending: true)
-        .limit(150) // ✅ Increased limit slightly for Master Ledger
+        .limit(150)
         .snapshots()
         .listen((snapshot) {
-
-      allOrders = snapshot.docs
+      // ✅ Kept your fix: using .value
+      allOrders.value = snapshot.docs
           .map((doc) => OrderModel.fromSnapshot(doc))
           .toList();
 
       applyFilter();
+
       isLoading.value = false;
     }, onError: (e) {
       debugPrint("Stream error: $e");
       isLoading.value = false;
     });
-  }
-
-  Future<void> pickDateRange(BuildContext context) async {
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2023),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Theme(
-          data: isDark ? ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(primary: Colors.purpleAccent),
-          ) : ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(primary: Colors.purple),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      selectedDateRange.value = picked;
-      applyFilter();
-    }
-  }
-
-  void clearDateFilter() {
-    selectedDateRange.value = null;
-    applyFilter();
   }
 
   void filterByStatus(String status) {
@@ -93,55 +68,53 @@ class SalesManagerHistoryController extends GetxController {
   }
 
   void applyFilter() {
-    List<OrderModel> temp = allOrders;
+    // ✅ IMPORTANT FIX: Pull from the reactive list
+    List<OrderModel> temp = allOrders.toList();
 
-    // --- 1. Filter by Status Tab ---
+    // --- STATUS FILTER ---
     if (currentFilter.value == "Trash") {
       temp = temp.where((o) => o.isDeleted == true).toList();
-    }
-    else if (currentFilter.value == "All") {
+    } else if (currentFilter.value == "All") {
       temp = temp.where((o) => o.isDeleted != true).toList();
-    }
-    else if (currentFilter.value == "All NDO") {
-      // ✅ "All NDO" shows everything EXCEPT Terminal States
-      // Note: 'Shipped' and 'Shipping' are NOT terminal, so they stay visible here.
-      List<String> terminalStatuses = ['delivered', 'completed', 'rejected', 'cancelled', 'deleted'];
+    } else if (currentFilter.value == "All NDO") {
+
+      // ✅ Terminal statuses exactly matched to UI badge exclusions
+      List<String> terminalStatuses = [
+        'shipped',
+        'delivered',
+        'completed',
+        'rejected',
+        'cancelled',
+        'deleted'
+      ];
 
       temp = temp.where((o) {
         String status = o.status.toLowerCase().trim();
         return !o.isDeleted && !terminalStatuses.contains(status);
       }).toList();
-    }
-    else {
-      // ✅ Handles specific clicks on "Shipping", "Shipped", etc.
-      temp = temp.where((o) =>
-      o.status.toLowerCase().trim() == currentFilter.value.toLowerCase().trim() &&
-          o.isDeleted != true
-      ).toList();
-    }
 
-    // --- 2. Filter by Date Range ---
-    if (selectedDateRange.value != null) {
-      DateTime start = selectedDateRange.value!.start;
-      DateTime end = selectedDateRange.value!.end.add(const Duration(days: 1));
-
+    } else {
       temp = temp.where((o) {
-        return o.orderDate.isAfter(start) && o.orderDate.isBefore(end);
+        return o.status.toLowerCase().trim() ==
+            currentFilter.value.toLowerCase().trim() &&
+            o.isDeleted != true;
       }).toList();
     }
 
-    // --- 3. Filter by Search Text ---
+    // --- SEARCH FILTER ---
     if (searchQuery.value.isNotEmpty) {
-      String lowerQuery = searchQuery.value.toLowerCase().trim();
-      temp = temp.where((o) {
-        bool matchBasic = o.clientName.toLowerCase().contains(lowerQuery) ||
-            o.marketingPersonName.toLowerCase().contains(lowerQuery) ||
-            (o.manualOrderNo?.toLowerCase().contains(lowerQuery) ?? false);
+      String q = searchQuery.value.toLowerCase();
 
+      temp = temp.where((o) {
+        bool matchBasic = o.clientName.toLowerCase().contains(q) ||
+            o.marketingPersonName.toLowerCase().contains(q) ||
+            (o.manualOrderNo?.toLowerCase().contains(q) ?? false);
+
+        // ✅ Deep search inside products array
         bool matchProducts = o.products.any((prod) {
           String pName = (prod['productName'] ?? '').toString().toLowerCase();
           String pCode = (prod['productCode'] ?? '').toString().toLowerCase();
-          return pName.contains(lowerQuery) || pCode.contains(lowerQuery);
+          return pName.contains(q) || pCode.contains(q);
         });
 
         return matchBasic || matchProducts;

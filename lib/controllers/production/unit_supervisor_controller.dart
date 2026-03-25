@@ -16,6 +16,7 @@ class UnitSupervisorController extends GetxController {
 
   StreamSubscription? _ordersSubscription;
 
+  // ✅ UPDATED: Added "Out SRC" before Shipping
   final List<String> factoryStages = [
     'Approved',
     'Fab Purchased',
@@ -28,6 +29,7 @@ class UnitSupervisorController extends GetxController {
     'Stitched',
     'Packing',
     'Packed',
+    'Out SRC', // 🏭 Added Stage
     'Shipping',
     'Shipped',
     'Delivered'
@@ -42,7 +44,7 @@ class UnitSupervisorController extends GetxController {
   void onInit() {
     super.onInit();
     fetchSupervisorProfile();
-    fetchActiveOrders(); // ✅ Renamed to match the UI's Pull-to-Refresh
+    fetchActiveOrders();
   }
 
   @override
@@ -66,11 +68,9 @@ class UnitSupervisorController extends GetxController {
     }
   }
 
-  // ✅ UPGRADED: Returns a Future for Pull-to-Refresh & prevents stream memory leaks
   Future<void> fetchActiveOrders() async {
     if (FirebaseAuth.instance.currentUser == null) return;
 
-    // Cancel the old stream if the user pulls to refresh
     await _ordersSubscription?.cancel();
 
     isLoading.value = true;
@@ -86,12 +86,10 @@ class UnitSupervisorController extends GetxController {
       activeOrders.value = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       isLoading.value = false;
 
-      // Stop the Pull-to-Refresh spinner once the data arrives
       if (!completer.isCompleted) {
         completer.complete();
       }
     }, onError: (e) {
-      // Ignore errors if the user simply logged out
       if (FirebaseAuth.instance.currentUser == null) return;
       debugPrint("Error fetching factory orders: $e");
       isLoading.value = false;
@@ -125,6 +123,7 @@ class UnitSupervisorController extends GetxController {
         String emoji = "🏭";
         if (newStatus == 'Packed') emoji = "📦";
         if (newStatus == 'Fab Ready') emoji = "👕";
+        if (newStatus == 'Out SRC') emoji = "🏢"; // ✅ Added Emoji for Outsourcing
         if (newStatus == 'Shipped') emoji = "🚚";
 
         await _db.collection('notifications').add({
@@ -136,7 +135,6 @@ class UnitSupervisorController extends GetxController {
         });
       }
 
-      // ✅ UPGRADED: Uses TColors for Snackbars
       Get.snackbar("Success", "Moved to $newStatus", backgroundColor: TColors.success.withValues(alpha:0.1), colorText: TColors.success);
     } catch (e) {
       Get.snackbar("Error", "Failed: $e", backgroundColor: TColors.error.withValues(alpha:0.1), colorText: TColors.error);
@@ -216,7 +214,6 @@ class UnitSupervisorController extends GetxController {
   void updateSearchQuery(String query) => searchQuery.value = query;
 
   List<Map<String, dynamic>> get stageUnitBreakdown {
-    // ✅ UPGRADED: Uses TColors to match the Dashboard Pipeline UI perfectly
     final stages = [
       {'name': 'Approved', 'icon': Icons.thumb_up_alt_outlined, 'color': TColors.electricBlue},
       {'name': 'Fab Purchased', 'icon': Icons.shopping_cart_outlined, 'color': TColors.neonPink},
@@ -229,6 +226,8 @@ class UnitSupervisorController extends GetxController {
       {'name': 'Stitched', 'icon': Icons.checkroom_outlined, 'color': Colors.brown},
       {'name': 'Packing', 'icon': Icons.inventory_2_outlined, 'color': TColors.packing},
       {'name': 'Packed', 'icon': Icons.all_inbox_rounded, 'color': Colors.deepPurple},
+      // ✅ ADDED: "Out SRC" Breakdown Card
+      {'name': 'Out SRC', 'icon': Icons.business_rounded, 'color': Colors.indigoAccent},
       {'name': 'Shipping', 'icon': Icons.local_shipping_outlined, 'color': TColors.shipping},
       {'name': 'Delivered', 'icon': Icons.task_alt_rounded, 'color': TColors.delivered},
     ];

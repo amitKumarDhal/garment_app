@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Needed for updating DB
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/order_model.dart';
 import 'sales_manager_controller.dart';
 
 class DeliverablesController extends GetxController {
   final SalesManagerController smController = Get.find<SalesManagerController>();
-  final FirebaseFirestore _db = FirebaseFirestore.instance; // ✅ Database reference
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // Currently selected date on the timeline
   var selectedDate = DateTime.now().obs;
@@ -27,11 +27,12 @@ class DeliverablesController extends GetxController {
 
   // 2. GET "AT RISK" ORDERS
   List<OrderModel> get atRiskOrders {
+    // ✅ "Out SRC" is NOT a safe status, so it will stay in the At Risk list if the deadline is near
     List<String> safeStatuses = ['shipping', 'shipped', 'delivered', 'completed', 'rejected'];
     DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
     var filtered = smController.activeOrders.where((order) {
-      String status = (order.status).toLowerCase();
+      String status = (order.status).toLowerCase().trim();
       if (safeStatuses.contains(status)) return false;
 
       DateTime cleanDeadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
@@ -55,14 +56,13 @@ class DeliverablesController extends GetxController {
 
   // 3. GET PRE-STITCHING QUEUE
   List<OrderModel> get notStitchedOrders {
-    // ✅ UPDATED: Included the new pre-stitching stages
     final preStitchingStatuses = [
       'approved', 'fab purchased', 'fab ready',
       'cutting', 'cutting done',
       'printing', 'printed'
     ];
     return smController.activeOrders.where((order) {
-      return preStitchingStatuses.contains(order.status.toLowerCase());
+      return preStitchingStatuses.contains(order.status.toLowerCase().trim());
     }).toList();
   }
 
@@ -71,10 +71,11 @@ class DeliverablesController extends GetxController {
     return notStitchedOrders.fold(0, (sum, order) => sum + order.quantity);
   }
 
-  // ✅ 5. GET ORDERS READY FOR DISPATCH (Status: Packed)
+  // ✅ 5. GET ORDERS READY FOR DISPATCH (Includes Packed & Out SRC)
   List<OrderModel> get readyForDispatchOrders {
     return smController.activeOrders.where((order) {
-      return order.status.toLowerCase() == 'packed';
+      String s = order.status.toLowerCase().trim();
+      return s == 'packed' || s == 'out src';
     }).toList();
   }
 
@@ -83,17 +84,15 @@ class DeliverablesController extends GetxController {
     return readyForDispatchOrders.fold(0, (sum, order) => sum + order.quantity);
   }
 
-  // ✅ 7. DISPATCH ORDER LOGIC (UPDATED WITH HISTORY LOGGING)
+  // ✅ 7. DISPATCH ORDER LOGIC
   Future<void> dispatchOrder(String orderId, String courier, String trackingNo) async {
     try {
-      // 1. Create the History Event
       final historyEvent = {
         'stage': 'Shipped',
         'updatedBy': smController.managerName.value,
         'timestamp': Timestamp.now(),
       };
 
-      // 2. Update DB with status, tracking, and history
       await _db.collection('orders').doc(orderId).update({
         'status': 'Shipped',
         'courierPartner': courier,
@@ -101,17 +100,17 @@ class DeliverablesController extends GetxController {
         'dispatchedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'lastUpdatedBy': smController.managerName.value,
-        'stageHistory': FieldValue.arrayUnion([historyEvent]), // <-- Push to timeline
+        'stageHistory': FieldValue.arrayUnion([historyEvent]),
       });
 
-      Get.back(); // Close dialog
+      Get.back();
       Get.snackbar("Success", "Order marked as Shipped!", backgroundColor: Colors.green, colorText: Colors.white);
     } catch (e) {
       Get.snackbar("Error", "Dispatch failed: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
     }
   }
 
-  // GET PIPELINE STAGE BREAKDOWN (UPDATED TO 14 STAGES)
+  // GET PIPELINE STAGE BREAKDOWN (UPDATED TO INCLUDE OUT SRC)
   List<Map<String, dynamic>> get stageUnitBreakdown {
     final stages = [
       {'name': 'Approved', 'icon': Icons.thumb_up_alt_outlined, 'color': Colors.blue},
@@ -125,6 +124,8 @@ class DeliverablesController extends GetxController {
       {'name': 'Stitched', 'icon': Icons.checkroom_outlined, 'color': Colors.brown},
       {'name': 'Packing', 'icon': Icons.inventory_2_outlined, 'color': Colors.purple},
       {'name': 'Packed', 'icon': Icons.all_inbox_rounded, 'color': Colors.deepPurple},
+      // ✅ ADDED: Out SRC stage
+      {'name': 'Out SRC', 'icon': Icons.business_rounded, 'color': Colors.indigoAccent},
       {'name': 'Shipping', 'icon': Icons.local_shipping_outlined, 'color': Colors.teal},
       {'name': 'Shipped', 'icon': Icons.local_shipping_outlined, 'color': Colors.teal},
       {'name': 'Delivered', 'icon': Icons.task_alt_rounded, 'color': Colors.green},
@@ -135,11 +136,11 @@ class DeliverablesController extends GetxController {
     for (var stage in stages) {
       String stageName = stage['name'] as String;
 
-      // ✅ SMART CHECK: 'Shipped' and 'Delivered' orders live in completedOrders!
+      // 'Shipped' and 'Delivered' orders live in completedOrders
       bool isCompletedStage = ['shipped', 'delivered'].contains(stageName.toLowerCase());
       var targetList = isCompletedStage ? smController.completedOrders : smController.activeOrders;
 
-      var filteredOrders = targetList.where((o) => o.status.toLowerCase() == stageName.toLowerCase());
+      var filteredOrders = targetList.where((o) => o.status.toLowerCase().trim() == stageName.toLowerCase().trim());
 
       int count = filteredOrders.fold(0, (sum, o) => sum + o.quantity);
       int orderCount = filteredOrders.length;
@@ -147,7 +148,7 @@ class DeliverablesController extends GetxController {
       breakdown.add({
         'name': stageName,
         'count': count,
-        'orderCount': orderCount, // Added this so UI can show the badge if needed
+        'orderCount': orderCount,
         'icon': stage['icon'],
         'color': stage['color'],
       });

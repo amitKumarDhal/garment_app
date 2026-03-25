@@ -59,7 +59,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           int orders = controller.notStitchedOrders.length;
                           final pipeline = controller.stageUnitBreakdown;
 
-                          // ✅ UPDATED: Included new fabric and cutting stages
                           final preStitchStages = pipeline.where((s) =>
                               ['Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done', 'Printing', 'Printed'].contains(s['name'])
                           ).toList();
@@ -128,8 +127,9 @@ class OrderDeliverablesScreen extends StatelessWidget {
                           int orders = controller.readyForDispatchOrders.length;
                           final pipeline = controller.stageUnitBreakdown;
 
+                          // ✅ UPDATED: Added "Out SRC" to the Ready to Ship card
                           final postStitchStages = pipeline.where((s) =>
-                              ['Stitching', 'Stitched', 'Packing', 'Packed'].contains(s['name'])
+                              ['Stitching', 'Stitched', 'Packing', 'Packed', 'Out SRC'].contains(s['name'])
                           ).toList();
 
                           return Container(
@@ -278,10 +278,12 @@ class OrderDeliverablesScreen extends StatelessWidget {
                                 bool isOverdue = daysLeft < 0;
                                 bool isDueToday = daysLeft == 0;
                                 bool isPacked = order.status.toLowerCase() == 'packed';
+                                bool isOutSrc = order.status.toLowerCase() == 'out src';
 
+                                // ✅ ADDED: Indigo Accent for Outsourced items in alerts
                                 Color alertColor = isPacked
                                     ? Colors.green
-                                    : (isOverdue ? Colors.redAccent : (isDueToday ? Colors.orange : Colors.amber));
+                                    : (isOutSrc ? Colors.indigoAccent : (isOverdue ? Colors.redAccent : (isDueToday ? Colors.orange : Colors.amber)));
 
                                 return GestureDetector(
                                   onTap: () => Get.to(() => SalesManagerOrderDetails(order: order)),
@@ -390,11 +392,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // =========================================================
-              // --- 3. THE DELIVERY SCHEDULE SECTION (RESTRUCTURED) ---
-              // =========================================================
-
-              // A. Section Heading
+              // --- 3. THE DELIVERY SCHEDULE SECTION ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
@@ -408,16 +406,14 @@ class OrderDeliverablesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // B. Scrollable Date Selector (Outside the card)
               SizedBox(
                 height: 65,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24), // Matches external padding
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   itemCount: 30,
                   itemBuilder: (context, index) {
-                    // Starts from 3 days ago for historical checking
                     DateTime date = DateTime.now().subtract(const Duration(days: 3)).add(Duration(days: index));
                     bool isToday = date.day == DateTime.now().day && date.month == DateTime.now().month;
 
@@ -430,7 +426,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
                         onTap: () => controller.selectDate(date),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 48, // Slightly wider for better touch target
+                          width: 48,
                           margin: const EdgeInsets.only(right: 10),
                           decoration: BoxDecoration(
                             color: isSelected ? TColors.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
@@ -469,7 +465,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // C. The Details Card (Changes based on selection)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -484,7 +479,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dynamic Header for the selected date
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                       child: Row(
@@ -511,7 +505,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
 
                     Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey.shade200),
 
-                    // Order List
                     Obx(() {
                       if (controller.ordersForSelectedDate.isEmpty) {
                         return Padding(
@@ -613,7 +606,6 @@ class OrderDeliverablesScreen extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED: Added new stages
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
@@ -627,6 +619,8 @@ class OrderDeliverablesScreen extends StatelessWidget {
       case 'stitched': return Colors.brown;
       case 'packing': return Colors.purple;
       case 'packed': return Colors.deepPurple;
+    // ✅ ADDED: Color for Outsourcing
+      case 'out src': return Colors.indigoAccent;
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;

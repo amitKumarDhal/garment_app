@@ -1,12 +1,14 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http; // ✅ For downloading the image
-import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
-import 'package:gal/gal.dart'; // ✅ For saving to gallery
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../controllers/production/unit_supervisor_controller.dart';
@@ -105,7 +107,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 2. HORIZONTAL STAGE SELECTOR ---
+          // --- 2. HORIZONTAL STAGE SELECTOR (Now includes Out SRC) ---
           Container(
             height: 60,
             margin: const EdgeInsets.only(bottom: 12),
@@ -127,6 +129,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   } else if (stage == 'All NSO') {
                     count = controller.activeOrders.where((o) {
                       String s = o.status.toLowerCase();
+                      // ✅ Terminal states exclusion remains same
                       return s != 'shipped' && s != 'delivered' && s != 'completed';
                     }).length;
                   } else {
@@ -265,8 +268,10 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                     bool isOverdue = daysLeft < 0;
                     bool isDueToday = daysLeft == 0;
                     bool isDone = ['delivered', 'completed'].contains(order.status.toLowerCase());
+                    bool isOutSrc = order.status.toLowerCase() == 'out src';
 
-                    Color urgencyColor = isDone ? TColors.success : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary));
+                    // ✅ Special styling for Out SRC
+                    Color urgencyColor = isDone ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary)));
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -373,7 +378,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                             ),
                           ),
 
-                          // FADED GRADIENT FOOTER
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -387,7 +391,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text("Target: ${DateFormat('dd MMM yyyy').format(deadline)}", style: TextStyle(color: urgencyColor, fontSize: 11, fontWeight: FontWeight.w700)),
                                 const Spacer(),
-                                Text(isOverdue ? "OVERDUE" : (isDueToday ? "DUE TODAY" : "ON TRACK"), style: TextStyle(color: urgencyColor, fontSize: 10, fontWeight: FontWeight.w900)),
+                                Text(isOutSrc ? "OUTSOURCED" : (isOverdue ? "OVERDUE" : (isDueToday ? "DUE TODAY" : "ON TRACK")), style: TextStyle(color: urgencyColor, fontSize: 10, fontWeight: FontWeight.w900)),
                               ],
                             ),
                           ),
@@ -428,7 +432,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  // --- UPDATED DIALOG (CLICKABLE ACTUAL SIZE MOCKUP) ---
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
@@ -456,7 +459,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- DRAG HANDLE ---
                       Center(
                         child: Container(
                           width: 40, height: 4,
@@ -465,7 +467,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // --- 1. ORDER ID ---
                       Center(
                         child: Text(
                             "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
@@ -474,7 +475,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // --- 2. CLICKABLE ACTUAL SIZE MOCKUP ---
                       Center(
                         child: GestureDetector(
                           onTap: () {
@@ -487,11 +487,10 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                             height: 280,
                             clipBehavior: Clip.hardEdge,
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.black38 : Colors.grey.shade100, // Slightly darker background to frame actual size
+                              color: isDark ? Colors.black38 : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(color: TColors.getBorderColor(context), width: 1.5),
                             ),
-                            // ✅ CHANGED to BoxFit.contain to show actual image size
                             child: (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
                               imageUrl: order.mockupUrl!,
@@ -524,7 +523,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
-                      // --- 3. ORDER DETAILS CARD ---
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -544,13 +542,11 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      // --- 4. STAGE PROGRESSION ---
                       Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 12),
                       _buildHorizontalTimeline(order, isDark, textColor),
                       const SizedBox(height: 24),
 
-                      // --- 5. UPDATE STAGE SELECTION ---
                       Text("Update Stage To:", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 12),
                       Wrap(
@@ -598,7 +594,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: FULL SCREEN IMAGE VIEWER
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
     Get.to(
           () => Scaffold(
@@ -621,7 +616,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
             panEnabled: true,
             boundaryMargin: const EdgeInsets.all(20),
             minScale: 1,
-            maxScale: 4, // Allow 4x zoom
+            maxScale: 4,
             child: CachedNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.contain,
@@ -635,23 +630,15 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
   Future<void> _downloadAndSaveImage(String url, String orderNo) async {
     try {
       Get.snackbar("Downloading...", "Saving mockup to your gallery.",
           backgroundColor: Colors.black87, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
 
-      // 1. Fetch the image bytes from the internet
       final response = await http.get(Uri.parse(url));
-
-      // 2. Get a temporary directory to store it briefly
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/mockup_$orderNo.jpg');
-
-      // 3. Write bytes to the file
       await file.writeAsBytes(response.bodyBytes);
-
-      // 4. Use Gal to save it securely to the phone's Photo Gallery
       await Gal.putImage(file.path);
 
       Get.snackbar("Success!", "Image saved to your photo gallery.",
@@ -663,8 +650,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     }
   }
 
-
-  // --- NEW CONFIRMATION DIALOG W/ REMARKS ---
   void _showConfirmationDialog(OrderModel order, String stage, UnitSupervisorController controller, TextEditingController remarkController, bool isDark, Color textColor) {
     remarkController.clear();
 
@@ -952,6 +937,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
       case 'stitched': return Colors.brown;
       case 'packing': return TColors.packing;
       case 'packed': return Colors.deepPurple;
+      case 'out src': return Colors.indigoAccent;
       case 'shipping':
       case 'shipped': return TColors.shipping;
       case 'delivered': return TColors.delivered;

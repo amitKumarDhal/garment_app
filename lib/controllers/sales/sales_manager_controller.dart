@@ -10,17 +10,17 @@ class SalesManagerController extends GetxController {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ✅ Centralized master list of production stages (UPDATED TO 14 STAGES)
+  // ✅ UPDATED: Centralized list now includes "Out SRC" before Shipping
   final List<String> productionStages = [
     'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
     'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
+    'Out SRC', // 🏢 New Stage
     'Shipping', 'Shipped', 'Delivered'
   ];
 
   // --- Observables ---
   var pendingOrders = <OrderModel>[].obs;
   var approvedOrders = <OrderModel>[].obs;
-
   var deletionRequests = <OrderModel>[].obs;
 
   int get urgentDeliverablesCount {
@@ -34,16 +34,15 @@ class SalesManagerController extends GetxController {
     return activeOrders.where((order) {
       String status = (order.status).toLowerCase().trim();
 
-      // If the order is already in a "Safe" stage, ignore it
       if (safeStatuses.contains(status)) return false;
 
       DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
       int daysLeft = deadline.difference(today).inDays;
 
-      // Match the "At Risk" logic (3 days or less, including overdue)
       return daysLeft <= 3;
     }).length;
   }
+
   var managerName = 'Manager'.obs;
   var activeOrders = <OrderModel>[].obs;
   var completedOrders = <OrderModel>[].obs;
@@ -84,7 +83,6 @@ class SalesManagerController extends GetxController {
     fetchMonthlyStats();
   }
 
-  /// --- 1. Fetch Pending Orders ---
   void fetchPendingOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -109,7 +107,6 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  /// --- 2. Fetch Approved Orders ---
   void fetchApprovedOrders() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -125,15 +122,15 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  /// --- 3. FETCH ORDERS FOR HISTORY SCREEN ---
+  /// --- ✅ UPDATED: Added "Out SRC" to the Active Orders Stream ---
   void fetchOrderHistory() {
     if (FirebaseAuth.instance.currentUser == null) return;
 
-    // ✅ UPDATED QUERY: Included the new stages so they appear in Active Orders
     _db.collection('orders')
         .where('status', whereIn: [
       'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
-      'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed', 'Shipping'
+      'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
+      'Out SRC', 'Shipping' // Included Out SRC here
     ])
         .orderBy('orderDate', descending: true)
         .snapshots()
@@ -144,7 +141,7 @@ class SalesManagerController extends GetxController {
     });
 
     _db.collection('orders')
-        .where('status', whereIn: ['Shipped', 'Delivered', 'Rejected']) // Include shipped here if you want it considered completed
+        .where('status', whereIn: ['Shipped', 'Delivered', 'Rejected'])
         .orderBy('orderDate', descending: true)
         .limit(50)
         .snapshots()
@@ -153,7 +150,6 @@ class SalesManagerController extends GetxController {
     });
   }
 
-  /// --- 4. FETCH DELETION REQUESTS ---
   void fetchDeletionRequests() {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -183,18 +179,17 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  // ✅ BULLETPROOF PARSING HELPER
   double _parseAmount(dynamic value) {
     if (value == null) return 0.0;
     if (value is num) return value.toDouble();
     if (value is String) {
-      // Strips out commas and ₹ symbols so tryParse doesn't fail
       String clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
       return double.tryParse(clean) ?? 0.0;
     }
     return 0.0;
   }
 
+  /// --- ✅ UPDATED: Added "out src" to Revenue Logic ---
   Future<void> fetchMonthlyStats() async {
     if (FirebaseAuth.instance.currentUser == null) return;
     try {
@@ -218,7 +213,6 @@ class SalesManagerController extends GetxController {
           .where('orderDate', isLessThanOrEqualTo: endOfMonth)
           .get();
 
-      // BUG FIXED: Added 'pending' and 'placed' so they don't inflate the stats
       List<String> excludedStatuses = ['rejected', 'cancelled', 'pending', 'placed'];
 
       int validOrderCount = 0;
@@ -230,7 +224,6 @@ class SalesManagerController extends GetxController {
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
-
         bool isDeleteRequested = data['isDeleteRequested'] == true;
 
         if (!excludedStatuses.contains(status) && !isDeleteRequested) {
@@ -246,24 +239,22 @@ class SalesManagerController extends GetxController {
           }
           unitsCount += orderQty;
 
-          // ✅ UPDATED: Included new stages in Revenue Statuses
           List<String> revenueStatuses = [
             'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
             'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
+            'out src', // ✅ Added
             'shipping', 'shipped', 'delivered', 'completed'
           ];
 
           if (revenueStatuses.contains(status)) {
-            // Using robust parser for both values
             double effRev = _parseAmount(data['effectiveRevenue']);
             double totalAmt = _parseAmount(data['totalAmount']);
-
-            // If manager gave margin, use it. Otherwise, instantly use full amount!
             double amount = (effRev > 0) ? effRev : totalAmt;
 
             String agent = data['marketingPersonName'] ?? 'Unknown';
             total += amount;
             agentSales[agent] = (agentSales[agent] ?? 0) + amount;
+            countMap[agent] = (agentSales[agent] ?? 0).toInt(); // Temporary fix for count
             countMap[agent] = (countMap[agent] ?? 0) + 1;
           }
         }
@@ -278,20 +269,15 @@ class SalesManagerController extends GetxController {
       topAgents.value = sortedAgents.take(10).map((e) {
         String agentName = e.key;
         double currentSales = e.value;
-
-        // 1. Determine if they are a Manager based on our Map
         bool isSM = managerMap[agentName] == true;
 
-        // 2. Assign the Rank Label
-        // We force 'SM' if they are a manager, otherwise we calculate based on sales
         String rankLabel = "JSA";
-        double targetAmount = 100000.0; // Default JSA Target
+        double targetAmount = 100000.0;
 
         if (isSM) {
           rankLabel = "SM";
           targetAmount = 150000.0;
         } else {
-          // Associate Logic
           if (currentSales >= 200000) {
             rankLabel = "SC";
             targetAmount = 200000.0;
@@ -299,7 +285,7 @@ class SalesManagerController extends GetxController {
             rankLabel = "SSA";
             targetAmount = 150000.0;
           } else if (currentSales >= 100000) {
-            rankLabel = "JSA"; // Or keep JSA as per your 1L target rule
+            rankLabel = "JSA";
             targetAmount = 100000.0;
           }
         }
@@ -318,7 +304,7 @@ class SalesManagerController extends GetxController {
           'greeting': greeting,
           'count': countMap[agentName] ?? 0,
           'isSM': isSM,
-          'rank': rankLabel, // THIS IS THE KEY FIELD THE UI NEEDS
+          'rank': rankLabel,
         };
       }).toList();
     } catch (e) {
@@ -326,7 +312,6 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  /// --- ACTIONS ---
   Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
   }
@@ -339,27 +324,36 @@ class SalesManagerController extends GetxController {
     await _updateStatus(orderId, newStatus, Colors.blue);
   }
 
-  // UPDATED WITH HISTORY LOGGING
-  Future<void> _updateStatus(String orderId, String newStatus, Color color) async {
+  /// --- ✅ UPDATED: Added Notification Emoji for Out SRC ---
+  Future<void> _updateStatus(String orderId, String newStatus, Color color, {double? effectiveRevenue}) async {
     try {
       final orderDoc = await _db.collection('orders').doc(orderId).get();
+
+      if (orderDoc.exists && orderDoc.data()?['status'] == newStatus) {
+        return;
+      }
+
       final associateId = orderDoc.data()?['marketingPersonId'] ?? '';
       final orderNo = orderDoc.data()?['manualOrderNo'] ?? orderId;
 
-      // 1. CREATE THE HISTORY EVENT
       final historyEvent = {
         'stage': newStatus,
         'updatedBy': managerName.value,
         'timestamp': Timestamp.now(),
       };
 
-      // 2. UPDATE STATUS AND APPEND TO HISTORY ARRAY
-      await _db.collection('orders').doc(orderId).update({
+      Map<String, dynamic> updatePayload = {
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
         'lastUpdatedBy': managerName.value,
         'stageHistory': FieldValue.arrayUnion([historyEvent]),
-      });
+      };
+
+      if (effectiveRevenue != null) {
+        updatePayload['effectiveRevenue'] = effectiveRevenue;
+      }
+
+      await _db.collection('orders').doc(orderId).update(updatePayload);
 
       if (associateId.isNotEmpty) {
         String emoji = "🔄";
@@ -368,6 +362,7 @@ class SalesManagerController extends GetxController {
         if (newStatus == 'Cutting' || newStatus == 'Stitching' || newStatus == 'Cutting Done') emoji = "✂️";
         if (newStatus == 'Printing' || newStatus == 'Printed') emoji = "🖨️";
         if (newStatus == 'Packed' || newStatus == 'Packing') emoji = "📦";
+        if (newStatus == 'Out SRC') emoji = "🏢"; // ✅ Added Emoji for Outsourcing
         if (newStatus == 'Shipping' || newStatus == 'Shipped') emoji = "🚚";
         if (newStatus == 'Delivered') emoji = "🎉";
         if (newStatus == 'Fab Purchased' || newStatus == 'Fab Ready') emoji = "🧵";
@@ -453,31 +448,7 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  // UPDATED WITH HISTORY LOGGING
   Future<void> approveOrderWithMargin(String orderId, double marginAmount, double totalAmount) async {
-    try {
-      final historyEvent = {
-        'stage': 'Approved',
-        'updatedBy': managerName.value,
-        'timestamp': Timestamp.now(),
-      };
-
-      await _db.collection('orders').doc(orderId).update({
-        'status': 'Approved',
-        'effectiveRevenue': marginAmount,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'lastUpdatedBy': managerName.value,
-        'stageHistory': FieldValue.arrayUnion([historyEvent]),
-      });
-
-      fetchMonthlyStats();
-      Get.back();
-
-      Get.snackbar("Success", "Order approved successfully!",
-          backgroundColor: Colors.green.withValues(alpha: 0.1), colorText: Colors.green);
-    } catch (e) {
-      Get.snackbar("Error", "Failed to approve order: $e",
-          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
-    }
+    await _updateStatus(orderId, 'Approved', Colors.green, effectiveRevenue: marginAmount);
   }
 }

@@ -1,10 +1,12 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../controllers/production/stock_summary_controller.dart';
 import '../../utils/constants/colors.dart';
-import '../../utils/constants/inventory_constants.dart'; // ✅ Added Constants
+import '../../utils/constants/inventory_constants.dart';
 import 'stock_detail_screen.dart';
 
 class StockSummaryScreen extends StatelessWidget {
@@ -102,12 +104,9 @@ class StockSummaryScreen extends StatelessWidget {
                     List colorsList = group['colorsList'];
                     String prodName = group['product'].toString().toLowerCase();
 
-                    // Note: "Others" might also use pcs or kg depending on your decision,
-                    // assuming "Others" is pcs here for safety if it's collars/accessories
                     bool isPcs = prodName.contains('collar') || prodName.contains('rib') || prodName == 'others';
                     String unit = isPcs ? "pcs" : "kg";
 
-                    // OPTIMIZED LATEST LOG LOGIC
                     Map<String, dynamic>? latestLog;
                     for (var c in colorsList) {
                       if (c['history'] != null && c['history'].isNotEmpty) {
@@ -140,13 +139,12 @@ class StockSummaryScreen extends StatelessWidget {
                           ),
                           border: Border.all(color: actionColor.withValues(alpha: 0.3), width: 1.5),
                           boxShadow: [
-                            if (!isDark) BoxShadow(color: actionColor.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))
+                            if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
                           ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // --- Top Section (Title, Icon & Action Badge) ---
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                               child: Row(
@@ -167,6 +165,7 @@ class StockSummaryScreen extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       group['title'],
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5),
                                     ),
                                   ),
@@ -193,7 +192,6 @@ class StockSummaryScreen extends StatelessWidget {
                               ),
                             ),
 
-                            // --- Middle Section (Horizontal Colors) ---
                             SizedBox(
                               height: 42,
                               child: ListView.builder(
@@ -203,14 +201,10 @@ class StockSummaryScreen extends StatelessWidget {
                                 itemCount: colorsList.length,
                                 itemBuilder: (context, cIndex) {
                                   var c = colorsList[cIndex];
-
-                                  // ✅ NEW: Extract style if available
                                   String styleLabel = "";
                                   if (c['history'] != null && c['history'].isNotEmpty) {
                                     String style = c['history'].first['style'] ?? 'N/A';
-                                    if (style != 'N/A') {
-                                      styleLabel = " - $style";
-                                    }
+                                    if (style != 'N/A') styleLabel = " - $style";
                                   }
 
                                   return Container(
@@ -241,7 +235,7 @@ class StockSummaryScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 16),
 
-                            // --- Footer (Total Balance & Last Update Info) ---
+                            // --- ❌ FIX: FOOTER SECTION (Wrapped in Expanded/Flexible to prevent overflow) ---
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
@@ -267,22 +261,28 @@ class StockSummaryScreen extends StatelessWidget {
                                     ],
                                   ),
                                   if (latestLog != null)
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(Icons.history_rounded, size: 12, color: actionColor),
-                                            const SizedBox(width: 4),
-                                            Text("Last updated", style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.w600)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          "$dateStr • $latestUpdater",
-                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black87),
-                                        ),
-                                      ],
+                                  // ✅ Expanded prevents the Row from taking too much horizontal space
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              Icon(Icons.history_rounded, size: 12, color: actionColor),
+                                              const SizedBox(width: 4),
+                                              Text("Last updated", style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.w600)),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "$dateStr • $latestUpdater",
+                                            maxLines: 1, // ✅ Forces single line
+                                            overflow: TextOverflow.ellipsis, // ✅ Adds '...' for long names
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black87),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                 ],
                               ),
@@ -301,9 +301,7 @@ class StockSummaryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: Uses InventoryConstants and strips extra labels (like "Others")
   Color _getColorObj(String colorName) {
-    // In case the grouping logic appends text, strip it down to the base color
     String cleanColorName = colorName.split(' (').first;
     return Color(InventoryConstants.getHexForColor(cleanColorName));
   }

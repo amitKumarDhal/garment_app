@@ -224,9 +224,9 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 14),
                   const SizedBox(width: 4),
-                  Text(
+                  const Text(
                     "SOFT DELETED",
-                    style: TextStyle(color: Colors.redAccent.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                    style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                   ),
                 ],
               ),
@@ -264,24 +264,36 @@ class SalesOrderHistoryScreen extends StatelessWidget {
 
             Text(
               order.clientName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: isDeleted ? Colors.grey : (isDark ? Colors.white : Colors.black87)),
             ),
             Text(
               productSummary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
 
+            // ✅ FIXED ROW (Line 275 Fix): Wrapped long text in Expanded
             Row(
               children: [
                 Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
-                Text(order.marketingPersonName, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                const SizedBox(width: 16),
+                Expanded( // ✅ Added Expanded to prevent overflow
+                  child: Text(
+                    order.marketingPersonName,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 12), // Adjusted spacing
                 Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text(
-                  DateFormat('MMM dd, yyyy • hh:mm a').format(order.orderDate),
+                  DateFormat('MMM dd • hh:mm a').format(order.orderDate),
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
               ],
@@ -307,7 +319,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       ),
     );
   }
-
   void _showPaymentDialog(BuildContext context, OrderModel order, SalesHistoryController controller) {
     final TextEditingController amountController = TextEditingController(text: order.balanceDue.toStringAsFixed(0));
 

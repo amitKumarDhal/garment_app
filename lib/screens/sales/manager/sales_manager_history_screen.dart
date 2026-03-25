@@ -17,12 +17,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     final controller = Get.put(SalesManagerHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // ✅ FORCE "All NDO" ON LOAD
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.currentFilter.value != "All NDO") {
-        controller.filterByStatus("All NDO");
-      }
-    });
+    // ✅ NOTE: Initial filter state is handled by controller.onInit()
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
@@ -76,75 +71,35 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Date Button + Status Chips
-                Row(
-                  children: [
-                    // Date Filter Button
-                    Obx(() {
-                      bool hasDate = controller.selectedDateRange.value != null;
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          hasDate ? controller.clearDateFilter() : controller.pickDateRange(context);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: hasDate ? TColors.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: hasDate ? TColors.primary : (isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(hasDate ? Icons.close_rounded : Icons.calendar_month_rounded, size: 14, color: hasDate ? Colors.white : (isDark ? Colors.white70 : Colors.black54)),
-                              if (hasDate) ...[
-                                const SizedBox(width: 6),
-                                Text(
-                                  "${DateFormat('MMM dd').format(controller.selectedDateRange.value!.start)} - ${DateFormat('dd').format(controller.selectedDateRange.value!.end)}",
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
-                                ),
-                              ]
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-
-                    const SizedBox(width: 10),
-
-                    // Scrollable Status Chips
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        // ✅ REMOVED OBX FROM HERE (Moved to individual chips for better reactivity)
-                        child: Row(
-                          children: [
-                            _buildFilterChip(controller, "All", isDark),
-                            _buildFilterChip(controller, "All NDO", isDark),
-                            _buildFilterChip(controller, "Delivered", isDark),
-                            _buildFilterChip(controller, "Pending", isDark),
-                            _buildFilterChip(controller, "Approved", isDark),
-                            _buildFilterChip(controller, "Fab Purchased", isDark),
-                            _buildFilterChip(controller, "Fab Ready", isDark),
-                            _buildFilterChip(controller, "Cutting", isDark),
-                            _buildFilterChip(controller, "Cutting Done", isDark),
-                            _buildFilterChip(controller, "Printing", isDark),
-                            _buildFilterChip(controller, "Printed", isDark),
-                            _buildFilterChip(controller, "Stitching", isDark),
-                            _buildFilterChip(controller, "Stitched", isDark),
-                            _buildFilterChip(controller, "Packing", isDark),
-                            _buildFilterChip(controller, "Packed", isDark),
-                            _buildFilterChip(controller, "Shipping", isDark),
-                            _buildFilterChip(controller, "Shipped", isDark),
-                            _buildFilterChip(controller, "Rejected", isDark),
-                            _buildFilterChip(controller, "Trash", isDark),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                // Scrollable Status Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildFilterChip(controller, "All", isDark),
+                      _buildFilterChip(controller, "All NDO", isDark),
+                      _buildFilterChip(controller, "Delivered", isDark),
+                      _buildFilterChip(controller, "Pending", isDark),
+                      _buildFilterChip(controller, "Approved", isDark),
+                      _buildFilterChip(controller, "Fab Purchased", isDark),
+                      _buildFilterChip(controller, "Fab Ready", isDark),
+                      _buildFilterChip(controller, "Cutting", isDark),
+                      _buildFilterChip(controller, "Cutting Done", isDark),
+                      _buildFilterChip(controller, "Printing", isDark),
+                      _buildFilterChip(controller, "Printed", isDark),
+                      _buildFilterChip(controller, "Stitching", isDark),
+                      _buildFilterChip(controller, "Stitched", isDark),
+                      _buildFilterChip(controller, "Packing", isDark),
+                      _buildFilterChip(controller, "Packed", isDark),
+                      // ✅ ADDED: Out SRC chip before Shipping
+                      _buildFilterChip(controller, "Out SRC", isDark),
+                      _buildFilterChip(controller, "Shipping", isDark),
+                      _buildFilterChip(controller, "Shipped", isDark),
+                      _buildFilterChip(controller, "Rejected", isDark),
+                      _buildFilterChip(controller, "Trash", isDark),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -221,17 +176,17 @@ class SalesManagerHistoryScreen extends StatelessWidget {
   // --- UI Helpers ---
 
   Widget _buildFilterChip(SalesManagerHistoryController controller, String label, bool isDark) {
-    // ✅ MOVED OBX HERE: Each chip now individually listens to data changes!
     return Obx(() {
       bool isSelected = controller.currentFilter.value == label;
 
       Color baseColor = TColors.primary;
       if (label == 'All NDO') baseColor = Colors.deepOrange;
+      else if (label == 'Out SRC') baseColor = Colors.indigoAccent; // ✅ Brand Color
       else if (label != 'All' && label != 'Trash') baseColor = _getStatusColor(label);
       else if (label == 'Trash') baseColor = Colors.red;
 
       int count = 0;
-      List<OrderModel> baseList = controller.allOrders; // The RxList trigger
+      List<OrderModel> baseList = controller.allOrders;
 
       if (label == 'All') {
         count = baseList.length;
@@ -277,34 +232,33 @@ class SalesManagerHistoryScreen extends StatelessWidget {
               ),
             ),
 
-            if (count > 0)
-              Positioned(
-                top: -6,
-                right: -6,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : baseColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
-                          width: 2
-                      ),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
-                      ]
-                  ),
-                  child: Text(
-                    count.toString(),
-                    style: TextStyle(
-                      color: isSelected ? baseColor : Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
+            Positioned(
+              top: -6,
+              right: -6,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                    color: isSelected ? Colors.white : baseColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+                        width: 2
                     ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
+                    ]
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    color: isSelected ? baseColor : Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
+            ),
           ],
         ),
       );
@@ -318,12 +272,11 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     final int qty = order.quantity;
     final double unitPrice = qty > 0 ? (order.totalAmount / qty) : 0.0;
 
-    // ✅ SMART LOCATION FALLBACK
     String displayLocation = "";
     if (order.state != null && order.state!.isNotEmpty) {
       displayLocation = order.state!;
     } else if (order.clientAddress != null && order.clientAddress!.isNotEmpty) {
-      displayLocation = order.clientAddress!; // Fallback to full address for older orders
+      displayLocation = order.clientAddress!;
     }
 
     return Container(
@@ -387,7 +340,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
           ),
 
-          // ✅ ALWAYS SHOWS LOCATION (Using State or Address fallback)
           if (displayLocation.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 2),
@@ -569,6 +521,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       case 'stitched': return Colors.brown;
       case 'packing':
       case 'packed': return Colors.purple;
+      case 'out src': return Colors.indigoAccent; // ✅ ADDED
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;

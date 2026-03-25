@@ -1,12 +1,14 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http; // ✅ For downloading the image
-import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
-import 'package:gal/gal.dart'; // ✅ For saving to gallery
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../controllers/production/unit_supervisor_controller.dart';
@@ -19,13 +21,9 @@ class UnitSupervisorHome extends StatelessWidget {
 
   String _getGreeting() {
     var hour = DateTime.now().hour;
-    if (hour < 12) {
-      return 'Good Morning,';
-    } else if (hour < 17) {
-      return 'Good Afternoon,';
-    } else {
-      return 'Good Evening,';
-    }
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 17) return 'Good Afternoon,';
+    return 'Good Evening,';
   }
 
   LinearGradient _buildSolidGradient(Color color) {
@@ -36,18 +34,6 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  LinearGradient _buildFadedGradient(Color color, bool isDark) {
-    return LinearGradient(
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-      colors: [
-        color.withValues(alpha: isDark ? 0.2 : 0.15),
-        color.withValues(alpha: isDark ? 0.05 : 0.05),
-      ],
-    );
-  }
-
-  // --- HELPER METHOD TO GET ACTUAL SIZES ---
   String _getFormattedSizes(OrderModel order) {
     List<String> sizes = [];
     if (order.products.isNotEmpty) {
@@ -158,6 +144,7 @@ class UnitSupervisorHome extends StatelessWidget {
           return const Center(child: CircularProgressIndicator(color: TColors.primary));
         }
 
+        // ✅ "Out SRC" remains in floor orders as it is a production stage
         List<String> excludedStages = ['shipping', 'shipped', 'delivered', 'completed', 'rejected'];
 
         List<OrderModel> floorOrders = controller.activeOrders
@@ -287,11 +274,11 @@ class UnitSupervisorHome extends StatelessWidget {
                                   bool isOverdue = daysLeft < 0;
                                   bool isDueToday = daysLeft == 0;
                                   bool isPacked = order.status.toLowerCase() == 'packed';
+                                  bool isOutSrc = order.status.toLowerCase() == 'out src';
 
-                                  Color alertColor = isPacked ? TColors.success : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber));
+                                  Color alertColor = isPacked ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber)));
 
                                   return GestureDetector(
-                                    // ✅ TAPPING RISK ORDER OPENS IMAGE DIALOG
                                     onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
                                     behavior: HitTestBehavior.opaque,
                                     child: Padding(
@@ -365,10 +352,7 @@ class UnitSupervisorHome extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 24),
-
-                // DATE WISE DELIVERABLES SCHEDULE
                 _buildDatewiseDeliverables(floorOrders, isDark, textColor, controller, today, context),
-
                 const SizedBox(height: 40),
               ],
             ),
@@ -543,7 +527,6 @@ class UnitSupervisorHome extends StatelessWidget {
                           var o = dateOrders[index];
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            // ✅ TAPPING DELIVERABLE ORDER OPENS IMAGE DIALOG
                             onTap: () => _showUpdateStageDialog(context, o, controller, isDark, textColor),
                             title: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -684,7 +667,6 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  // --- ✅ UPDATED DIALOG (CLICKABLE ACTUAL SIZE MOCKUP & NEW SIZES HELPER) ---
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
@@ -712,7 +694,6 @@ class UnitSupervisorHome extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- DRAG HANDLE ---
                       Center(
                         child: Container(
                           width: 40, height: 4,
@@ -720,8 +701,6 @@ class UnitSupervisorHome extends StatelessWidget {
                           decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-
-                      // --- 1. ORDER ID ---
                       Center(
                         child: Text(
                             "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
@@ -730,7 +709,6 @@ class UnitSupervisorHome extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // --- 2. CLICKABLE ACTUAL SIZE MOCKUP ---
                       Center(
                         child: GestureDetector(
                           onTap: () {
@@ -750,7 +728,7 @@ class UnitSupervisorHome extends StatelessWidget {
                             child: (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
                               imageUrl: order.mockupUrl!,
-                              fit: BoxFit.contain, // ✅ ACTUAL SIZE (NO CROP)
+                              fit: BoxFit.contain,
                               placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
                               errorWidget: (context, url, error) => Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -779,7 +757,6 @@ class UnitSupervisorHome extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
-                      // --- 3. ORDER DETAILS CARD ---
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -793,21 +770,17 @@ class UnitSupervisorHome extends StatelessWidget {
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                             _buildInfoRow(isDark, Icons.category_rounded, "Product", "${order.productName} (${order.quantity} pcs)", textColor),
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-
-                            // ✅ CALLING THE NEW HELPER HERE
                             _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", _getFormattedSizes(order), textColor),
                           ],
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      // --- 4. STAGE PROGRESSION ---
                       Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 12),
                       _buildHorizontalTimeline(order, isDark, textColor),
                       const SizedBox(height: 24),
 
-                      // --- 5. UPDATE STAGE SELECTION ---
                       Text("Update Stage To:", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 12),
                       Wrap(
@@ -855,7 +828,6 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: FULL SCREEN IMAGE VIEWER
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
     Get.to(
           () => Scaffold(
@@ -878,7 +850,7 @@ class UnitSupervisorHome extends StatelessWidget {
             panEnabled: true,
             boundaryMargin: const EdgeInsets.all(20),
             minScale: 1,
-            maxScale: 4, // Allow 4x zoom
+            maxScale: 4,
             child: CachedNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.contain,
@@ -892,7 +864,6 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
   Future<void> _downloadAndSaveImage(String url, String orderNo) async {
     try {
       Get.snackbar("Downloading...", "Saving mockup to your gallery.",
@@ -914,7 +885,6 @@ class UnitSupervisorHome extends StatelessWidget {
     }
   }
 
-  // --- NEW COMPACT CONFIRMATION DIALOG W/ REMARKS ---
   void _showConfirmationDialog(OrderModel order, String stage, UnitSupervisorController controller, TextEditingController remarkController, bool isDark, Color textColor) {
     remarkController.clear();
 
@@ -1106,6 +1076,8 @@ class UnitSupervisorHome extends StatelessWidget {
       case 'stitched': return Colors.brown;
       case 'packing': return TColors.packing;
       case 'packed': return Colors.deepPurple;
+    // ✅ ADDED: Color for Outsourcing
+      case 'out src': return Colors.indigoAccent;
       case 'shipping':
       case 'shipped': return TColors.shipping;
       case 'delivered': return TColors.delivered;

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import '../../data/models/order_model.dart';
 
 class SalesAgentController extends GetxController {
@@ -16,7 +17,7 @@ class SalesAgentController extends GetxController {
   final isLoading = true.obs;
   final agentName = "".obs;
 
-  // ✅ NEW: User Role Observable (JSA, SSA, SC, SM)
+  // User Role Observable
   final userRole = "JSA".obs;
 
   // Observables for Gross vs Net
@@ -24,25 +25,19 @@ class SalesAgentController extends GetxController {
   final netAchievement = 0.0.obs;
   final totalOrders = 0.obs;
 
-  // Observable to track if the personal margin is pending
+  // Observable to track if personal margin is pending
   final hasPendingER = false.obs;
 
-  // Dynamic Target Observables
+  // Dynamic Target Observables (UPDATED FOR CUMULATIVE LOGIC)
   final baseTarget = 100000.0.obs;
   final currentDynamicTarget = 100000.0.obs;
-  final prevMonthPendingAmount = 0.0.obs;
-  final isPrevMonthCompleted = true.obs;
-
-  // Tracks if the previous month actually had any data
+  final prevMonthPendingAmount = 0.0.obs; // Represents "Accumulated Lifetime Due"
+  final isPrevMonthCompleted = true.obs; // True if accumulated due is 0
   final hasPrevMonthData = false.obs;
 
-  // Checks if user is a manager (hides bonus UI if true)
   var isSalesManager = false.obs;
-
-  // OBSERVABLE FOR SELECTED MONTH
   var selectedMonth = DateTime.now().obs;
 
-  // METHOD TO CHANGE MONTH AND RELOAD
   void changeMonth(int offset) {
     HapticFeedback.selectionClick();
     DateTime current = selectedMonth.value;
@@ -63,24 +58,17 @@ class SalesAgentController extends GetxController {
         final userDoc = await _db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           name = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? name;
-
           String role = (userDoc.data()?['Role'] ?? userDoc.data()?['role'] ?? '').toString().toLowerCase();
 
-          // ✅ Assign exact Role Acronym
           userRole.value = _parseRoleAcronym(role);
 
           if (role.contains('manager') || role == 'sales manager') {
             baseTarget.value = 150000.0;
             isSalesManager.value = true;
           } else {
-            // ✅ Dynamic Base Target based on Role
             baseTarget.value = _getTargetForRole(userRole.value);
             isSalesManager.value = false;
-
-            // ✅ Silent Auto-Promotion Check (Only run if they are a Junior)
-            if (userRole.value == 'JSA') {
-              await _checkPromotionEligibility(user.uid);
-            }
+            // Removed old promotion logic here, it is now handled beautifully in the Stats function!
           }
         }
         agentName.value = name;
@@ -90,65 +78,19 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // ✅ Helper: Role to Target Mapping
   double _getTargetForRole(String role) {
-    if (role == 'SSA') return 150000.0; // 1.5 Lakh
-    if (role == 'SC') return 200000.0;  // 2 Lakh
+    if (role == 'SSA') return 150000.0;
+    if (role == 'SC') return 200000.0;
     if (role == 'SM') return 150000.0;
-    return 100000.0; // Default JSA 1L
+    return 100000.0; // Default JSA
   }
 
-  // ✅ Helper: Parse Role String to Acronym
   String _parseRoleAcronym(String role) {
     if (role.contains('senior') || role == 'ssa') return 'SSA';
     if (role.contains('coordinator') || role == 'sc') return 'SC';
     if (role.contains('manager') || role == 'sm') return 'SM';
-    return 'JSA'; // Default
+    return 'JSA';
   }
-
-  // ✅ THE SILENT PROMOTION ENGINE
-  Future<void> _checkPromotionEligibility(String uid) async {
-    DateTime now = DateTime.now();
-    DateTime firstOfThisMonth = DateTime(now.year, now.month, 1);
-    DateTime firstOfLastMonth = DateTime(now.year, now.month - 1, 1);
-
-    final lastMonthSnap = await _db.collection('orders')
-        .where('marketingPersonId', isEqualTo: uid)
-        .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(firstOfLastMonth))
-        .where('orderDate', isLessThan: Timestamp.fromDate(firstOfThisMonth))
-        .get();
-
-    int orderCount = 0;
-    double totalRevenue = 0.0;
-    bool has50kOrder = false;
-
-    for (var doc in lastMonthSnap.docs) {
-      final data = doc.data();
-      if (data['isDeleted'] == true) continue;
-
-      String status = (data['status'] ?? '').toString().toLowerCase();
-      if (status == 'rejected' || status == 'cancelled') continue;
-
-      orderCount++;
-      double effRev = _parseAmount(data['effectiveRevenue']);
-      double totAmt = _parseAmount(data['totalAmount']);
-      double val = (effRev > 0) ? effRev : totAmt;
-
-      totalRevenue += val;
-      if (val >= 50000) has50kOrder = true;
-    }
-
-    // 🏆 CRITERIA CHECK: 10 Orders + 1.5L Revenue + One 50k Order
-    if (orderCount >= 10 && totalRevenue >= 150000 && has50kOrder) {
-      await _db.collection('users').doc(uid).update({'Role': 'Senior Sales Associate'});
-      userRole.value = 'SSA';
-      baseTarget.value = 150000.0; // Upgrade their target immediately
-
-      Get.snackbar("Level Up! 🚀", "Congratulations! You've been promoted to Senior Sales Associate (SSA)!",
-          backgroundColor: Colors.purple.withValues(alpha:0.1), colorText: Colors.purple, duration: const Duration(seconds: 6));
-    }
-  }
-
 
   Future<void> loadDashboardData() async {
     if (_auth.currentUser == null) return;
@@ -158,101 +100,209 @@ class SalesAgentController extends GetxController {
     isLoading.value = false;
   }
 
-  // --- Calculate My Personal Stats & Previous Month Rollover ---
+  // =====================================================================
+  // ✅ THE NEW AUTOMATED CAREER PATH ENGINE (Promotions & Demotions)
+  // =====================================================================
+  Future<void> _evaluateAgentCareerPath(Map<String, double> monthlySalesMap, double accumulatedDue, double currentMonthNet) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || isSalesManager.value) return;
+
+    // 1. JSA -> SSA PROMOTION LOGIC
+    if (userRole.value == 'JSA') {
+      // RULE: No pending debt AND current month hit 1.5L
+      if (accumulatedDue <= 0 && currentMonthNet >= 150000) {
+        await _db.collection('users').doc(uid).update({'Role': 'SSA'});
+        userRole.value = 'SSA';
+        baseTarget.value = 150000.0; // Target instantly updates
+
+        Get.snackbar(
+          "Promotion Unlocked! 🚀",
+          "You cleared all dues and hit 1.5L! You are now a Senior Sales Associate.",
+          backgroundColor: Colors.purple.withValues(alpha: 0.15),
+          colorText: Colors.purple,
+          duration: const Duration(seconds: 6),
+        );
+        return; // Stop evaluating to prevent conflicts
+      }
+    }
+
+    // 2. SSA DEMOTION & SALARY HIKE LOGIC
+    if (userRole.value == 'SSA') {
+      DateTime now = DateTime.now();
+      List<double> last3Months = [];
+
+      // Get revenue for the exact last 3 completed months
+      for (int i = 1; i <= 3; i++) {
+        DateTime prevDate = DateTime(now.year, now.month - i, 1);
+        String monthKey = DateFormat('yyyy-MM').format(prevDate);
+        last3Months.add(monthlySalesMap[monthKey] ?? 0.0);
+      }
+
+      // We need at least 3 months of data to judge them
+      if (last3Months.length == 3) {
+
+        // DEMOTION RULE: Missed 1.5L target 3 months in a row
+        bool failedAll3 = last3Months.every((rev) => rev < 150000);
+        if (failedAll3) {
+          await _db.collection('users').doc(uid).update({'Role': 'JSA'});
+          userRole.value = 'JSA';
+          baseTarget.value = 100000.0;
+
+          Get.snackbar(
+            "Rank Adjusted 📉",
+            "Target missed for 3 consecutive months. Rank adjusted to JSA.",
+            backgroundColor: Colors.redAccent.withValues(alpha: 0.15),
+            colorText: Colors.redAccent,
+            duration: const Duration(seconds: 6),
+          );
+          return;
+        }
+
+        // SALARY PROMOTION RULE: Hit 1.5L target 3 months in a row
+        bool hitAll3 = last3Months.every((rev) => rev >= 150000);
+        if (hitAll3) {
+          // Check DB first so we don't spam them with popups every time they load the app
+          final doc = await _db.collection('users').doc(uid).get();
+          if (doc.data()?['salaryHikeEligible'] != true) {
+            await _db.collection('users').doc(uid).update({'salaryHikeEligible': true});
+
+            Get.snackbar(
+              "Salary Hike Eligible! 💰",
+              "You hit the SSA target for 3 consecutive months! You are eligible for a salary promotion.",
+              backgroundColor: Colors.green.withValues(alpha: 0.15),
+              colorText: Colors.green,
+              duration: const Duration(seconds: 8),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // =====================================================================
+  // ✅ STATS WITH CUMULATIVE DEBT
+  // =====================================================================
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
     if (agentName.value.isEmpty) return;
 
     try {
       DateTime targetMonth = selectedMonth.value;
-      DateTime startOfMonth = DateTime(targetMonth.year, targetMonth.month, 1);
-      DateTime endOfMonth = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
 
-      DateTime prevMonth = DateTime(targetMonth.year, targetMonth.month - 1, 1);
-      DateTime startOfPrevMonth = DateTime(prevMonth.year, prevMonth.month, 1);
-      DateTime endOfPrevMonth = DateTime(prevMonth.year, prevMonth.month + 1, 0, 23, 59, 59);
-
-      final currentMonthFuture = _db.collection('orders')
+      final allOrdersSnap = await _db.collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
-          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('orderDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
-          .orderBy('orderDate', descending: true)
+          .orderBy('orderDate', descending: false)
           .get();
 
-      final prevMonthFuture = _db.collection('orders')
-          .where('marketingPersonName', isEqualTo: agentName.value)
-          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfPrevMonth))
-          .where('orderDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfPrevMonth))
-          .get();
-
-      final results = await Future.wait([currentMonthFuture, prevMonthFuture]);
-      final currentSnap = results[0];
-      final prevSnap = results[1];
-
-      // ✅ UPDATED: Added new granular statuses so orders don't disappear from agent's dashboard
       List<String> validStatuses = [
         'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'shipping', 'shipped', 'delivered', 'completed'
       ];
-      // --- CALCULATE PREVIOUS MONTH ---
-      double prevTotalNet = 0.0;
-      hasPrevMonthData.value = prevSnap.docs.isNotEmpty;
 
-      for (var doc in prevSnap.docs) {
+      Map<String, double> monthlySalesMap = {};
+      double currentMonthGross = 0.0;
+      double currentMonthNet = 0.0;
+      int currentMonthOrderCount = 0;
+      bool currentMonthMissingMargin = false;
+
+      String targetMonthKey = DateFormat('yyyy-MM').format(targetMonth);
+
+      for (var doc in allOrdersSnap.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'pending').toString().toLowerCase();
+
         if (validStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
+          DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
+          String monthKey = DateFormat('yyyy-MM').format(orderDate);
+
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
-          prevTotalNet += (effRev > 0) ? effRev : totalAmt;
+          double finalAmount = (effRev > 0) ? effRev : totalAmt;
+
+          monthlySalesMap[monthKey] = (monthlySalesMap[monthKey] ?? 0.0) + finalAmount;
+
+          if (monthKey == targetMonthKey) {
+            currentMonthOrderCount++;
+            currentMonthGross += totalAmt;
+            currentMonthNet += finalAmount;
+            if (effRev <= 0) currentMonthMissingMargin = true;
+          }
         }
       }
 
-      // CALCULATE SHORTFALL
-      double shortfall = baseTarget.value - prevTotalNet;
+      double accumulatedDue = 0.0;
+      List<String> sortedKeys = monthlySalesMap.keys.toList()..sort();
+      hasPrevMonthData.value = sortedKeys.isNotEmpty;
 
-      if (!hasPrevMonthData.value || shortfall <= 0) {
+      for (String mKey in sortedKeys) {
+        if (mKey == targetMonthKey) break;
+
+        double monthRevenue = monthlySalesMap[mKey] ?? 0.0;
+
+        // Cumulative Debt Formula
+        accumulatedDue = accumulatedDue + (baseTarget.value - monthRevenue);
+
+        if (accumulatedDue < 0) {
+          accumulatedDue = 0;
+        }
+      }
+
+      // ✅ Evaluate the agent's career path BEFORE setting the UI variables
+      await _evaluateAgentCareerPath(monthlySalesMap, accumulatedDue, currentMonthNet);
+
+      // Set the Observables for the UI
+      grossSales.value = currentMonthGross;
+      netAchievement.value = currentMonthNet;
+      totalOrders.value = currentMonthOrderCount;
+      hasPendingER.value = currentMonthMissingMargin;
+
+      if (accumulatedDue <= 0) {
         isPrevMonthCompleted.value = true;
         prevMonthPendingAmount.value = 0.0;
         currentDynamicTarget.value = baseTarget.value;
       } else {
         isPrevMonthCompleted.value = false;
-        prevMonthPendingAmount.value = shortfall;
-        currentDynamicTarget.value = baseTarget.value + shortfall;
+        prevMonthPendingAmount.value = accumulatedDue;
+        currentDynamicTarget.value = baseTarget.value + accumulatedDue;
       }
-
-      // --- CALCULATE CURRENT MONTH ---
-      double totalGross = 0.0;
-      double totalNet = 0.0;
-      int orderCount = 0;
-      bool currentMonthMissingMargin = false;
-
-      for (var doc in currentSnap.docs) {
-        final data = doc.data();
-        String status = (data['status'] ?? 'pending').toString().toLowerCase();
-        if (validStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
-          orderCount++;
-          double totalAmt = _parseAmount(data['totalAmount']);
-          double effRev = _parseAmount(data['effectiveRevenue']);
-
-          if (effRev <= 0) {
-            currentMonthMissingMargin = true;
-          }
-
-          totalGross += totalAmt;
-          totalNet += (effRev > 0) ? effRev : totalAmt;
-        }
-      }
-
-      grossSales.value = totalGross;
-      netAchievement.value = totalNet;
-      totalOrders.value = orderCount;
-      hasPendingER.value = currentMonthMissingMargin;
 
     } catch (e) {
       debugPrint("❌ Stats Error: $e");
     }
+  }
+
+  // =====================================================================
+  // ✅ TIERED COMMISSION CALCULATOR
+  // =====================================================================
+  double calculateTieredBonus() {
+    if (netAchievement.value < currentDynamicTarget.value) {
+      return 0.0;
+    }
+
+    double surplusAmount = netAchievement.value - currentDynamicTarget.value;
+    if (surplusAmount <= 0) return 0.0;
+
+    double bonus = 0.0;
+    double remainingSurplus = surplusAmount;
+
+    if (remainingSurplus > 0) {
+      double slab1Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
+      bonus += (slab1Amount * 0.02);
+      remainingSurplus -= slab1Amount;
+    }
+
+    if (remainingSurplus > 0) {
+      double slab2Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
+      bonus += (slab2Amount * 0.015);
+      remainingSurplus -= slab2Amount;
+    }
+
+    if (remainingSurplus > 0) {
+      bonus += (remainingSurplus * 0.01);
+    }
+
+    return bonus;
   }
 
   // --- Calculate Team Leaderboard ---
@@ -276,7 +326,6 @@ class SalesAgentController extends GetxController {
         }
       }
 
-      // ✅ UPDATED & CLEANED: Added new granular statuses. Only lowercase needed since we convert the data string to lowercase below.
       List<String> revenueStatuses = [
         'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
@@ -306,7 +355,6 @@ class SalesAgentController extends GetxController {
             pendingERMap[agent] = true;
           }
 
-          // ✅ Perfect fallback logic remains intact
           double amountToCount = (effRev > 0) ? effRev : totalAmt;
 
           salesMap[agent] = (salesMap[agent] ?? 0) + amountToCount;
@@ -352,7 +400,7 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- UPDATE ORDER (Edit Logic) ---
+  // --- UPDATE ORDER ---
   Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
     try {
       isLoading.value = true;
@@ -394,86 +442,50 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- REQUEST DELETE ORDER LOGIC ---
+  // --- REQUEST DELETE ---
   Future<void> deleteOrder(String orderId, String currentStatus) async {
     final lockedStatuses = [
-      'fab ready',
-      'cutting',
-      'cutting done',
-      'printing',
-      'printed',
-      'stitching',
-      'stitched',
-      'packing',
-      'packed',
-      'shipping',
-      'shipped',
-      'delivered',
-      'completed'
+      'fab ready', 'cutting', 'cutting done', 'printing', 'printed',
+      'stitching', 'stitched', 'packing', 'packed', 'shipping',
+      'shipped', 'delivered', 'completed'
     ];
 
     if (lockedStatuses.contains(currentStatus.toLowerCase().trim())) {
-      Get.snackbar(
-          "Action Denied",
-          "Production has already started ($currentStatus). Deletion is no longer possible.",
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-          colorText: Colors.red,
-          snackPosition: SnackPosition.BOTTOM
-      );
+      Get.snackbar("Action Denied", "Production has already started. Deletion not possible.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
       return;
     }
 
     try {
       isLoading.value = true;
-
-      // 1. Flag the order in Firestore
       await _db.collection('orders').doc(orderId).update({
         'isDeleteRequested': true,
         'deleteRequestedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Notify all Sales Managers
       try {
-        final managerSnapshot = await _db.collection('users')
-            .where('Role', isEqualTo: 'Sales Manager')
-            .get();
-
+        final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
         for (var managerDoc in managerSnapshot.docs) {
           await _db.collection('notifications').add({
             'targetUserId': managerDoc.id,
             'title': 'Deletion Request 🗑️',
             'message': '${agentName.value} requested to delete order ID: $orderId',
-            'type': 'OrderApproval', // ✅ Ensuring the NotificationController routes this to the right screen
+            'type': 'OrderApproval',
             'orderId': orderId,
             'timestamp': FieldValue.serverTimestamp(),
             'isRead': false,
           });
         }
-      } catch (e) {
-        debugPrint("Notification failed: $e");
-      }
+      } catch (e) {}
 
-      // 3. Refresh Local Data
       await fetchAgentStats();
-
-      Get.snackbar(
-          "Request Sent",
-          "Deletion request sent to manager for approval.",
-          backgroundColor: Colors.orange.withValues(alpha: 0.1),
-          colorText: Colors.orange,
-          snackPosition: SnackPosition.BOTTOM
-      );
+      Get.snackbar("Request Sent", "Deletion request sent to manager.", backgroundColor: Colors.orange.withValues(alpha: 0.1), colorText: Colors.orange);
     } catch (e) {
-      Get.snackbar(
-          "Error",
-          "Could not send deletion request: $e",
-          backgroundColor: Colors.red.withValues(alpha: 0.1),
-          colorText: Colors.red
-      );
+      Get.snackbar("Error", "Could not send request: $e", backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
+
   double _parseAmount(dynamic value) {
     if (value == null) return 0.0;
     if (value is int) return value.toDouble();
@@ -486,7 +498,7 @@ class SalesAgentController extends GetxController {
   }
 
   double get achievementPercentage {
-    if (currentDynamicTarget.value <= 0) return 0.0;
-    return (grossSales.value / currentDynamicTarget.value).clamp(0.0, 1.0);
+    if (baseTarget.value <= 0) return 0.0;
+    return (grossSales.value / baseTarget.value).clamp(0.0, 1.0);
   }
 }
