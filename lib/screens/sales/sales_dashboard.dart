@@ -347,6 +347,7 @@ class SalesDashboard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         "₹${formatCurrency.format(gross)}",
+                        overflow: TextOverflow.ellipsis, // ✅ Safety for large amounts
                         style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: Colors.white, letterSpacing: -1),
                       ),
                       Text(
@@ -374,16 +375,45 @@ class SalesDashboard extends StatelessWidget {
                 child: Column(
                   children: [
                     if (!bonusUnlocked) ...[
+                      // ✅ NEW: Current Month Target Row
+                      Row(
+                        children: [
+                          const Icon(Icons.ads_click_rounded, color: Colors.blueAccent, size: 18),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              "Current month remaining:",
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "₹${formatCurrency.format((baseTarget - net).clamp(0, double.infinity))}",
+                            style: const TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.w900),
+                          ),
+                        ],
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(color: Colors.white10, height: 1),
+                      ),
+
                       // Previous Pending Row
                       Row(
                         children: [
                           Icon(Icons.history_toggle_off_rounded, color: Colors.amberAccent.withValues(alpha: 0.8), size: 18),
                           const SizedBox(width: 10),
-                          const Text(
-                            "Previous month pending:",
-                            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                          const Expanded(
+                            child: Text(
+                              "Previous month pending:",
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           Text(
                             "₹${formatCurrency.format(prevPendingAmount)}",
                             style: const TextStyle(color: Colors.amberAccent, fontSize: 14, fontWeight: FontWeight.w900),
@@ -394,32 +424,40 @@ class SalesDashboard extends StatelessWidget {
                         padding: EdgeInsets.symmetric(vertical: 10),
                         child: Divider(color: Colors.white10, height: 1),
                       ),
-                      // Required Row
+
+                      // Required Row (The Total Gap)
                       Row(
                         children: [
                           const Icon(Icons.track_changes_rounded, color: Colors.redAccent, size: 18),
                           const SizedBox(width: 10),
-                          const Text(
-                            "Required to fulfil target:",
-                            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                          const Expanded(
+                            child: Text(
+                              "Remaining after adjustment:",
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           Text(
-                            "-₹${formatCurrency.format(remainingToClear)}",
+                            "₹${formatCurrency.format(remainingToClear)}",
                             style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.w900),
                           ),
                         ],
                       ),
                     ] else ...[
-                      // Success Message when all cleared
-                      const Row(
+                      // Success Message
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.stars_rounded, color: Colors.greenAccent, size: 20),
-                          SizedBox(width: 10),
-                          Text(
-                            "ALL DUES & TARGETS CLEARED!",
-                            style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                          const Icon(Icons.stars_rounded, color: Colors.greenAccent, size: 20),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              "ALL DUES & TARGETS CLEARED!",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                            ),
                           ),
                         ],
                       ),
@@ -429,7 +467,6 @@ class SalesDashboard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-
             // --- NET ACHIEVEMENT PILL ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -440,34 +477,40 @@ class SalesDashboard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Net Achievement (ER)",
-                        style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "₹${formatCurrency.format(net)}",
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
-                      ),
-                    ],
+                  Expanded( // ✅ Added Expanded
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Net Achievement (ER)",
+                          style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "₹${formatCurrency.format(net)}",
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                        ),
+                      ],
+                    ),
                   ),
-                  Container(height: 30, width: 1, color: Colors.white10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        "Total Orders",
-                        style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "${controller.totalOrders.value}",
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
-                      ),
-                    ],
+                  Container(height: 30, width: 1, color: Colors.white10, margin: const EdgeInsets.symmetric(horizontal: 10)),
+                  Expanded( // ✅ Added Expanded
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          "Total Orders",
+                          style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${controller.totalOrders.value}",
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -476,57 +519,53 @@ class SalesDashboard extends StatelessWidget {
             // --- BONUS CALCULATOR ROW ---
             if (!controller.isSalesManager.value) ...[
               const SizedBox(height: 12),
-              GestureDetector(
-                onTap: bonusUnlocked ? () => _showTieredBonusBreakdown(Get.context!, controller) : null,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: bonusUnlocked ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: bonusUnlocked ? Colors.amberAccent.withValues(alpha: 0.3) : Colors.transparent,
-                      width: 1.5,
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: bonusUnlocked ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: bonusUnlocked ? Colors.amberAccent.withValues(alpha: 0.3) : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      bonusUnlocked ? Icons.auto_awesome_rounded : Icons.lock_outline_rounded,
+                      color: bonusUnlocked ? Colors.amberAccent : Colors.white24,
+                      size: 22,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        bonusUnlocked ? Icons.auto_awesome_rounded : Icons.lock_outline_rounded,
-                        color: bonusUnlocked ? Colors.amberAccent : Colors.white24,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              bonusUnlocked ? "TIERED EXTRA EARNINGS" : "BONUS LOCKED",
-                              style: TextStyle(
-                                color: bonusUnlocked ? Colors.amberAccent : Colors.white38,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                              ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bonusUnlocked ? "EXTRA EARNINGS" : "BONUS LOCKED",
+                            style: TextStyle(
+                              color: bonusUnlocked ? Colors.amberAccent : Colors.white38,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              bonusUnlocked
-                                  ? "+ ₹${formatCurrency.format(extraEarning)}"
-                                  : "Clear dues to earn extra commission",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: bonusUnlocked ? 20 : 12,
-                                fontWeight: bonusUnlocked ? FontWeight.w900 : FontWeight.w600,
-                              ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            bonusUnlocked
+                                ? "+ ₹${formatCurrency.format(extraEarning)}"
+                                : "Clear dues to earn extra commission",
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: bonusUnlocked ? 20 : 12,
+                              fontWeight: bonusUnlocked ? FontWeight.w900 : FontWeight.w600,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      if (bonusUnlocked)
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -535,6 +574,7 @@ class SalesDashboard extends StatelessWidget {
       );
     });
   }
+
   Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       if (controller.isLoading.value && controller.leaderboardData.isEmpty) {

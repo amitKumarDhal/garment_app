@@ -1,14 +1,18 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/widgets/custom_text_field.dart';
 import '../../controllers/floor_management/marketing_upload_controller.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class MarketingUploadScreen extends StatefulWidget {
-  // ✅ OPTIONAL PARAMETER: If passed, the screen enters Edit Mode
   final OrderModel? existingOrder;
 
   const MarketingUploadScreen({super.key, this.existingOrder});
@@ -20,11 +24,40 @@ class MarketingUploadScreen extends StatefulWidget {
 class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   final controller = Get.put(MarketingUploadController());
 
+  // ✅ HELPER: Translates the String names into actual Flutter Colors
+  Color _getColorFromString(String colorName) {
+    switch (colorName) {
+      case 'White': return Colors.white;
+      case 'Off white': return const Color(0xFFFAF9F6);
+      case 'Beige': return const Color(0xFFF5F5DC);
+      case 'Light grey': return Colors.grey.shade300;
+      case 'Dark grey': return Colors.grey.shade700;
+      case 'Black': return Colors.black;
+      case 'Sky blue': return Colors.lightBlue.shade300;
+      case 'Ocean blue': return const Color(0xFF0077BE);
+      case 'Royal blue': return const Color(0xFF4169E1);
+      case 'Navy blue': return const Color(0xFF000080);
+      case 'Neon green': return const Color(0xFF39FF14);
+      case 'Green': return Colors.green;
+      case 'Bottle green': return const Color(0xFF006A4E);
+      case 'Lemon yellow': return const Color(0xFFFFF44F);
+      case 'Yellow': return Colors.yellow;
+      case 'Mustard yellow': return const Color(0xFFFFDB58);
+      case 'Orange': return Colors.orange;
+      case 'Red': return Colors.red;
+      case 'Maroon': return const Color(0xFF800000);
+      case 'Pink': return Colors.pink;
+      case 'Light pink': return const Color(0xFFFFB6C1);
+      case 'Brown': return Colors.brown;
+      case 'Purple': return Colors.purple;
+      case 'Lavender': return const Color(0xFFE6E6FA);
+      default: return Colors.transparent;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-
-    // ✅ Check if we are editing an existing order or creating a new one
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.existingOrder != null) {
         controller.loadOrderData(widget.existingOrder!);
@@ -37,8 +70,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // ✅ Dynamic UI text based on mode
     final bool isEditMode = widget.existingOrder != null;
     final String pageTitle = isEditMode ? "Edit Ledger Entry" : "Create Order";
     final String submitText = isEditMode ? "UPDATE ORDER" : "SUBMIT ORDER";
@@ -49,12 +80,12 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleSpacing: isEditMode ? 0 : 24, // Tighter spacing if showing back button
+        titleSpacing: isEditMode ? 0 : 24,
         leading: isEditMode
             ? IconButton(
           icon: Icon(Icons.close_rounded, color: isDark ? Colors.white : Colors.black87, size: 24),
           onPressed: () {
-            controller.clearForm(); // Clean up before leaving
+            controller.clearForm();
             Get.back();
           },
         )
@@ -79,7 +110,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- TOP ALERT (Only show sync box if it's a NEW order) ---
                 if (!isEditMode)
                   Obx(
                         () => Container(
@@ -139,7 +169,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   TCustomTextField(label: "Client Name", controller: controller.clientName, prefixIcon: Icons.person_outline_rounded, validator: (val) => val!.isEmpty ? "Required" : null),
                   const SizedBox(height: 16),
 
-                  // ✅ NEW: PIN CODE & STATE ROW
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -147,7 +176,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                         flex: 2,
                         child: TCustomTextField(
                           label: "PIN Code",
-                          controller: controller.pincode, // Make sure to add this to your Controller
+                          controller: controller.pincode,
                           prefixIcon: Icons.pin_drop_rounded,
                           keyboardType: TextInputType.number,
                           inputFormatters: [
@@ -194,8 +223,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   const SizedBox(height: 16),
                   TCustomTextField(label: "Phone Number", controller: controller.phone, prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone),
                   const SizedBox(height: 16),
-
-                  // ✅ Detailed Address (Used for House/Street)
                   TCustomTextField(label: "Street Address / Area", controller: controller.address, prefixIcon: Icons.location_on_outlined, maxLines: 2),
                   const SizedBox(height: 16),
 
@@ -209,7 +236,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
 
                 // --- SECTION 3: DYNAMIC PRODUCTS ---
                 _buildSectionHeader("Product Specs", Icons.inventory_2_outlined, isDark),
-
                 const SizedBox(height: 16),
 
                 Obx(
@@ -253,7 +279,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 ),
                                 const SizedBox(height: 16),
 
-                                // ✅ ROW 1: Product Name / Details (Full Width & Taller)
                                 TCustomTextField(
                                     label: "Product Name / Details",
                                     controller: itemForm.productDetails,
@@ -262,12 +287,14 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                     validator: (val) => val!.isEmpty ? "Required" : null
                                 ),
                                 const SizedBox(height: 12),
+
+                                // ROW 2: Neck & Category
                                 Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start, // Align to top
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       child: Obx(() => _buildDropdown(
-                                        label: "Neck Type", // Shortened label to prevent overflow
+                                        label: "Neck Type",
                                         value: itemForm.selectedNeckType.value,
                                         items: controller.neckTypes,
                                         icon: Icons.checkroom_rounded,
@@ -275,10 +302,10 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                         onChanged: (val) => itemForm.selectedNeckType.value = val,
                                       )),
                                     ),
-                                    const SizedBox(width: 8), // Reduced gap slightly
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: Obx(() => _buildDropdown(
-                                        label: "Category", // Shortened label
+                                        label: "Category",
                                         value: itemForm.selectedProductType.value,
                                         items: controller.productTypes,
                                         icon: Icons.category_rounded,
@@ -290,16 +317,62 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                // ✅ ROW 2: Sizes (Full Width & Taller for large size lists)
+                                // ✅ ROW 3: FABRIC TYPE & COLOR
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Obx(() => _buildDropdown(
+                                        label: "Fabric Type",
+                                        value: itemForm.selectedFabric.value,
+                                        items: controller.fabricOptions,
+                                        icon: Icons.texture_rounded,
+                                        isDark: isDark,
+                                        onChanged: (val) => itemForm.selectedFabric.value = val,
+                                      )),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Obx(() => _buildDropdown(
+                                        label: "Color",
+                                        value: itemForm.selectedColor.value,
+                                        items: controller.colorOptions,
+                                        icon: Icons.color_lens_rounded,
+                                        isDark: isDark,
+                                        isColorDropdown: true,
+                                        onChanged: (val) => itemForm.selectedColor.value = val,
+                                      )),
+                                    ),
+                                  ],
+                                ),
+
+                                // Custom Color Pop-up field
+                                Obx(() {
+                                  if (itemForm.selectedColor.value == 'Custom/Mixed') {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: TCustomTextField(
+                                        label: "Specify Custom/Mixed Color",
+                                        controller: itemForm.customColor,
+                                        prefixIcon: Icons.format_paint_rounded,
+                                        validator: (val) => val!.isEmpty ? "Please specify color" : null,
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                }),
+                                const SizedBox(height: 12),
+
+                                // ✅ ROW 4: Sizes
                                 TCustomTextField(
-                                  label: "Sizes Breakdown (e.g., S:10, M:20, L:15)",
+                                  label: "Sizes Breakdown (e.g., S:10, L:15)",
                                   controller: itemForm.sizeDescription,
                                   prefixIcon: Icons.straighten_rounded,
                                   maxLines: 2,
                                 ),
                                 const SizedBox(height: 12),
 
-                                // ✅ ROW 3: Code & Qty (Compact)
+                                // ROW 5: Code & Qty
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -316,7 +389,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                // ✅ ROW 4: Price & GST (Compact)
+                                // ROW 6: Price & GST
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -339,7 +412,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
 
                       const SizedBox(height: 12),
 
-                      // "ADD ANOTHER ITEM" BUTTON
                       Material(
                         color: Colors.transparent,
                         child: InkWell(
@@ -407,7 +479,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     );
   }
 
-
+  // ✅ UPDATED DROPDOWN BUILDER (Handles the color dot rendering)
   Widget _buildDropdown({
     required String label,
     required String? value,
@@ -415,23 +487,21 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     required IconData icon,
     required bool isDark,
     required Function(String?) onChanged,
+    bool isColorDropdown = false, // ✅ Optional flag for color rendering
   }) {
+    final safeValue = (value != null && items.contains(value)) ? value : null;
+
     return DropdownButtonFormField<String>(
-      initialValue: value,
-
+      initialValue: safeValue,
       isExpanded: true,
-
-      icon: Icon(Icons.keyboard_arrow_down_rounded,
-          color: isDark ? Colors.white70 : Colors.black54, size: 18),
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: isDark ? Colors.white70 : Colors.black54, size: 18),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12),
         prefixIcon: Icon(icon, color: isDark ? Colors.white70 : Colors.black54, size: 18),
         filled: true,
         fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -446,12 +516,34 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
       items: items.map((String item) {
         return DropdownMenuItem<String>(
           value: item,
-          child: Text(item, overflow: TextOverflow.ellipsis),
+          child: Row(
+            children: [
+              // ✅ Dynamic rendering of the color dot
+              if (isColorDropdown && item != 'Custom/Mixed') ...[
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: _getColorFromString(item),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: isDark ? Colors.white30 : Colors.black26, width: 1),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (isColorDropdown && item == 'Custom/Mixed') ...[
+                Icon(Icons.palette_rounded, size: 14, color: isDark ? Colors.white70 : Colors.black54),
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: Text(item, overflow: TextOverflow.ellipsis)),
+            ],
+          ),
         );
       }).toList(),
       onChanged: onChanged,
     );
   }
+
   Widget _buildSectionHeader(String title, IconData icon, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4),
@@ -478,18 +570,17 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     );
   }
 
-  // ✅ "COMING SOON" PLACEHOLDER
   Widget _buildImagePicker(bool isDark) {
     return Obx(() {
       final bool hasImage = controller.uploadedMockupUrl.value.isNotEmpty;
 
       return GestureDetector(
         onTap: controller.isUploadingMockup.value
-            ? null // Disable tap while uploading
+            ? null
             : () => controller.pickAndUploadMockup(),
         child: Container(
           width: double.infinity,
-          height: 200, // Fixed height for a consistent look
+          height: 200,
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF2C2C2E).withValues(alpha: 0.5) : Colors.grey.shade50,
@@ -520,13 +611,17 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                 errorWidget: (context, url, error) => const Icon(Icons.error),
               ),
-              // Add a subtle gradient overlay to make the change button readable
+              // Gradient overlay for better text/icon visibility
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.4),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.6)
+                    ],
                   ),
                 ),
               ),
@@ -541,6 +636,26 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                     SizedBox(width: 8),
                     Text("Tap to Change Mockup", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ],
+                ),
+              ),
+              // ✅ REMOVE MOCKUP BUTTON
+              Positioned(
+                top: 12,
+                right: 12,
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    controller.removeMockup();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white30, width: 1),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                  ),
                 ),
               ),
             ],
@@ -581,7 +696,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     });
   }
 
-  // ✅ UPDATED SUMMARY: Locks "Advance" in Edit Mode
   Widget _buildCalculationSummary(bool isDark, MarketingUploadController controller) {
     final bool isEditMode = controller.isEditing.value;
 
@@ -614,7 +728,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                       isDark,
                       isBold: true,
                       icon: Icons.payments_outlined,
-                      readOnly: isEditMode, // 🔒 Lock advance field when editing
+                      readOnly: isEditMode,
                       hintText: isEditMode ? "Locked" : "Advance (₹)"
                   )
               ),
@@ -639,9 +753,8 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
           const SizedBox(height: 8),
           Obx(() => _buildLedgerRow("Grand Total", "₹${controller.grandTotal.value.toStringAsFixed(2)}", isDark, isBold: true)),
           const SizedBox(height: 8),
-          // ✅ THE FIXED CODE
+
           Obx(() {
-            // We do a "dummy read" of an observable so GetX knows when to rebuild this row
             final _ = controller.balanceDue.value;
 
             return _buildLedgerRow(
@@ -671,7 +784,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     return Row(children: List.generate(40, (index) => Expanded(child: Container(color: index % 2 == 0 ? Colors.transparent : (isDark ? Colors.grey.shade800 : Colors.grey.shade300), height: 1.5))));
   }
 
-  // ✅ UPDATED INPUT HELPER: Supports Read-Only State
   Widget _buildSmallInput(TextEditingController controller, String label, bool isDark, {bool isBold = false, required IconData icon, bool readOnly = false, String? hintText}) {
     return Container(
       height: 48,

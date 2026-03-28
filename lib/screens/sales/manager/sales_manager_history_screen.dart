@@ -17,8 +17,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     final controller = Get.put(SalesManagerHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // ✅ NOTE: Initial filter state is handled by controller.onInit()
-
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
       appBar: AppBar(
@@ -43,7 +41,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // --- 1. CLEAN SEARCH & FILTER HEADER ---
+          // --- 1. SEARCH & FILTER HEADER ---
           Container(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             decoration: BoxDecoration(
@@ -92,7 +90,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                       _buildFilterChip(controller, "Stitched", isDark),
                       _buildFilterChip(controller, "Packing", isDark),
                       _buildFilterChip(controller, "Packed", isDark),
-                      // ✅ ADDED: Out SRC chip before Shipping
                       _buildFilterChip(controller, "Out SRC", isDark),
                       _buildFilterChip(controller, "Shipping", isDark),
                       _buildFilterChip(controller, "Shipped", isDark),
@@ -101,11 +98,66 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 12),
+
+                // ✅ REDESIGNED DYNAMIC SUMMARY ROW
+                Obx(() {
+                  final count = controller.filteredOrdersCount;
+                  final total = controller.filteredTotalRevenue;
+                  final aov = controller.filteredAov;
+                  final currentStatus = controller.currentFilter.value.toUpperCase();
+
+                  final format = NumberFormat.compactCurrency(symbol: '₹', locale: 'en_IN', decimalDigits: 2);
+                  final aovFormat = NumberFormat.compactCurrency(symbol: '₹', locale: 'en_IN', decimalDigits: 1);
+
+                  return Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), width: 1.5),
+                        boxShadow: [
+                          if(!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
+                        ]
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header
+                        Row(
+                          children: [
+                            Icon(Icons.analytics_rounded, size: 16, color: TColors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              "SUMMARY: $currentStatus",
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: isDark ? Colors.white70 : Colors.black54, letterSpacing: 1),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Metrics
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildMetricTile("ORDERS", count.toString(), Colors.blueAccent, isDark),
+                            _buildVerticalDivider(isDark),
+                            _buildMetricTile("TOTAL REV", format.format(total), Colors.green, isDark),
+                            _buildVerticalDivider(isDark),
+                            _buildMetricTile("AOV", aovFormat.format(aov), Colors.purpleAccent, isDark),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ],
             ),
           ),
 
-          // --- 2. ORDERS LIST WITH REFRESH INDICATOR ---
+          // --- 3. ORDERS LIST WITH REFRESH INDICATOR ---
           Expanded(
             child: RefreshIndicator(
               color: TColors.primary,
@@ -175,13 +227,40 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
   // --- UI Helpers ---
 
+  Widget _buildMetricTile(String label, String value, Color color, bool isDark) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : Colors.black45, letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerticalDivider(bool isDark) {
+    return Container(
+      height: 30,
+      width: 1,
+      color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+    );
+  }
+
   Widget _buildFilterChip(SalesManagerHistoryController controller, String label, bool isDark) {
     return Obx(() {
       bool isSelected = controller.currentFilter.value == label;
 
       Color baseColor = TColors.primary;
       if (label == 'All NDO') baseColor = Colors.deepOrange;
-      else if (label == 'Out SRC') baseColor = Colors.indigoAccent; // ✅ Brand Color
+      else if (label == 'Out SRC') baseColor = Colors.indigoAccent;
       else if (label != 'All' && label != 'Trash') baseColor = _getStatusColor(label);
       else if (label == 'Trash') baseColor = Colors.red;
 
@@ -193,12 +272,12 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       } else if (label == 'All NDO') {
         count = baseList.where((o) {
           String s = o.status.toLowerCase();
-          return s != 'shipped' && s != 'delivered' && s != 'completed';
+          return s != 'shipped' && s != 'delivered' && s != 'completed' && s != 'rejected' && s != 'cancelled' && !o.isDeleted;
         }).length;
       } else if (label == 'Trash') {
         count = baseList.where((o) => o.isDeleted || o.status.toLowerCase() == 'deleted').length;
       } else {
-        count = baseList.where((o) => o.status.toLowerCase() == label.toLowerCase()).length;
+        count = baseList.where((o) => o.status.toLowerCase() == label.toLowerCase() && !o.isDeleted).length;
       }
 
       return Padding(
@@ -519,9 +598,9 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       case 'printed': return Colors.cyan;
       case 'stitching': return Colors.amber;
       case 'stitched': return Colors.brown;
-      case 'packing':
-      case 'packed': return Colors.purple;
-      case 'out src': return Colors.indigoAccent; // ✅ ADDED
+      case 'packing': return Colors.purple;
+      case 'packed': return Colors.deepPurple;
+      case 'out src': return Colors.indigoAccent;
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;

@@ -17,8 +17,11 @@ class OrderModel {
   final DateTime? updatedAt;
   final String? lastUpdatedBy;
   final String? marketingPersonId;
+
+  // ✅ PRODUCT SPECIFICS (Root level for quick access)
   final String? neckType;
   final String? productType;
+  final String? color; // ✅ ADDED COLOR FIELD
 
   // Single Product Fields (Maintained for Legacy backward compatibility)
   final String? productCode;
@@ -42,7 +45,7 @@ class OrderModel {
   // Image Paths
   final String? imageUrl;
   final String? localImagePath;
-  final String? mockupUrl; // ✅ ADDED FOR CLOUDINARY MOCKUPS
+  final String? mockupUrl; // FOR CLOUDINARY MOCKUPS
 
   // THE DYNAMIC MULTI-ITEM LIST
   final List<Map<String, dynamic>> products;
@@ -94,7 +97,7 @@ class OrderModel {
     this.balanceDue = 0.0,
     this.imageUrl,
     this.localImagePath,
-    this.mockupUrl, // ✅ ADDED
+    this.mockupUrl,
     this.products = const [],
     this.marginNumber = 0,
     this.effectiveRevenue = 0.0,
@@ -104,6 +107,7 @@ class OrderModel {
     this.stageHistory = const [],
     this.neckType = 'Not Specified',
     this.productType = 'Not Specified',
+    this.color = 'Not Specified', // ✅ ADDED
   });
 
   Map<String, dynamic> toJson() {
@@ -139,7 +143,7 @@ class OrderModel {
       "balanceDue": balanceDue,
       "imageUrl": imageUrl,
       "localImagePath": localImagePath,
-      "mockupUrl": mockupUrl, // ✅ ADDED
+      "mockupUrl": mockupUrl,
 
       // Save the dynamic array
       "products": products,
@@ -160,6 +164,7 @@ class OrderModel {
 
       "neckType": neckType,
       "productType": productType,
+      "color": color, // ✅ ADDED
     };
   }
 
@@ -190,6 +195,7 @@ class OrderModel {
         'total': total,
         'neckType': data['neckType'] ?? 'Not Specified',
         'productType': data['productType'] ?? 'Not Specified',
+        'color': data['color'] ?? 'Not Specified', // ✅ ADDED TO FALLBACK
       });
     }
 
@@ -225,7 +231,6 @@ class OrderModel {
       imageUrl: data['imageUrl'] ?? '',
       localImagePath: data['localImagePath'] ?? '',
 
-      // ✅ ADDED WITH SMART FALLBACK FOR OLD ORDERS
       mockupUrl: data['mockupUrl'] ?? data['designMockupUrl'] ?? '',
 
       products: parsedProducts,
@@ -245,6 +250,7 @@ class OrderModel {
 
       neckType: data['neckType'] ?? 'Not Specified',
       productType: data['productType'] ?? 'Not Specified',
+      color: data['color'] ?? 'Not Specified', // ✅ ADDED TO ROOT PARSING
     );
   }
 
@@ -267,7 +273,6 @@ class OrderModel {
     return 0;
   }
 
-  // ✅ SAFELY PARSES DOUBLES (Strips commas and Currency Symbols)
   static double _parseDouble(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();

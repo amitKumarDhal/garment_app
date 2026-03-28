@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -119,7 +121,7 @@ class SalesManagerHome extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. HEADER ROW ---
+              // --- 1. HEADER ROW (WITH TIMEFRAME SELECTOR) ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -131,38 +133,60 @@ class SalesManagerHome extends StatelessWidget {
                           color: isDark ? Colors.white : Colors.black
                       )
                   ),
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _pickMonth(context, controller),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF2C2C2E) : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(20)
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                                "Monthly",
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white : Colors.black
-                                )
+                  const SizedBox(width: 8),
+                  // ✅ SAFE WRAPPER: Prevents overflow on small screens if date is too long
+                  Expanded(
+                    child: Obx(() => Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // Dropdown Trigger
+                        GestureDetector(
+                          onTap: () => _showTimeframeSelector(context, controller, isDark),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF2C2C2E) : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(20)
                             ),
-                            const SizedBox(width: 4),
-                            Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 16,
-                                color: isDark ? Colors.white : Colors.black
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                    controller.selectedTimeframe.value,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : Colors.black
+                                    )
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white : Colors.black),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
+                        // Show specific month picker ONLY if 'Monthly' is selected
+                        if (controller.selectedTimeframe.value == 'Monthly')
+                          GestureDetector(
+                            onTap: () => _pickMonth(context, controller),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                  color: TColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: TColors.primary.withValues(alpha: 0.3))
+                              ),
+                              child: Text(
+                                DateFormat('MMM yyyy').format(controller.selectedMonth.value),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: TColors.primary),
+                              ),
+                            ),
+                          )
+                      ],
+                    )),
                   ),
                 ],
               ),
@@ -293,6 +317,89 @@ class SalesManagerHome extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              // --- 4. SHIPPING & GST ROW ---
+              Row(
+                children: [
+                  Expanded(
+                    child: Obx(() => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.teal.withValues(alpha: 0.3), width: 1.2),
+                        boxShadow: [
+                          if (!isDark) BoxShadow(color: Colors.teal.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.15), shape: BoxShape.circle),
+                            child: const Icon(Icons.local_shipping_rounded, color: Colors.teal, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Shipping", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  NumberFormat.compactCurrency(locale: 'en_IN', symbol: '₹', decimalDigits: 1).format(controller.totalShippingCollected.value),
+                                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Obx(() => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.pinkAccent.withValues(alpha: 0.3), width: 1.2),
+                        boxShadow: [
+                          if (!isDark) BoxShadow(color: Colors.pinkAccent.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: Colors.pinkAccent.withValues(alpha: 0.15), shape: BoxShape.circle),
+                            child: const Icon(Icons.account_balance_rounded, color: Colors.pinkAccent, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Total GST", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  NumberFormat.compactCurrency(locale: 'en_IN', symbol: '₹', decimalDigits: 1).format(controller.totalGstCollected.value),
+                                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // --- 5. UNITS & DELIVERABLES ROW ---
               Row(
                 children: [
                   Expanded(
@@ -326,13 +433,20 @@ class SalesManagerHome extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 )),
                                 const SizedBox(height: 2),
+                                // ✅ OVERFLOW FIX: Wrapped dynamic text in Expanded
                                 Row(
                                   children: [
                                     Text("Units Sold ", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 11, fontWeight: FontWeight.w600)),
-                                    Obx(() => Text(
-                                      "(${DateFormat('MMM').format(controller.selectedMonth.value)})",
-                                      style: TextStyle(color: Colors.blueAccent.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.bold),
-                                    )),
+                                    Expanded(
+                                      child: Obx(() => Text(
+                                        controller.selectedTimeframe.value == 'Monthly'
+                                            ? "(${DateFormat('MMM').format(controller.selectedMonth.value)})"
+                                            : "(${controller.selectedTimeframe.value})",
+                                        style: TextStyle(color: Colors.blueAccent.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.bold),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      )),
+                                    ),
                                   ],
                                 ),
                               ],
@@ -479,6 +593,58 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
+  // ✅ HELPER: Timeframe Bottom Sheet
+  void _showTimeframeSelector(BuildContext context, SalesManagerController controller, bool isDark) {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Select Timeframe", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: controller.timeframes.map((tf) {
+                return Obx(() {
+                  bool isSelected = controller.selectedTimeframe.value == tf;
+                  return GestureDetector(
+                    onTap: () {
+                      controller.setTimeframe(tf);
+                      Get.back();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.grey.shade100),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? TColors.primary : Colors.transparent),
+                      ),
+                      child: Text(
+                        tf,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                });
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopAssociatesLeaderboard(BuildContext context, bool isDark, SalesManagerController controller) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -509,7 +675,7 @@ class SalesManagerHome extends StatelessWidget {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 30),
-                  child: Text("No sales recorded this month.", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                  child: Text("No sales recorded for this period.", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
                 ),
               );
             }
@@ -815,6 +981,29 @@ class SalesManagerHome extends StatelessWidget {
     );
   }
 
+  Widget _buildEmptyState(bool isDark, String message, IconData icon) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+                message,
+                style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w600)
+            )
+          ]
+      ),
+    );
+  }
+
   Widget _buildHorizontalPendingOrderCard(BuildContext context, OrderModel order, bool isDark) {
     return Container(
       width: 280,
@@ -911,7 +1100,6 @@ class SalesManagerHome extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
-          // Title Label (Removed the Row and the Arrow Icon)
           Text(
             title,
             style: const TextStyle(
@@ -924,14 +1112,6 @@ class SalesManagerHome extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-  Widget _buildEmptyState(bool isDark, String message, IconData icon) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.white, borderRadius: BorderRadius.circular(16)),
-      child: Column(children: [Icon(icon, size: 40, color: Colors.grey[300]), const SizedBox(height: 8), Text(message, style: const TextStyle(color: Colors.grey))]),
     );
   }
 

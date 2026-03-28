@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/order_model.dart';
 
@@ -9,8 +10,9 @@ class SalesManagerController extends GetxController {
   static SalesManagerController get instance => Get.find();
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ✅ UPDATED: Centralized list now includes "Out SRC" before Shipping
+  // ✅ Centralized list now includes "Out SRC" before Shipping
   final List<String> productionStages = [
     'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
     'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
@@ -22,6 +24,8 @@ class SalesManagerController extends GetxController {
   var pendingOrders = <OrderModel>[].obs;
   var approvedOrders = <OrderModel>[].obs;
   var deletionRequests = <OrderModel>[].obs;
+  var totalShippingCollected = 0.0.obs;
+  var totalGstCollected = 0.0.obs;
 
   int get urgentDeliverablesCount {
     List<String> safeStatuses = [
@@ -53,11 +57,22 @@ class SalesManagerController extends GetxController {
   var totalOrdersCount = 0.obs;
   var totalUnitsSold = 0.obs;
 
+  // ✅ TIMEFRAME OBSERVABLES
   var selectedMonth = DateTime.now().obs;
+  var selectedTimeframe = 'Monthly'.obs;
+  final List<String> timeframes = [
+    'Monthly', 'Last 3 Months', 'Last 6 Months', 'Last 9 Months', 'Last 12 Months', 'This FY'
+  ];
+
+  @override
+  void onInit() {
+    super.onInit();
+    fetchAllData();
+  }
 
   void fetchAllData() async {
     await Future.delayed(const Duration(milliseconds: 800));
-    if (FirebaseAuth.instance.currentUser == null) return;
+    if (_auth.currentUser == null) return;
 
     try {
       isLoading.value = true;
@@ -78,13 +93,66 @@ class SalesManagerController extends GetxController {
     }
   }
 
+  // ✅ TIMEFRAME HELPER FUNCTIONS
+  void setTimeframe(String tf) {
+    HapticFeedback.selectionClick();
+    selectedTimeframe.value = tf;
+    fetchAllData();
+  }
+
   void changeMonth(DateTime newMonth) {
     selectedMonth.value = newMonth;
-    fetchMonthlyStats();
+    if (selectedTimeframe.value != 'Monthly') {
+      selectedTimeframe.value = 'Monthly'; // Auto-revert to monthly if a specific month is picked
+    }
+    fetchAllData();
+  }
+
+  Map<String, dynamic> _getDateRange() {
+    DateTime now = DateTime.now();
+    DateTime start;
+    DateTime end;
+    int monthsInPeriod = 1;
+
+    switch (selectedTimeframe.value) {
+      case 'Last 3 Months':
+        start = DateTime(now.year, now.month - 2, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 3;
+        break;
+      case 'Last 6 Months':
+        start = DateTime(now.year, now.month - 5, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 6;
+        break;
+      case 'Last 9 Months':
+        start = DateTime(now.year, now.month - 8, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 9;
+        break;
+      case 'Last 12 Months':
+        start = DateTime(now.year, now.month - 11, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 12;
+        break;
+      case 'This FY':
+        int startYear = now.month >= 4 ? now.year : now.year - 1;
+        start = DateTime(startYear, 4, 1);
+        end = DateTime(startYear + 1, 3, 31, 23, 59, 59);
+        monthsInPeriod = 12;
+        break;
+      case 'Monthly':
+      default:
+        start = DateTime(selectedMonth.value.year, selectedMonth.value.month, 1);
+        end = DateTime(selectedMonth.value.year, selectedMonth.value.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 1;
+        break;
+    }
+    return {'start': start, 'end': end, 'multiplier': monthsInPeriod};
   }
 
   void fetchPendingOrders() {
-    if (FirebaseAuth.instance.currentUser == null) return;
+    if (_auth.currentUser == null) return;
     try {
       _db.collection('orders')
           .where('status', whereIn: ['Placed', 'Pending'])
@@ -108,7 +176,7 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchApprovedOrders() {
-    if (FirebaseAuth.instance.currentUser == null) return;
+    if (_auth.currentUser == null) return;
     try {
       _db.collection('orders')
           .where('status', isEqualTo: 'Approved')
@@ -122,9 +190,8 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  /// --- ✅ UPDATED: Added "Out SRC" to the Active Orders Stream ---
   void fetchOrderHistory() {
-    if (FirebaseAuth.instance.currentUser == null) return;
+    if (_auth.currentUser == null) return;
 
     _db.collection('orders')
         .where('status', whereIn: [
@@ -151,7 +218,7 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchDeletionRequests() {
-    if (FirebaseAuth.instance.currentUser == null) return;
+    if (_auth.currentUser == null) return;
     try {
       _db.collection('orders')
           .where('isDeleteRequested', isEqualTo: true)
@@ -165,7 +232,7 @@ class SalesManagerController extends GetxController {
   }
 
   Future<void> fetchManagerProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
       try {
         final doc = await _db.collection('users').doc(user.uid).get();
@@ -189,73 +256,123 @@ class SalesManagerController extends GetxController {
     return 0.0;
   }
 
-  /// --- ✅ UPDATED: Added "out src" to Revenue Logic ---
+  // ✅ UPDATED: Integrates Timeframe scaling and cumulative logic
   Future<void> fetchMonthlyStats() async {
-    if (FirebaseAuth.instance.currentUser == null) return;
+    if (_auth.currentUser == null) return;
     try {
-      DateTime targetDate = selectedMonth.value;
-      DateTime startOfMonth = DateTime(targetDate.year, targetDate.month, 1);
-      DateTime endOfMonth = DateTime(targetDate.year, targetDate.month + 1, 0, 23, 59, 59);
+      final rangeData = _getDateRange();
+      DateTime start = rangeData['start'];
+      DateTime end = rangeData['end'];
+      int multiplier = rangeData['multiplier'];
 
+      String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
+
+      // 1. Fetch Users & Identify Roles/Base Targets
       final usersSnap = await _db.collection('users').get();
-      Map<String, bool> managerMap = {};
+      Map<String, String> roleMap = {};
+      Map<String, double> baseTargetMap = {};
+
       for (var doc in usersSnap.docs) {
         final d = doc.data();
         String n = d['FullName'] ?? d['Name'] ?? '';
-        String r = (d['Role'] ?? d['role'] ?? '').toString().toLowerCase();
-        if (n.isNotEmpty && (r.contains('manager') || r == 'sales manager')) {
-          managerMap[n] = true;
+        String r = (d['Role'] ?? d['role'] ?? 'JSA').toString().toUpperCase();
+
+        if (n.isNotEmpty) {
+          if (r.contains('MANAGER') || r == 'SM') r = 'SM';
+          else if (r.contains('SENIOR') || r == 'SSA') r = 'SSA';
+          else if (r.contains('COORDINATOR') || r == 'SC') r = 'SC';
+          else r = 'JSA';
+
+          roleMap[n] = r;
+          // Set Base Target per Role
+          baseTargetMap[n] = (r == 'SC') ? 200000.0 : ((r == 'SSA' || r == 'SM') ? 150000.0 : 100000.0);
         }
       }
 
+      // 2. Fetch ALL historical orders to calculate cumulative debt
       final snapshot = await _db.collection('orders')
-          .where('orderDate', isGreaterThanOrEqualTo: startOfMonth)
-          .where('orderDate', isLessThanOrEqualTo: endOfMonth)
+          .where('orderDate', isLessThanOrEqualTo: end)
           .get();
 
-      List<String> excludedStatuses = ['rejected', 'cancelled', 'pending', 'placed'];
+      List<String> validStatuses = [
+        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
+        'out src', 'shipping', 'shipped', 'delivered', 'completed'
+      ];
 
       int validOrderCount = 0;
       double total = 0.0;
+      double shippingTotal = 0.0;
+      double gstTotal = 0.0;
       int unitsCount = 0;
-      Map<String, double> agentSales = {};
-      Map<String, int> countMap = {};
+
+      // agentName -> { monthKey -> revenue }
+      Map<String, Map<String, double>> agentHistory = {};
+      Map<String, int> currentPeriodCount = {};
+      Map<String, double> currentPeriodSales = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
         bool isDeleteRequested = data['isDeleteRequested'] == true;
+        bool isDeleted = data['isDeleted'] == true;
 
-        if (!excludedStatuses.contains(status) && !isDeleteRequested) {
-          validOrderCount++;
+        if (validStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
+          DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
+          String monthKey = DateFormat('yyyy-MM').format(orderDate);
+          String agent = data['marketingPersonName'] ?? 'Unknown';
 
-          int orderQty = 0;
-          if (data['products'] != null && data['products'] is List) {
-            for (var item in data['products']) {
-              orderQty += (item['qty'] is num) ? (item['qty'] as num).toInt() : int.tryParse(item['qty'].toString()) ?? 0;
+          double totalAmt = _parseAmount(data['totalAmount']);
+          double effRev = _parseAmount(data['effectiveRevenue']);
+
+          // Use Net Achievement (ER) if available, otherwise Gross
+          double finalAmount = (effRev > 0) ? effRev : totalAmt;
+
+          // Track Historical Revenue per Agent
+          agentHistory.putIfAbsent(agent, () => {});
+          agentHistory[agent]![monthKey] = (agentHistory[agent]![monthKey] ?? 0.0) + finalAmount;
+
+          // If the order belongs to the currently viewed timeframe, add it to Global Stats
+          if (orderDate.isAfter(start.subtract(const Duration(seconds: 1))) &&
+              orderDate.isBefore(end.add(const Duration(seconds: 1)))) {
+
+            validOrderCount++;
+            total += finalAmount;
+
+            // Current Period Agent Stats
+            currentPeriodSales[agent] = (currentPeriodSales[agent] ?? 0) + finalAmount;
+            currentPeriodCount[agent] = (currentPeriodCount[agent] ?? 0) + 1;
+
+            // Global Shipping Tracking
+            double shipping = _parseAmount(data['shippingCharge']);
+            shippingTotal += shipping;
+
+            // Exact GST Extraction
+            double orderGst = 0.0;
+            if (data['products'] != null && data['products'] is List) {
+              for (var item in data['products']) {
+                double pPrice = _parseAmount(item['price']);
+                int pQty = (item['qty'] is num) ? (item['qty'] as num).toInt() : int.tryParse(item['qty'].toString()) ?? 0;
+                double pGstPct = _parseAmount(item['gstPercentage']);
+                orderGst += (pPrice * pQty) * (pGstPct / 100);
+              }
+            } else {
+              double pGstPct = _parseAmount(data['gstPercentage']);
+              double base = totalAmt / (1 + (pGstPct / 100));
+              orderGst += totalAmt - base;
             }
-          } else if (data['quantity'] != null) {
-            orderQty = (data['quantity'] is num) ? (data['quantity'] as num).toInt() : int.tryParse(data['quantity'].toString()) ?? 0;
-          }
-          unitsCount += orderQty;
+            gstTotal += orderGst;
 
-          List<String> revenueStatuses = [
-            'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
-            'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
-            'out src', // ✅ Added
-            'shipping', 'shipped', 'delivered', 'completed'
-          ];
-
-          if (revenueStatuses.contains(status)) {
-            double effRev = _parseAmount(data['effectiveRevenue']);
-            double totalAmt = _parseAmount(data['totalAmount']);
-            double amount = (effRev > 0) ? effRev : totalAmt;
-
-            String agent = data['marketingPersonName'] ?? 'Unknown';
-            total += amount;
-            agentSales[agent] = (agentSales[agent] ?? 0) + amount;
-            countMap[agent] = (agentSales[agent] ?? 0).toInt(); // Temporary fix for count
-            countMap[agent] = (countMap[agent] ?? 0) + 1;
+            // Unit Count Tracking
+            int orderQty = 0;
+            if (data['products'] != null && data['products'] is List) {
+              for (var item in data['products']) {
+                orderQty += (item['qty'] is num) ? (item['qty'] as num).toInt() : int.tryParse(item['qty'].toString()) ?? 0;
+              }
+            } else if (data['quantity'] != null) {
+              orderQty = (data['quantity'] is num) ? (data['quantity'] as num).toInt() : int.tryParse(data['quantity'].toString()) ?? 0;
+            }
+            unitsCount += orderQty;
           }
         }
       }
@@ -263,50 +380,61 @@ class SalesManagerController extends GetxController {
       totalOrdersCount.value = validOrderCount;
       totalRevenue.value = total;
       totalUnitsSold.value = unitsCount;
+      totalShippingCollected.value = shippingTotal;
+      totalGstCollected.value = gstTotal;
 
-      var sortedAgents = agentSales.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      // 3. Process Leaderboard with Cumulative Debt Logic
+      List<Map<String, dynamic>> leaderboardList = [];
 
-      topAgents.value = sortedAgents.take(10).map((e) {
-        String agentName = e.key;
-        double currentSales = e.value;
-        bool isSM = managerMap[agentName] == true;
+      for (String agent in agentHistory.keys) {
+        // Only show agents on the board who have sales in the current viewing period
+        if (!currentPeriodSales.containsKey(agent)) continue;
 
-        String rankLabel = "JSA";
-        double targetAmount = 100000.0;
+        double currentSales = currentPeriodSales[agent] ?? 0.0;
+        String role = roleMap[agent] ?? 'JSA';
+        double baseTarget = baseTargetMap[agent] ?? 100000.0;
+        bool isSM = role == 'SM';
 
-        if (isSM) {
-          rankLabel = "SM";
-          targetAmount = 150000.0;
-        } else {
-          if (currentSales >= 200000) {
-            rankLabel = "SC";
-            targetAmount = 200000.0;
-          } else if (currentSales >= 150000) {
-            rankLabel = "SSA";
-            targetAmount = 150000.0;
-          } else if (currentSales >= 100000) {
-            rankLabel = "JSA";
-            targetAmount = 100000.0;
+        double accumulatedDue = 0.0;
+
+        // Calculate historical cumulative debt ONLY if looking at 'Monthly' timeframe
+        if (selectedTimeframe.value == 'Monthly') {
+          List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
+          for (String mKey in sortedKeys) {
+            if (mKey == targetMonthKey) break; // Stop accumulating before current month
+            double monthRev = agentHistory[agent]![mKey] ?? 0.0;
+            accumulatedDue += (baseTarget - monthRev);
+            if (accumulatedDue < 0) accumulatedDue = 0; // Surplus does not carry forward
           }
         }
 
-        double progress = currentSales / targetAmount;
+        // Apply the Dynamic Target (Scaled by multiplier)
+        double dynamicTarget = (baseTarget * multiplier) + accumulatedDue;
+        double progress = dynamicTarget > 0 ? (currentSales / dynamicTarget) : 0.0;
+
         String greeting = "";
         if (progress >= 1.0) greeting = "Target Smashed! 🏆";
         else if (progress >= 0.8) greeting = "Almost there! 🔥";
         else greeting = "Keep Pushing 📉";
 
-        return {
-          'name': agentName,
+        leaderboardList.add({
+          'name': agent,
           'amount': currentSales,
           'formatted': NumberFormat.compactCurrency(symbol: '₹', locale: 'en_IN', decimalDigits: 1).format(currentSales),
           'progress': progress,
           'greeting': greeting,
-          'count': countMap[agentName] ?? 0,
+          'count': currentPeriodCount[agent] ?? 0,
           'isSM': isSM,
-          'rank': rankLabel,
-        };
-      }).toList();
+          'rank': role,
+        });
+      }
+
+      // Sort the list so highest earners are at the top
+      leaderboardList.sort((a, b) => b['amount'].compareTo(a['amount']));
+
+      // Update UI state
+      topAgents.value = leaderboardList.take(10).toList();
+
     } catch (e) {
       print("❌ STATS ERROR: $e");
     }
@@ -324,7 +452,6 @@ class SalesManagerController extends GetxController {
     await _updateStatus(orderId, newStatus, Colors.blue);
   }
 
-  /// --- ✅ UPDATED: Added Notification Emoji for Out SRC ---
   Future<void> _updateStatus(String orderId, String newStatus, Color color, {double? effectiveRevenue}) async {
     try {
       final orderDoc = await _db.collection('orders').doc(orderId).get();
@@ -362,7 +489,7 @@ class SalesManagerController extends GetxController {
         if (newStatus == 'Cutting' || newStatus == 'Stitching' || newStatus == 'Cutting Done') emoji = "✂️";
         if (newStatus == 'Printing' || newStatus == 'Printed') emoji = "🖨️";
         if (newStatus == 'Packed' || newStatus == 'Packing') emoji = "📦";
-        if (newStatus == 'Out SRC') emoji = "🏢"; // ✅ Added Emoji for Outsourcing
+        if (newStatus == 'Out SRC') emoji = "🏢";
         if (newStatus == 'Shipping' || newStatus == 'Shipped') emoji = "🚚";
         if (newStatus == 'Delivered') emoji = "🎉";
         if (newStatus == 'Fab Purchased' || newStatus == 'Fab Ready') emoji = "🧵";

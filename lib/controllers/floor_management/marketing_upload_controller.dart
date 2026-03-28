@@ -2,14 +2,19 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
+import '../../utils/widgets/custom_text_field.dart';
 
-// ✅ Helper Class for Dynamic Items
+// =========================================================================
+// ✅ 1. HELPER CLASS FOR DYNAMIC ITEMS
+// =========================================================================
 class OrderItemForm {
   final productCode = TextEditingController();
   final productDetails = TextEditingController();
@@ -18,8 +23,14 @@ class OrderItemForm {
   final orderValue = TextEditingController();
   final gstInfo = TextEditingController();
 
+  final customColor = TextEditingController();
+
   final selectedNeckType = Rx<String?>(null);
   final selectedProductType = Rx<String?>(null);
+  final selectedColor = Rx<String?>(null);
+
+  // ✅ NEW: Fabric Dropdown State
+  final selectedFabric = Rx<String?>(null);
 
   void dispose() {
     productCode.dispose();
@@ -28,9 +39,13 @@ class OrderItemForm {
     quantity.dispose();
     orderValue.dispose();
     gstInfo.dispose();
+    customColor.dispose();
   }
 }
 
+// =========================================================================
+// ✅ 2. THE CONTROLLER
+// =========================================================================
 class MarketingUploadController extends GetxController {
   static MarketingUploadController get instance => Get.find();
 
@@ -46,7 +61,6 @@ class MarketingUploadController extends GetxController {
   final address = TextEditingController();
   final deadline = TextEditingController();
 
-  // ✅ Location Fields
   final pincode = TextEditingController();
   final selectedState = "".obs;
 
@@ -54,13 +68,33 @@ class MarketingUploadController extends GetxController {
   final shippingCharge = TextEditingController();
   final advanceAmount = TextEditingController();
 
-  // ✅ Dropdown Options
+  // Dropdown Options
   final List<String> neckTypes = ['Round Neck', 'Collared Neck'];
   final List<String> productTypes = [
     'Sports Jersey',
     'Business Promotional',
     'Team/Staff Wear',
     'Specific Event Use'
+  ];
+
+  // ✅ NEW: Exact Fabric Options matching the Stock Update screen
+  final List<String> fabricOptions = [
+    'Dotknit (160 gsm)',
+    'Nokia (120 gsm)',
+    'Spun matty (220 gsm)',
+    'Pc matty (240 gsm)',
+    'Polyester collar',
+    'Acrylic collar',
+    'Others'
+  ];
+
+  // ✅ UPDATED: Full 24-color palette from the provided list + Custom/Mixed
+  final List<String> colorOptions = [
+    'White', 'Off white', 'Beige', 'Light grey', 'Dark grey', 'Black',
+    'Sky blue', 'Ocean blue', 'Royal blue', 'Navy blue', 'Neon green',
+    'Green', 'Bottle green', 'Lemon yellow', 'Yellow', 'Mustard yellow',
+    'Orange', 'Red', 'Maroon', 'Pink', 'Light pink', 'Brown', 'Purple',
+    'Lavender', 'Custom/Mixed'
   ];
 
   final items = <OrderItemForm>[].obs;
@@ -73,11 +107,9 @@ class MarketingUploadController extends GetxController {
   String? originalMarketingPersonName;
   String? originalMarketingPersonId;
 
-  // ✅ NEW IMAGE OBSERVABLES (Matches UI exactly)
   final RxString uploadedMockupUrl = ''.obs;
   final RxBool isUploadingMockup = false.obs;
 
-  // Observables for Financials
   final RxDouble subTotal = 0.0.obs;
   final RxDouble taxAmount = 0.0.obs;
   final RxDouble grandTotal = 0.0.obs;
@@ -202,7 +234,6 @@ class MarketingUploadController extends GetxController {
     pincode.text = orderJson['pincode'] ?? "";
     selectedState.value = orderJson['state'] ?? "";
 
-    // ✅ Load existing URL into the new variable
     uploadedMockupUrl.value = order.mockupUrl ?? orderJson['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
@@ -222,6 +253,23 @@ class MarketingUploadController extends GetxController {
 
       itemForm.selectedNeckType.value = prod['neckType'];
       itemForm.selectedProductType.value = prod['productType'];
+
+      // ✅ Load Fabric Type Safely
+      String loadedFabric = prod['fabricType'] ?? '';
+      if (loadedFabric.isNotEmpty && loadedFabric != 'Not Specified' && fabricOptions.contains(loadedFabric)) {
+        itemForm.selectedFabric.value = loadedFabric;
+      }
+
+      // Load Color Type Safely
+      String loadedColor = prod['color'] ?? '';
+      if (loadedColor.isNotEmpty && loadedColor != 'Not Specified') {
+        if (!colorOptions.contains(loadedColor)) {
+          itemForm.selectedColor.value = 'Custom/Mixed';
+          itemForm.customColor.text = loadedColor;
+        } else {
+          itemForm.selectedColor.value = loadedColor;
+        }
+      }
 
       itemForm.quantity.addListener(_calculateTotal);
       itemForm.orderValue.addListener(_calculateTotal);
@@ -277,26 +325,18 @@ class MarketingUploadController extends GetxController {
     return months[month - 1];
   }
 
-  // ✅ NEW: CLOUDINARY UPLOAD LOGIC
   Future<void> pickAndUploadMockup() async {
     final ImagePicker picker = ImagePicker();
-
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (image == null) return;
 
     try {
       isUploadingMockup.value = true;
-
       const String cloudName = "dt2yfdelm";
       const String uploadPreset = "yoobbel_mockups";
 
       var uri = Uri.parse("https://api.cloudinary.com/v1_1/$cloudName/image/upload");
       var request = http.MultipartRequest("POST", uri);
-
       request.fields['upload_preset'] = uploadPreset;
       request.files.add(await http.MultipartFile.fromPath('file', image.path));
 
@@ -305,15 +345,8 @@ class MarketingUploadController extends GetxController {
       if (response.statusCode == 200) {
         var responseData = await response.stream.toBytes();
         var result = json.decode(String.fromCharCodes(responseData));
-
         uploadedMockupUrl.value = result['secure_url'];
-
-        Get.snackbar(
-          "Success",
-          "Mockup uploaded successfully!",
-          backgroundColor: Colors.green.withValues(alpha: 0.1),
-          colorText: Colors.green,
-        );
+        Get.snackbar("Success", "Mockup uploaded successfully!", backgroundColor: Colors.green.withValues(alpha: 0.1), colorText: Colors.green);
       } else {
         Get.snackbar("Upload Failed", "Could not upload to Cloudinary.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent);
       }
@@ -322,6 +355,10 @@ class MarketingUploadController extends GetxController {
     } finally {
       isUploadingMockup.value = false;
     }
+  }
+
+  void removeMockup() {
+    uploadedMockupUrl.value = '';
   }
 
   void submitOrder() async {
@@ -364,6 +401,11 @@ class MarketingUploadController extends GetxController {
         avgGst = gst;
         if (i == 0) firstProductName = item.productDetails.text.trim();
 
+        String finalColor = item.selectedColor.value ?? 'Not Specified';
+        if (finalColor == 'Custom/Mixed' && item.customColor.text.trim().isNotEmpty) {
+          finalColor = item.customColor.text.trim();
+        }
+
         productsList.add({
           "productCode": item.productCode.text.trim(),
           "productName": item.productDetails.text.trim(),
@@ -374,6 +416,8 @@ class MarketingUploadController extends GetxController {
           "total": itemTotal,
           "neckType": item.selectedNeckType.value ?? 'Not Specified',
           "productType": item.selectedProductType.value ?? 'Not Specified',
+          "color": finalColor,
+          "fabricType": item.selectedFabric.value ?? 'Not Specified', // ✅ SAVING FABRIC TO DATABASE
         });
       }
 
@@ -399,8 +443,6 @@ class MarketingUploadController extends GetxController {
         "marketingPersonName": agentName,
         "marketingPersonId": userId,
         "products": productsList,
-
-        // ✅ IMPORTANT: Attaching the uploaded Cloudinary URL
         "mockupUrl": uploadedMockupUrl.value.isEmpty ? null : uploadedMockupUrl.value,
       };
 
@@ -420,9 +462,7 @@ class MarketingUploadController extends GetxController {
               'isRead': false,
             });
           }
-        } catch (e) {
-          debugPrint("Could not notify manager of update: $e");
-        }
+        } catch (e) {}
 
         Get.snackbar("Success", "Order updated successfully!", backgroundColor: Colors.green, colorText: Colors.white);
       }
@@ -508,7 +548,6 @@ class MarketingUploadController extends GetxController {
     deadline.clear();
     shippingCharge.clear();
     advanceAmount.clear();
-
     pincode.clear();
     selectedState.value = "";
 
@@ -516,8 +555,6 @@ class MarketingUploadController extends GetxController {
     addNewItem();
 
     _selectedDeadline = null;
-
-    // ✅ Clear mockup variables
     uploadedMockupUrl.value = '';
     isUploadingMockup.value = false;
 

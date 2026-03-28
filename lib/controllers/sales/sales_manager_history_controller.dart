@@ -11,20 +11,38 @@ class SalesManagerHistoryController extends GetxController {
 
   var isLoading = true.obs;
 
-  // ✅ Kept your excellent fix: Reactive list
+  // ✅ All orders from DB (Source of Truth)
   var allOrders = <OrderModel>[].obs;
+  // ✅ Filtered orders shown in the list
   var displayedOrders = <OrderModel>[].obs;
 
   var currentFilter = "All NDO".obs;
   var searchQuery = "".obs;
 
+  // =========================================================================
+  // ✅ DYNAMIC SUMMARY GETTERS (Updates automatically based on selection)
+  // =========================================================================
+
+  /// 1. Get total number of orders currently visible in the list
+  int get filteredOrdersCount => displayedOrders.length;
+
+  /// 2. Get total revenue sum for currently visible orders
+  double get filteredTotalRevenue =>
+      displayedOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
+
+  /// 3. Get Average Order Value (AOV) for visible orders
+  double get filteredAov {
+    if (displayedOrders.isEmpty) return 0.0;
+    return filteredTotalRevenue / filteredOrdersCount;
+  }
+
+  // =========================================================================
+
   @override
   void onInit() {
     super.onInit();
-
-    // ✅ STRICT OVERRIDE: Always reset to "All NDO" when entering the screen
+    // ✅ Always start with "All NDO" (Next Day Orders / Active floor items)
     currentFilter.value = "All NDO";
-
     fetchAllOrders();
   }
 
@@ -34,51 +52,52 @@ class SalesManagerHistoryController extends GetxController {
     super.onClose();
   }
 
+  /// Listens to real-time changes in Firestore
   void fetchAllOrders() {
     isLoading.value = true;
 
     _listener = _db
         .collection('orders')
         .orderBy('orderDate', descending: true)
-        .limit(150)
+        .limit(200) // Adjusted limit for larger catalogs
         .snapshots()
         .listen((snapshot) {
-      // ✅ Kept your fix: using .value
+
       allOrders.value = snapshot.docs
           .map((doc) => OrderModel.fromSnapshot(doc))
           .toList();
 
       applyFilter();
-
       isLoading.value = false;
     }, onError: (e) {
-      debugPrint("Stream error: $e");
+      debugPrint("❌ Master Ledger Stream error: $e");
       isLoading.value = false;
     });
   }
 
+  /// Sets the status filter (e.g., 'Approved', 'Out SRC')
   void filterByStatus(String status) {
     currentFilter.value = status;
     applyFilter();
   }
 
+  /// Updates search query and recalculates the list
   void searchOrders(String query) {
     searchQuery.value = query;
     applyFilter();
   }
 
+  /// Core logic to filter data and calculate metrics
   void applyFilter() {
-    // ✅ IMPORTANT FIX: Pull from the reactive list
     List<OrderModel> temp = allOrders.toList();
 
-    // --- STATUS FILTER ---
+    // --- 1. STATUS FILTER LOGIC ---
     if (currentFilter.value == "Trash") {
       temp = temp.where((o) => o.isDeleted == true).toList();
     } else if (currentFilter.value == "All") {
       temp = temp.where((o) => o.isDeleted != true).toList();
     } else if (currentFilter.value == "All NDO") {
-
-      // ✅ Terminal statuses exactly matched to UI badge exclusions
+      // Terminal statuses to exclude from "Active Pipeline"
       List<String> terminalStatuses = [
         'shipped',
         'delivered',
@@ -92,8 +111,8 @@ class SalesManagerHistoryController extends GetxController {
         String status = o.status.toLowerCase().trim();
         return !o.isDeleted && !terminalStatuses.contains(status);
       }).toList();
-
     } else {
+      // Specific status logic (e.g., 'Out SRC', 'Packing')
       temp = temp.where((o) {
         return o.status.toLowerCase().trim() ==
             currentFilter.value.toLowerCase().trim() &&
@@ -101,16 +120,17 @@ class SalesManagerHistoryController extends GetxController {
       }).toList();
     }
 
-    // --- SEARCH FILTER ---
+    // --- 2. SEARCH FILTER LOGIC ---
     if (searchQuery.value.isNotEmpty) {
-      String q = searchQuery.value.toLowerCase();
+      String q = searchQuery.value.toLowerCase().trim();
 
       temp = temp.where((o) {
+        // Search in ID, Agent Name, and Client Name
         bool matchBasic = o.clientName.toLowerCase().contains(q) ||
             o.marketingPersonName.toLowerCase().contains(q) ||
             (o.manualOrderNo?.toLowerCase().contains(q) ?? false);
 
-        // ✅ Deep search inside products array
+        // Search inside the products nested map
         bool matchProducts = o.products.any((prod) {
           String pName = (prod['productName'] ?? '').toString().toLowerCase();
           String pCode = (prod['productCode'] ?? '').toString().toLowerCase();
@@ -121,6 +141,7 @@ class SalesManagerHistoryController extends GetxController {
       }).toList();
     }
 
+    // Updating this observable triggers the Obx in the UI
     displayedOrders.assignAll(temp);
   }
 }

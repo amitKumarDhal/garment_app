@@ -38,7 +38,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  // --- HELPER METHOD TO GET ACTUAL SIZES ---
   String _getFormattedSizes(OrderModel order) {
     List<String> sizes = [];
     if (order.products.isNotEmpty) {
@@ -48,13 +47,9 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         }
       }
     }
-    if (sizes.isNotEmpty) {
-      return sizes.join(" | ");
-    } else if (order.sizeDescription != null && order.sizeDescription!.trim().isNotEmpty) {
-      return order.sizeDescription!;
-    } else {
-      return "Not Specified";
-    }
+    if (sizes.isNotEmpty) return sizes.join(" | ");
+    if (order.sizeDescription != null && order.sizeDescription!.trim().isNotEmpty) return order.sizeDescription!;
+    return "Not Specified";
   }
 
   @override
@@ -107,7 +102,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 2. HORIZONTAL STAGE SELECTOR (Now includes Out SRC) ---
+          // --- 2. HORIZONTAL STAGE SELECTOR ---
           Container(
             height: 60,
             margin: const EdgeInsets.only(bottom: 12),
@@ -129,7 +124,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   } else if (stage == 'All NSO') {
                     count = controller.activeOrders.where((o) {
                       String s = o.status.toLowerCase();
-                      // ✅ Terminal states exclusion remains same
                       return s != 'shipped' && s != 'delivered' && s != 'completed';
                     }).length;
                   } else {
@@ -270,7 +264,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                     bool isDone = ['delivered', 'completed'].contains(order.status.toLowerCase());
                     bool isOutSrc = order.status.toLowerCase() == 'out src';
 
-                    // ✅ Special styling for Out SRC
                     Color urgencyColor = isDone ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary)));
 
                     return Container(
@@ -432,6 +425,105 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
+  // ===========================================================================
+  // ✅ CLEANED MATERIAL REQUIREMENT CARD (Direct Fetch from Sales Input)
+  // ===========================================================================
+  Widget _buildMaterialRequirementCard(OrderModel order, bool isDark, Color textColor, UnitSupervisorController controller) {
+    // Group required materials avoiding duplicates if multiple products share the same fabric+color
+    Map<String, Map<String, dynamic>> materials = {};
+
+    for (var prod in order.products) {
+      String savedFabric = (prod['fabricType'] ?? 'Not Specified').toString();
+      String color = (prod['color'] ?? order.color ?? 'Not Specified').toString();
+      String lowerFab = savedFabric.toLowerCase();
+      String neckType = (prod['neckType'] ?? '').toString().toLowerCase();
+
+      // 1. Record the Main Fabric
+      if (savedFabric != 'Not Specified' && savedFabric.isNotEmpty) {
+        String lookupKey = "${lowerFab}_${color.toLowerCase()}";
+        if (!materials.containsKey(lookupKey)) {
+          materials[lookupKey] = {
+            'name': savedFabric,
+            'color': color,
+            'lookupKey': lookupKey,
+            'unit': lowerFab.contains('collar') ? 'pcs' : 'kg',
+          };
+        }
+      }
+
+      // 2. Record Collar explicitly if the neck type requires it (and the main fabric isn't already a collar)
+      if (neckType.contains('collar') && !lowerFab.contains('collar')) {
+        String colLookupKey = "collar_${color.toLowerCase()}";
+        if (!materials.containsKey(colLookupKey)) {
+          materials[colLookupKey] = {
+            'name': 'Collar',
+            'color': color,
+            'lookupKey': colLookupKey,
+            'unit': 'pcs',
+          };
+        }
+      }
+    }
+
+    if (materials.isEmpty) return const SizedBox.shrink();
+
+    return Obx(() {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2E) : Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_rounded, color: Colors.blue, size: 18),
+                const SizedBox(width: 8),
+                Text("Live Stock Availability", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            ...materials.values.map((mat) {
+              double inStock = controller.inventoryStock[mat['lookupKey']] ?? 0.0;
+              String displayStock = mat['unit'] == 'pcs' ? inStock.toInt().toString() : inStock.toStringAsFixed(1);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "${mat['name']} (${mat['color']})",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "In Stock: $displayStock ${mat['unit']}",
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      );
+    });
+  }
+
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
@@ -468,9 +560,33 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                       ),
 
                       Center(
-                        child: Text(
-                            "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textColor, letterSpacing: -0.5)
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                                "Order #${order.manualOrderNo ?? order.id?.substring(0,6)}",
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textColor, letterSpacing: -0.5)
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.deepOrange.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.layers_rounded, size: 14, color: Colors.deepOrange),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "${order.quantity} PCS",
+                                    style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w900, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -522,6 +638,9 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                           child: Center(child: Text("Tap image to view full screen & download", style: TextStyle(fontSize: 10, color: TColors.textSecondary, fontStyle: FontStyle.italic))),
                         ),
                       const SizedBox(height: 24),
+
+                      // ✅ SIMPLIFIED LIVE MATERIAL CARD
+                      _buildMaterialRequirementCard(order, isDark, textColor, controller),
 
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -677,10 +796,13 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 RichText(
                     textAlign: TextAlign.center,
                     text: TextSpan(
-                        style: const TextStyle(color: TColors.textSecondary, fontSize: 13, height: 1.3),
+                        style: const TextStyle(color: TColors.textSecondary, fontSize: 14, height: 1.3),
                         children: [
-                          const TextSpan(text: "Change status to "),
-                          TextSpan(text: '"$stage"', style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.bold)),
+                          const TextSpan(text: "Move "),
+                          TextSpan(text: "${order.quantity} pieces ", style: TextStyle(color: textColor, fontWeight: FontWeight.w900)),
+                          const TextSpan(text: "to "),
+                          TextSpan(text: '"$stage"', style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900)),
+                          const TextSpan(text: " ?"),
                         ]
                     )
                 ),

@@ -15,24 +15,15 @@ class UnitSupervisorController extends GetxController {
   var isLoading = true.obs;
 
   StreamSubscription? _ordersSubscription;
+  StreamSubscription? _inventorySubscription;
 
-  // ✅ UPDATED: Added "Out SRC" before Shipping
+  // ✅ OBSERVABLE INVENTORY MAP (Key: "fabric_color", Value: total quantity)
+  final RxMap<String, double> inventoryStock = <String, double>{}.obs;
+
   final List<String> factoryStages = [
-    'Approved',
-    'Fab Purchased',
-    'Fab Ready',
-    'Cutting',
-    'Cutting Done',
-    'Printing',
-    'Printed',
-    'Stitching',
-    'Stitched',
-    'Packing',
-    'Packed',
-    'Out SRC', // 🏭 Added Stage
-    'Shipping',
-    'Shipped',
-    'Delivered'
+    'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
+    'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
+    'Out SRC', 'Shipping', 'Shipped', 'Delivered'
   ];
 
   var selectedFilterStage = 'All'.obs;
@@ -45,12 +36,52 @@ class UnitSupervisorController extends GetxController {
     super.onInit();
     fetchSupervisorProfile();
     fetchActiveOrders();
+    listenToInventoryLogs(); // ✅ Start listening to stock
   }
 
   @override
   void onClose() {
     _ordersSubscription?.cancel();
+    _inventorySubscription?.cancel();
     super.onClose();
+  }
+
+  // ===========================================================================
+  // ✅ REAL-TIME INVENTORY LOG AGGREGATOR
+  // ===========================================================================
+  void listenToInventoryLogs() {
+    // Listens to the exact collection from your screenshot
+    _inventorySubscription = _db.collection('inventory_logs').snapshots().listen((snapshot) {
+      Map<String, double> calculatedStock = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        String rawProduct = (data['product'] ?? '').toString().toLowerCase();
+        String rawColor = (data['color'] ?? 'Not Specified').toString().toLowerCase();
+        String type = (data['type'] ?? 'IN').toString().toUpperCase();
+        double qty = double.tryParse(data['qty']?.toString() ?? '0') ?? 0.0;
+
+        // Standardize the fabric name for easy matching
+        String baseFabric = "unknown";
+        if (rawProduct.contains('dot')) baseFabric = "dotknit";
+        else if (rawProduct.contains('spun') || rawProduct.contains('matty')) baseFabric = "spun matty";
+        else if (rawProduct.contains('nokia')) baseFabric = "nokia";
+        else if (rawProduct.contains('collar')) baseFabric = "collar";
+        else baseFabric = rawProduct;
+
+        // Create a unique key like: "dotknit_navy blue"
+        String key = "${baseFabric}_$rawColor";
+
+        // Aggregate IN and OUT
+        if (type == 'IN') {
+          calculatedStock[key] = (calculatedStock[key] ?? 0.0) + qty;
+        } else if (type == 'OUT') {
+          calculatedStock[key] = (calculatedStock[key] ?? 0.0) - qty;
+        }
+      }
+
+      inventoryStock.value = calculatedStock;
+    }, onError: (e) => debugPrint("Error fetching inventory logs: $e"));
   }
 
   Future<void> fetchSupervisorProfile() async {
@@ -72,7 +103,6 @@ class UnitSupervisorController extends GetxController {
     if (FirebaseAuth.instance.currentUser == null) return;
 
     await _ordersSubscription?.cancel();
-
     isLoading.value = true;
     Completer<void> completer = Completer<void>();
 
@@ -86,12 +116,8 @@ class UnitSupervisorController extends GetxController {
       activeOrders.value = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       isLoading.value = false;
 
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
+      if (!completer.isCompleted) completer.complete();
     }, onError: (e) {
-      if (FirebaseAuth.instance.currentUser == null) return;
-      debugPrint("Error fetching factory orders: $e");
       isLoading.value = false;
       if (!completer.isCompleted) completer.complete();
     });
@@ -123,7 +149,7 @@ class UnitSupervisorController extends GetxController {
         String emoji = "🏭";
         if (newStatus == 'Packed') emoji = "📦";
         if (newStatus == 'Fab Ready') emoji = "👕";
-        if (newStatus == 'Out SRC') emoji = "🏢"; // ✅ Added Emoji for Outsourcing
+        if (newStatus == 'Out SRC') emoji = "🏢";
         if (newStatus == 'Shipped') emoji = "🚚";
 
         await _db.collection('notifications').add({
@@ -226,7 +252,6 @@ class UnitSupervisorController extends GetxController {
       {'name': 'Stitched', 'icon': Icons.checkroom_outlined, 'color': Colors.brown},
       {'name': 'Packing', 'icon': Icons.inventory_2_outlined, 'color': TColors.packing},
       {'name': 'Packed', 'icon': Icons.all_inbox_rounded, 'color': Colors.deepPurple},
-      // ✅ ADDED: "Out SRC" Breakdown Card
       {'name': 'Out SRC', 'icon': Icons.business_rounded, 'color': Colors.indigoAccent},
       {'name': 'Shipping', 'icon': Icons.local_shipping_outlined, 'color': TColors.shipping},
       {'name': 'Delivered', 'icon': Icons.task_alt_rounded, 'color': TColors.delivered},
