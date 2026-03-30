@@ -542,7 +542,7 @@ class SalesDashboard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            bonusUnlocked ? "EXTRA EARNINGS" : "BONUS LOCKED",
+                            bonusUnlocked ? "TIERED EXTRA EARNINGS" : "BONUS LOCKED",
                             style: TextStyle(
                               color: bonusUnlocked ? Colors.amberAccent : Colors.white38,
                               fontSize: 10,
@@ -962,113 +962,5 @@ class SalesDashboard extends StatelessWidget {
     if (hour < 12) return "Good Morning,";
     if (hour < 17) return "Good Afternoon,";
     return "Good Evening,";
-  }
-
-  // =========================================================================
-  // ✅ HELPER: Shows the exact math of the 3 Slabs to the Agent
-  // =========================================================================
-  void _showTieredBonusBreakdown(BuildContext context, SalesAgentController controller) {
-    final formatCurrency = NumberFormat('#,##,##0', 'en_IN');
-    final net = controller.netAchievement.value;
-    final target = controller.currentDynamicTarget.value;
-
-    double surplus = net - target;
-    if (surplus <= 0) return;
-
-    // Calculate Slab 1 (0 to 50k at 2%)
-    double slab1Amt = surplus > 50000 ? 50000 : surplus;
-    double slab1Bonus = slab1Amt * 0.02;
-
-    // Calculate Slab 2 (50k to 1L at 1.5%)
-    double remainingAfterSlab1 = surplus - slab1Amt;
-    double slab2Amt = remainingAfterSlab1 > 50000 ? 50000 : remainingAfterSlab1;
-    double slab2Bonus = slab2Amt * 0.015;
-
-    // Calculate Slab 3 (Above 1L at 1%)
-    double slab3Amt = remainingAfterSlab1 - slab2Amt;
-    double slab3Bonus = slab3Amt * 0.01;
-
-    double totalBonus = slab1Bonus + slab2Bonus + slab3Bonus;
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.calculate_rounded, color: Colors.amber, size: 24),
-                const SizedBox(width: 8),
-                Text("Bonus Breakdown", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text("Eligible Surplus: ₹${formatCurrency.format(surplus)}", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 24),
-
-            // Slab 1
-            _buildSlabRow("Slab 1 (0 to 50k)", "2.0%", slab1Amt, slab1Bonus, isDark, formatCurrency),
-
-            // Slab 2
-            if (slab2Amt > 0)
-              _buildSlabRow("Slab 2 (50k to 1L)", "1.5%", slab2Amt, slab2Bonus, isDark, formatCurrency),
-
-            // Slab 3
-            if (slab3Amt > 0)
-              _buildSlabRow("Slab 3 (Above 1L)", "1.0%", slab3Amt, slab3Bonus, isDark, formatCurrency),
-
-            const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Total Earnings", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
-                Text("₹${formatCurrency.format(totalBonus)}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green)),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Get.back(),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5E35B1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: const Text("Awesome!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            )
-          ],
-        ),
-      ),
-      isScrollControlled: true,
-    );
-  }
-
-  // =========================================================================
-  // ✅ HELPER: UI row for each slab in the bottom sheet
-  // =========================================================================
-  Widget _buildSlabRow(String title, String percent, double amount, double bonus, bool isDark, NumberFormat format) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black87)),
-              Text("₹${format.format(amount)} @ $percent", style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-            ],
-          ),
-          Text("+ ₹${format.format(bonus)}", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.amber)),
-        ],
-      ),
-    );
   }
 }

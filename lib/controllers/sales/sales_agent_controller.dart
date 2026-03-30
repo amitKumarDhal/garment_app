@@ -68,7 +68,6 @@ class SalesAgentController extends GetxController {
           } else {
             baseTarget.value = _getTargetForRole(userRole.value);
             isSalesManager.value = false;
-            // Removed old promotion logic here, it is now handled beautifully in the Stats function!
           }
         }
         agentName.value = name;
@@ -101,86 +100,7 @@ class SalesAgentController extends GetxController {
   }
 
   // =====================================================================
-  // ✅ THE NEW AUTOMATED CAREER PATH ENGINE (Promotions & Demotions)
-  // =====================================================================
-  Future<void> _evaluateAgentCareerPath(Map<String, double> monthlySalesMap, double accumulatedDue, double currentMonthNet) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null || isSalesManager.value) return;
-
-    // 1. JSA -> SSA PROMOTION LOGIC
-    if (userRole.value == 'JSA') {
-      // RULE: No pending debt AND current month hit 1.5L
-      if (accumulatedDue <= 0 && currentMonthNet >= 150000) {
-        await _db.collection('users').doc(uid).update({'Role': 'SSA'});
-        userRole.value = 'SSA';
-        baseTarget.value = 150000.0; // Target instantly updates
-
-        Get.snackbar(
-          "Promotion Unlocked! 🚀",
-          "You cleared all dues and hit 1.5L! You are now a Senior Sales Associate.",
-          backgroundColor: Colors.purple.withValues(alpha: 0.15),
-          colorText: Colors.purple,
-          duration: const Duration(seconds: 6),
-        );
-        return; // Stop evaluating to prevent conflicts
-      }
-    }
-
-    // 2. SSA DEMOTION & SALARY HIKE LOGIC
-    if (userRole.value == 'SSA') {
-      DateTime now = DateTime.now();
-      List<double> last3Months = [];
-
-      // Get revenue for the exact last 3 completed months
-      for (int i = 1; i <= 3; i++) {
-        DateTime prevDate = DateTime(now.year, now.month - i, 1);
-        String monthKey = DateFormat('yyyy-MM').format(prevDate);
-        last3Months.add(monthlySalesMap[monthKey] ?? 0.0);
-      }
-
-      // We need at least 3 months of data to judge them
-      if (last3Months.length == 3) {
-
-        // DEMOTION RULE: Missed 1.5L target 3 months in a row
-        bool failedAll3 = last3Months.every((rev) => rev < 150000);
-        if (failedAll3) {
-          await _db.collection('users').doc(uid).update({'Role': 'JSA'});
-          userRole.value = 'JSA';
-          baseTarget.value = 100000.0;
-
-          Get.snackbar(
-            "Rank Adjusted 📉",
-            "Target missed for 3 consecutive months. Rank adjusted to JSA.",
-            backgroundColor: Colors.redAccent.withValues(alpha: 0.15),
-            colorText: Colors.redAccent,
-            duration: const Duration(seconds: 6),
-          );
-          return;
-        }
-
-        // SALARY PROMOTION RULE: Hit 1.5L target 3 months in a row
-        bool hitAll3 = last3Months.every((rev) => rev >= 150000);
-        if (hitAll3) {
-          // Check DB first so we don't spam them with popups every time they load the app
-          final doc = await _db.collection('users').doc(uid).get();
-          if (doc.data()?['salaryHikeEligible'] != true) {
-            await _db.collection('users').doc(uid).update({'salaryHikeEligible': true});
-
-            Get.snackbar(
-              "Salary Hike Eligible! 💰",
-              "You hit the SSA target for 3 consecutive months! You are eligible for a salary promotion.",
-              backgroundColor: Colors.green.withValues(alpha: 0.15),
-              colorText: Colors.green,
-              duration: const Duration(seconds: 8),
-            );
-          }
-        }
-      }
-    }
-  }
-
-  // =====================================================================
-  // ✅ STATS WITH CUMULATIVE DEBT
+  // ✅ STATS WITH CUMULATIVE DEBT (Career Path Upgrade Logic Removed!)
   // =====================================================================
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
@@ -248,9 +168,6 @@ class SalesAgentController extends GetxController {
         }
       }
 
-      // ✅ Evaluate the agent's career path BEFORE setting the UI variables
-      await _evaluateAgentCareerPath(monthlySalesMap, accumulatedDue, currentMonthNet);
-
       // Set the Observables for the UI
       grossSales.value = currentMonthGross;
       netAchievement.value = currentMonthNet;
@@ -273,7 +190,7 @@ class SalesAgentController extends GetxController {
   }
 
   // =====================================================================
-  // ✅ TIERED COMMISSION CALCULATOR
+  // ✅ TIERED COMMISSION CALCULATOR (Extra Earning Logic)
   // =====================================================================
   double calculateTieredBonus() {
     if (netAchievement.value < currentDynamicTarget.value) {

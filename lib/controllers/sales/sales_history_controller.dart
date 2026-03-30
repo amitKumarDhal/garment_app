@@ -86,6 +86,9 @@ class SalesHistoryController extends GetxController {
     try {
       isLoading.value = true;
 
+      // ✅ Safe ID check
+      if (order.id == null) return;
+
       await _db.collection('orders').doc(order.id).update({
         'isDeleteRequested': true,
         'deleteRequestedAt': FieldValue.serverTimestamp(),
@@ -120,6 +123,41 @@ class SalesHistoryController extends GetxController {
         "Could not send delete request: $e",
         backgroundColor: Colors.red.withValues(alpha: 0.1),
         colorText: Colors.red,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // --- 2B. CANCEL Deletion Request Method ---
+  // ✅ FIX: Changed String to String? and added a null check
+  Future<void> cancelDeleteRequest(String? orderId) async {
+    if (orderId == null) return; // Safety check
+
+    try {
+      isLoading.value = true;
+
+      await _db.collection('orders').doc(orderId).update({
+        'isDeleteRequested': false,
+        'deleteRequestedAt': FieldValue.delete(),
+      });
+
+      fetchHistory();
+
+      Get.snackbar(
+        "Request Cancelled",
+        "Your deletion request has been successfully withdrawn.",
+        backgroundColor: Colors.green.withValues(alpha: 0.1),
+        colorText: Colors.green,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Could not cancel request: $e",
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
+        colorText: Colors.red,
+        snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       isLoading.value = false;
@@ -178,7 +216,6 @@ class SalesHistoryController extends GetxController {
   // ✅ 6. SECURE PAYMENT LOGIC (Requires Manager Approval)
   Future<void> recordPayment(OrderModel order, double amount) async {
 
-    // 🚨 1. NEW VALIDATION: PREVENT OVERPAYMENT!
     if (amount > order.balanceDue) {
       Get.snackbar(
         "Invalid Payment Amount",
@@ -188,7 +225,7 @@ class SalesHistoryController extends GetxController {
         duration: const Duration(seconds: 4),
         snackPosition: SnackPosition.BOTTOM,
       );
-      return; // Stops the function from proceeding
+      return;
     }
 
     try {
@@ -196,21 +233,19 @@ class SalesHistoryController extends GetxController {
 
       final user = _auth.currentUser;
       String agentName = user?.displayName ?? 'Sales Associate';
-      String agentUid = user?.uid ?? ''; // CAPTURED EXACT UID
+      String agentUid = user?.uid ?? '';
 
-      // 2. Create a Pending Payment Request
       await _db.collection('payment_requests').add({
         'orderId': order.id,
         'manualOrderNo': order.manualOrderNo ?? 'Unknown',
         'clientName': order.clientName,
         'agentName': agentName,
-        'agentUid': agentUid, // SAVED UID FOR BULLETPROOF ROUTING
+        'agentUid': agentUid,
         'amount': amount,
         'status': 'pending',
         'requestedAt': FieldValue.serverTimestamp(),
       });
 
-      // 3. Notify the Sales Managers
       final managerSnapshot = await _db.collection('users')
           .where('Role', isEqualTo: 'Sales Manager')
           .get();
@@ -226,7 +261,6 @@ class SalesHistoryController extends GetxController {
         });
       }
 
-      // 4. Show Success Message to Associate
       Get.snackbar(
         "Approval Requested",
         "Payment of ₹$amount sent to Manager. The due balance will update once approved.",
@@ -249,7 +283,10 @@ class SalesHistoryController extends GetxController {
   }
 
   // ✅ 7. CHECK PENDING PAYMENT STATUS
-  Stream<bool> hasPendingPayment(String orderId) {
+  // ✅ FIX: Changed String to String? and added a null check
+  Stream<bool> hasPendingPayment(String? orderId) {
+    if (orderId == null) return Stream.value(false); // Safety check
+
     return _db.collection('payment_requests')
         .where('orderId', isEqualTo: orderId)
         .where('status', isEqualTo: 'pending')

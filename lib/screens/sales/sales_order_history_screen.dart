@@ -1,13 +1,15 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http; // ✅ For downloading the image
-import 'package:path_provider/path_provider.dart'; // ✅ For temporary storage
-import 'package:gal/gal.dart'; // ✅ For saving to gallery
-import 'package:cached_network_image/cached_network_image.dart'; // ✅ Imported for image caching
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../controllers/floor_management/marketing_upload_controller.dart';
 import '../../utils/constants/colors.dart';
@@ -70,7 +72,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // ✅ ALL 14 STAGES ADDED TO CHIPS
                 SizedBox(
                   height: 40,
                   child: ListView(
@@ -276,12 +277,11 @@ class SalesOrderHistoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // ✅ FIXED ROW (Line 275 Fix): Wrapped long text in Expanded
             Row(
               children: [
                 Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
-                Expanded( // ✅ Added Expanded to prevent overflow
+                Expanded(
                   child: Text(
                     order.marketingPersonName,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
@@ -289,7 +289,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 12), // Adjusted spacing
+                const SizedBox(width: 12),
                 Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text(
@@ -319,6 +319,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       ),
     );
   }
+
   void _showPaymentDialog(BuildContext context, OrderModel order, SalesHistoryController controller) {
     final TextEditingController amountController = TextEditingController(text: order.balanceDue.toStringAsFixed(0));
 
@@ -359,7 +360,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: FULL SCREEN IMAGE VIEWER
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
     Get.to(
           () => Scaffold(
@@ -396,7 +396,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: DOWNLOAD AND SAVE TO GALLERY LOGIC
   Future<void> _downloadAndSaveImage(String url, String orderNo) async {
     try {
       Get.snackbar("Downloading...", "Saving mockup to your gallery.",
@@ -462,15 +461,33 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                       child: const Text("Deleted", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                     )
+                  // ✅ FIX: "Pending Deletion" now has a clickable Undo icon!
                   else if (order.isDeleteRequested)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                      child: const Text("Pending Deletion", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                          child: const Text("Pending Deletion", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            HapticFeedback.heavyImpact();
+                            _confirmCancelDelete(context, order);
+                          },
+                          icon: const Icon(Icons.undo_rounded, color: Colors.blueAccent, size: 20),
+                          padding: const EdgeInsets.only(left: 8),
+                          constraints: const BoxConstraints(),
+                        )
+                      ],
                     )
                   else if (canRequestDelete)
                       IconButton(
-                        onPressed: () => _confirmDelete(context, order),
+                        onPressed: () {
+                          HapticFeedback.heavyImpact();
+                          _confirmDelete(context, order);
+                        },
                         icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
                       )
                     else
@@ -479,7 +496,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // --- ✅ NEW: CLICKABLE ACTUAL SIZE MOCKUP (Top of Details) ---
               if (order.mockupUrl != null && order.mockupUrl!.isNotEmpty) ...[
                 Center(
                   child: GestureDetector(
@@ -496,7 +512,7 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       ),
                       child: CachedNetworkImage(
                         imageUrl: order.mockupUrl!,
-                        fit: BoxFit.contain, // Actual size, no crop
+                        fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
                         errorWidget: (context, url, error) => Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -525,7 +541,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               _modalRow("Deadline", DateFormat('MMM dd, yyyy').format(order.deliveryDate), isDark),
               _modalRow("Status", isDeleted ? "DELETED" : order.status.toUpperCase(), isDark, isStatus: true, overrideColor: isDeleted ? Colors.grey : null),
 
-              // ✅ NEW: SHOW LOCATION (State + PIN)
               if ((order.state != null && order.state!.isNotEmpty) || (order.pincode != null && order.pincode!.isNotEmpty))
                 _modalRow("State / PIN", "${order.state ?? 'N/A'} - ${order.pincode ?? 'N/A'}", isDark),
 
@@ -558,7 +573,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                             Text(item['productName'] ?? "Unknown", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
                             const SizedBox(height: 4),
 
-                            // ✅ NEW: SHOWING CATEGORY & NECK TYPE
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               margin: const EdgeInsets.only(bottom: 4),
@@ -753,8 +767,27 @@ class SalesOrderHistoryScreen extends StatelessWidget {
       cancelTextColor: Colors.black87,
       onConfirm: () {
         Get.find<SalesHistoryController>().requestDeleteOrder(order);
-        Get.back();
-        Get.back();
+        Get.back(); // Close the DefaultDialog
+        Navigator.pop(context); // Close the bottom sheet that was open behind it
+      },
+    );
+  }
+
+  // ✅ NEW: Undo Popup Helper
+  void _confirmCancelDelete(BuildContext context, OrderModel order) {
+    Get.defaultDialog(
+      title: "Cancel Deletion?",
+      titleStyle: const TextStyle(fontWeight: FontWeight.bold),
+      middleText: "Do you want to withdraw the deletion request and keep this order active?",
+      textConfirm: "Yes, Keep Order",
+      textCancel: "No",
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.blueAccent,
+      cancelTextColor: Colors.black87,
+      onConfirm: () {
+        Get.find<SalesHistoryController>().cancelDeleteRequest(order.id);
+        Get.back(); // Close the DefaultDialog
+        Navigator.pop(context); // Close the bottom sheet that was open behind it
       },
     );
   }
@@ -783,7 +816,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED COLOR MAP FOR AGENT
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
