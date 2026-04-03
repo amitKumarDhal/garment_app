@@ -266,6 +266,9 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
 
                     Color urgencyColor = isDone ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary)));
 
+                    // Calculate required fabric immediately for the quick view
+                    String fabricRequired = controller.getFabricRequiredText(order.quantity, order.productName);
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
@@ -319,6 +322,13 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                 _buildInfoRow(isDark, Icons.category_outlined, "Product", order.productName, textColor),
                                 const SizedBox(height: 6),
                                 _buildInfoRow(isDark, Icons.layers_outlined, "Quantity", "${order.quantity} Units", textColor),
+
+                                // ✅ NEW: Instantly visible fabric requirement calculation!
+                                if (fabricRequired != "Not Specified") ...[
+                                  const SizedBox(height: 6),
+                                  _buildInfoRow(isDark, Icons.calculate_rounded, "Est. Fabric", fabricRequired, Colors.blueAccent),
+                                ],
+
                                 const SizedBox(height: 16),
 
                                 // --- ACTION & HISTORY BUTTONS ---
@@ -401,7 +411,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(bool isDark, IconData icon, String label, String value, Color textColor) {
+  Widget _buildInfoRow(bool isDark, IconData icon, String label, String value, Color valueColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -416,7 +426,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(color: valueColor, fontSize: 12, fontWeight: FontWeight.w800),
               softWrap: true,
             ),
           ),
@@ -426,10 +436,9 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
   }
 
   // ===========================================================================
-  // ✅ CLEANED MATERIAL REQUIREMENT CARD (Direct Fetch from Sales Input)
+  // ✅ ENHANCED MATERIAL REQUIREMENT CARD (Calculated Requirement + Live Stock)
   // ===========================================================================
   Widget _buildMaterialRequirementCard(OrderModel order, bool isDark, Color textColor, UnitSupervisorController controller) {
-    // Group required materials avoiding duplicates if multiple products share the same fabric+color
     Map<String, Map<String, dynamic>> materials = {};
 
     for (var prod in order.products) {
@@ -438,7 +447,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
       String lowerFab = savedFabric.toLowerCase();
       String neckType = (prod['neckType'] ?? '').toString().toLowerCase();
 
-      // 1. Record the Main Fabric
       if (savedFabric != 'Not Specified' && savedFabric.isNotEmpty) {
         String lookupKey = "${lowerFab}_${color.toLowerCase()}";
         if (!materials.containsKey(lookupKey)) {
@@ -451,7 +459,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
         }
       }
 
-      // 2. Record Collar explicitly if the neck type requires it (and the main fabric isn't already a collar)
       if (neckType.contains('collar') && !lowerFab.contains('collar')) {
         String colLookupKey = "collar_${color.toLowerCase()}";
         if (!materials.containsKey(colLookupKey)) {
@@ -465,7 +472,9 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
       }
     }
 
-    if (materials.isEmpty) return const SizedBox.shrink();
+    String estimatedKg = controller.getFabricRequiredText(order.quantity, order.productName);
+
+    if (materials.isEmpty && estimatedKg == "Not Specified") return const SizedBox.shrink();
 
     return Obx(() {
       return Container(
@@ -483,11 +492,34 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
               children: [
                 const Icon(Icons.inventory_2_rounded, color: Colors.blue, size: 18),
                 const SizedBox(width: 8),
-                Text("Live Stock Availability", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
+                Text("Material Requirements", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
               ],
             ),
             const SizedBox(height: 12),
 
+            // ✅ Prominent banner showing the exact requirement math
+            if (estimatedKg != "Not Specified") ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calculate_rounded, size: 16, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Text("Total Fabric Needed: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                    const Spacer(),
+                    Text(estimatedKg, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.blue)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Live Stock list
             ...materials.values.map((mat) {
               double inStock = controller.inventoryStock[mat['lookupKey']] ?? 0.0;
               String displayStock = mat['unit'] == 'pcs' ? inStock.toInt().toString() : inStock.toStringAsFixed(1);
@@ -500,7 +532,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                     Expanded(
                       child: Text(
                         "${mat['name']} (${mat['color']})",
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor),
                       ),
                     ),
                     Container(
@@ -511,7 +543,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                       ),
                       child: Text(
                         "In Stock: $displayStock ${mat['unit']}",
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.blue),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.blue),
                       ),
                     ),
                   ],
@@ -639,7 +671,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
-                      // ✅ SIMPLIFIED LIVE MATERIAL CARD
+                      // ✅ UPDATED MATERIAL CARD WITH CALCULATION
                       _buildMaterialRequirementCard(order, isDark, textColor, controller),
 
                       Container(

@@ -9,6 +9,9 @@ class OrderModel {
   final String? organization;
   final String? clientAddress;
 
+  // ✅ NEW: GST NUMBER FIELD
+  final String? clientGstNumber;
+
   // ✅ LOCATION FIELDS
   final String? pincode;
   final String? state;
@@ -74,6 +77,7 @@ class OrderModel {
     this.clientPhone,
     this.organization,
     this.clientAddress,
+    this.clientGstNumber, // ✅ ADDED
     this.pincode,
     this.state,
     this.productCode,
@@ -107,7 +111,7 @@ class OrderModel {
     this.stageHistory = const [],
     this.neckType = 'Not Specified',
     this.productType = 'Not Specified',
-    this.color = 'Not Specified', // ✅ ADDED
+    this.color = 'Not Specified',
   });
 
   Map<String, dynamic> toJson() {
@@ -117,6 +121,7 @@ class OrderModel {
       "clientPhone": clientPhone,
       "organization": organization,
       "clientAddress": clientAddress,
+      "clientGstNumber": clientGstNumber, // ✅ ADDED
       "pincode": pincode,
       "state": state,
       "createdAt": createdAt ?? FieldValue.serverTimestamp(),
@@ -164,7 +169,7 @@ class OrderModel {
 
       "neckType": neckType,
       "productType": productType,
-      "color": color, // ✅ ADDED
+      "color": color,
     };
   }
 
@@ -195,7 +200,7 @@ class OrderModel {
         'total': total,
         'neckType': data['neckType'] ?? 'Not Specified',
         'productType': data['productType'] ?? 'Not Specified',
-        'color': data['color'] ?? 'Not Specified', // ✅ ADDED TO FALLBACK
+        'color': data['color'] ?? 'Not Specified',
       });
     }
 
@@ -206,6 +211,7 @@ class OrderModel {
       clientPhone: data['clientPhone'] ?? '',
       organization: data['organization'] ?? '',
       clientAddress: data['clientAddress'] ?? '',
+      clientGstNumber: data['clientGstNumber'] ?? '', // ✅ ADDED
       pincode: data['pincode']?.toString() ?? '',
       state: data['state']?.toString() ?? '',
       productCode: data['productCode'] ?? '',
@@ -250,7 +256,7 @@ class OrderModel {
 
       neckType: data['neckType'] ?? 'Not Specified',
       productType: data['productType'] ?? 'Not Specified',
-      color: data['color'] ?? 'Not Specified', // ✅ ADDED TO ROOT PARSING
+      color: data['color'] ?? 'Not Specified',
     );
   }
 

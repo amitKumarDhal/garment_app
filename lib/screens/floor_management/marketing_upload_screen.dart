@@ -1,10 +1,8 @@
-import 'dart:io';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../data/models/order_model.dart';
@@ -24,7 +22,9 @@ class MarketingUploadScreen extends StatefulWidget {
 class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   final controller = Get.put(MarketingUploadController());
 
-  // ✅ HELPER: Translates the String names into actual Flutter Colors
+  // ✅ NEW: Local state to toggle the GST field visibility
+  final RxBool showGstField = false.obs;
+
   Color _getColorFromString(String colorName) {
     switch (colorName) {
       case 'White': return Colors.white;
@@ -61,6 +61,10 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.existingOrder != null) {
         controller.loadOrderData(widget.existingOrder!);
+        // ✅ If the existing order has a GST number, show the field automatically!
+        if (widget.existingOrder!.clientGstNumber?.isNotEmpty == true) {
+          showGstField.value = true;
+        }
       } else {
         controller.fetchLastOrderSerial();
       }
@@ -221,6 +225,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
 
                   TCustomTextField(label: "Organization / Business", controller: controller.organization, prefixIcon: Icons.domain_rounded),
                   const SizedBox(height: 16),
+
                   TCustomTextField(label: "Phone Number", controller: controller.phone, prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone),
                   const SizedBox(height: 16),
                   TCustomTextField(label: "Street Address / Area", controller: controller.address, prefixIcon: Icons.location_on_outlined, maxLines: 2),
@@ -233,6 +238,59 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                     ),
                   ),
                 ]),
+
+                // ✅ NEW: GST Toggle Section (Right Below Client Info)
+                Obx(() {
+                  if (showGstField.value) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: _buildFormCard(isDark, [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TCustomTextField(
+                                label: "GST Number (Optional)",
+                                hintText: "21AABCY432K1ZH",
+                                controller: controller.clientGstNumber,
+                                prefixIcon: Icons.receipt_long_rounded,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                controller.clientGstNumber.clear();
+                                showGstField.value = false;
+                              },
+                              icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent),
+                              tooltip: "Remove GST",
+                            )
+                          ],
+                        )
+                      ]),
+                    );
+                  } else {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 4),
+                      child: InkWell(
+                        onTap: () => showGstField.value = true,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.add_circle_outline_rounded, size: 18, color: TColors.primary),
+                              const SizedBox(width: 8),
+                              const Text("Add GST Number (Optional)", style: TextStyle(color: TColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                }),
+
+                const SizedBox(height: 28),
 
                 // --- SECTION 3: DYNAMIC PRODUCTS ---
                 _buildSectionHeader("Product Specs", Icons.inventory_2_outlined, isDark),
@@ -317,7 +375,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                // ✅ ROW 3: FABRIC TYPE & COLOR
+                                // ROW 3: FABRIC TYPE & COLOR
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -363,7 +421,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 }),
                                 const SizedBox(height: 12),
 
-                                // ✅ ROW 4: Sizes
+                                // ROW 4: Sizes
                                 TCustomTextField(
                                   label: "Sizes Breakdown (e.g., S:10, L:15)",
                                   controller: itemForm.sizeDescription,
@@ -479,7 +537,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     );
   }
 
-  // ✅ UPDATED DROPDOWN BUILDER (Handles the color dot rendering)
   Widget _buildDropdown({
     required String label,
     required String? value,
@@ -487,7 +544,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     required IconData icon,
     required bool isDark,
     required Function(String?) onChanged,
-    bool isColorDropdown = false, // ✅ Optional flag for color rendering
+    bool isColorDropdown = false,
   }) {
     final safeValue = (value != null && items.contains(value)) ? value : null;
 
@@ -518,7 +575,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
           value: item,
           child: Row(
             children: [
-              // ✅ Dynamic rendering of the color dot
               if (isColorDropdown && item != 'Custom/Mixed') ...[
                 Container(
                   width: 14,
@@ -611,7 +667,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                 errorWidget: (context, url, error) => const Icon(Icons.error),
               ),
-              // Gradient overlay for better text/icon visibility
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -638,7 +693,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   ],
                 ),
               ),
-              // ✅ REMOVE MOCKUP BUTTON
               Positioned(
                 top: 12,
                 right: 12,

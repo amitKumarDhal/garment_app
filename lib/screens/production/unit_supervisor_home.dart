@@ -2,7 +2,6 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -144,7 +143,6 @@ class UnitSupervisorHome extends StatelessWidget {
           return const Center(child: CircularProgressIndicator(color: TColors.primary));
         }
 
-        // ✅ "Out SRC" remains in floor orders as it is a production stage
         List<String> excludedStages = ['shipping', 'shipped', 'delivered', 'completed', 'rejected'];
 
         List<OrderModel> floorOrders = controller.activeOrders
@@ -278,6 +276,8 @@ class UnitSupervisorHome extends StatelessWidget {
 
                                   Color alertColor = isPacked ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber)));
 
+                                  String fabricRequired = controller.getFabricRequiredText(order.quantity, order.productName);
+
                                   return GestureDetector(
                                     onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
                                     behavior: HitTestBehavior.opaque,
@@ -310,6 +310,16 @@ class UnitSupervisorHome extends StatelessWidget {
                                                     Expanded(child: Text("${order.quantity} Units stuck in ${order.status.toUpperCase()}", style: const TextStyle(fontSize: 11, color: TColors.textSecondary, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
                                                   ],
                                                 ),
+                                                if (fabricRequired != "Not Specified") ...[
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      const Icon(Icons.calculate_rounded, size: 12, color: Colors.blueAccent),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(child: Text("Needs $fabricRequired", style: const TextStyle(fontSize: 11, color: Colors.blueAccent, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                                    ],
+                                                  ),
+                                                ]
                                               ],
                                             ),
                                           ),
@@ -522,9 +532,11 @@ class UnitSupervisorHome extends StatelessWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         padding: EdgeInsets.zero,
                         itemCount: dateOrders.length,
-                        separatorBuilder: (_, __) => Divider(height: 1, color: TColors.getBorderColor(context), indent: 16, endIndent: 16),
+                        separatorBuilder: (_, _) => Divider(height: 1, color: TColors.getBorderColor(context), indent: 16, endIndent: 16),
                         itemBuilder: (context, index) {
                           var o = dateOrders[index];
+                          String fabricRequired = controller.getFabricRequiredText(o.quantity, o.productName);
+
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             onTap: () => _showUpdateStageDialog(context, o, controller, isDark, textColor),
@@ -537,7 +549,17 @@ class UnitSupervisorHome extends StatelessWidget {
                             ),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 4),
-                              child: Text("${o.clientName} • ${o.productName} (${o.quantity} Units)", maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: TColors.textSecondary)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("${o.clientName} • ${o.productName} (${o.quantity} Units)", maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: TColors.textSecondary)),
+                                  if (fabricRequired != "Not Specified")
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text("Est. Fabric: $fabricRequired", style: const TextStyle(fontSize: 11, color: Colors.blueAccent, fontWeight: FontWeight.w700)),
+                                    ),
+                                ],
+                              ),
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded, size: 16, color: TColors.textSecondary),
                           );
@@ -667,6 +689,122 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
+  Widget _buildMaterialRequirementCard(OrderModel order, bool isDark, Color textColor, UnitSupervisorController controller) {
+    Map<String, Map<String, dynamic>> materials = {};
+
+    for (var prod in order.products) {
+      String savedFabric = (prod['fabricType'] ?? 'Not Specified').toString();
+      String color = (prod['color'] ?? order.color ?? 'Not Specified').toString();
+      String lowerFab = savedFabric.toLowerCase();
+      String neckType = (prod['neckType'] ?? '').toString().toLowerCase();
+
+      if (savedFabric != 'Not Specified' && savedFabric.isNotEmpty) {
+        String lookupKey = "${lowerFab}_${color.toLowerCase()}";
+        if (!materials.containsKey(lookupKey)) {
+          materials[lookupKey] = {
+            'name': savedFabric,
+            'color': color,
+            'lookupKey': lookupKey,
+            'unit': lowerFab.contains('collar') ? 'pcs' : 'kg',
+          };
+        }
+      }
+
+      if (neckType.contains('collar') && !lowerFab.contains('collar')) {
+        String colLookupKey = "collar_${color.toLowerCase()}";
+        if (!materials.containsKey(colLookupKey)) {
+          materials[colLookupKey] = {
+            'name': 'Collar',
+            'color': color,
+            'lookupKey': colLookupKey,
+            'unit': 'pcs',
+          };
+        }
+      }
+    }
+
+    String estimatedKg = controller.getFabricRequiredText(order.quantity, order.productName);
+
+    if (materials.isEmpty && estimatedKg == "Not Specified") return const SizedBox.shrink();
+
+    return Obx(() {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2E) : Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_rounded, color: Colors.blue, size: 18),
+                const SizedBox(width: 8),
+                Text("Material Requirements", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            if (estimatedKg != "Not Specified") ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calculate_rounded, size: 16, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Text("Total Fabric Needed: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                    const Spacer(),
+                    Text(estimatedKg, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.blue)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            ...materials.values.map((mat) {
+              double inStock = controller.inventoryStock[mat['lookupKey']] ?? 0.0;
+              String displayStock = mat['unit'] == 'pcs' ? inStock.toInt().toString() : inStock.toStringAsFixed(1);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "${mat['name']} (${mat['color']})",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "In Stock: $displayStock ${mat['unit']}",
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      );
+    });
+  }
+
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
     TextEditingController remarkController = TextEditingController();
 
@@ -757,6 +895,8 @@ class UnitSupervisorHome extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
+                      _buildMaterialRequirementCard(order, isDark, textColor, controller),
+
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -776,7 +916,17 @@ class UnitSupervisorHome extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
+                      // ✅ THE FIX IS HERE: ADDED "VIEW ALL" BUTTON
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
+                          GestureDetector(
+                            onTap: () => _showHistoryDialog(context, order, isDark, textColor),
+                            child: const Text("View All", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: TColors.primary)),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       _buildHorizontalTimeline(order, isDark, textColor),
                       const SizedBox(height: 24),
@@ -1063,6 +1213,102 @@ class UnitSupervisorHome extends StatelessWidget {
     );
   }
 
+  void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark, Color textColor) {
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: isDark ? TColors.darkCard : TColors.lightCard,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (context) {
+          List<dynamic> history = List.from(order.stageHistory.reversed);
+
+          return FractionallySizedBox(
+            heightFactor: 0.6,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Stage History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textColor)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                        child: Text(order.manualOrderNo ?? "Unknown ID", style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900, fontSize: 12)),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  if (history.isEmpty)
+                    const Expanded(child: Center(child: Text("No updates have been made yet.", style: TextStyle(color: TColors.textSecondary))))
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          var event = history[index];
+                          DateTime time = DateTime.now();
+                          if (event['timestamp'] != null) time = (event['timestamp'] as Timestamp).toDate();
+
+                          String stage = event['stage'] ?? 'Unknown Stage';
+                          String updater = event['updatedBy'] ?? 'System';
+                          Color color = _getStatusColor(stage);
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: 14, height: 14,
+                                      decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.3), width: 3)),
+                                    ),
+                                    if (index != history.length - 1)
+                                      Container(width: 2, height: 40, color: isDark ? Colors.white10 : Colors.grey.shade200)
+                                  ],
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(stage, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textColor)),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.person_rounded, size: 12, color: TColors.textSecondary),
+                                          const SizedBox(width: 4),
+                                          Text("Updated by $updater", style: const TextStyle(fontSize: 12, color: TColors.textSecondary, fontWeight: FontWeight.w500)),
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                    DateFormat('dd MMM\nhh:mm a').format(time),
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: TColors.textSecondary, height: 1.3)
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                ],
+              ),
+            ),
+          );
+        }
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return TColors.electricBlue;
@@ -1076,7 +1322,6 @@ class UnitSupervisorHome extends StatelessWidget {
       case 'stitched': return Colors.brown;
       case 'packing': return TColors.packing;
       case 'packed': return Colors.deepPurple;
-    // ✅ ADDED: Color for Outsourcing
       case 'out src': return Colors.indigoAccent;
       case 'shipping':
       case 'shipped': return TColors.shipping;

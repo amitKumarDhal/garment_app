@@ -29,7 +29,6 @@ class OrderItemForm {
   final selectedProductType = Rx<String?>(null);
   final selectedColor = Rx<String?>(null);
 
-  // ✅ NEW: Fabric Dropdown State
   final selectedFabric = Rx<String?>(null);
 
   void dispose() {
@@ -57,6 +56,10 @@ class MarketingUploadController extends GetxController {
   final orderNo = TextEditingController();
   final clientName = TextEditingController();
   final organization = TextEditingController();
+
+  // ✅ NEW: Added GST Controller
+  final clientGstNumber = TextEditingController();
+
   final phone = TextEditingController();
   final address = TextEditingController();
   final deadline = TextEditingController();
@@ -77,7 +80,6 @@ class MarketingUploadController extends GetxController {
     'Specific Event Use'
   ];
 
-  // ✅ NEW: Exact Fabric Options matching the Stock Update screen
   final List<String> fabricOptions = [
     'Dotknit (160 gsm)',
     'Nokia (120 gsm)',
@@ -88,7 +90,6 @@ class MarketingUploadController extends GetxController {
     'Others'
   ];
 
-  // ✅ UPDATED: Full 24-color palette from the provided list + Custom/Mixed
   final List<String> colorOptions = [
     'White', 'Off white', 'Beige', 'Light grey', 'Dark grey', 'Black',
     'Sky blue', 'Ocean blue', 'Royal blue', 'Navy blue', 'Neon green',
@@ -234,6 +235,9 @@ class MarketingUploadController extends GetxController {
     pincode.text = orderJson['pincode'] ?? "";
     selectedState.value = orderJson['state'] ?? "";
 
+    // ✅ NEW: Load the GST Number safely from the database
+    clientGstNumber.text = orderJson['clientGstNumber'] ?? "";
+
     uploadedMockupUrl.value = order.mockupUrl ?? orderJson['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
@@ -254,13 +258,11 @@ class MarketingUploadController extends GetxController {
       itemForm.selectedNeckType.value = prod['neckType'];
       itemForm.selectedProductType.value = prod['productType'];
 
-      // ✅ Load Fabric Type Safely
       String loadedFabric = prod['fabricType'] ?? '';
       if (loadedFabric.isNotEmpty && loadedFabric != 'Not Specified' && fabricOptions.contains(loadedFabric)) {
         itemForm.selectedFabric.value = loadedFabric;
       }
 
-      // Load Color Type Safely
       String loadedColor = prod['color'] ?? '';
       if (loadedColor.isNotEmpty && loadedColor != 'Not Specified') {
         if (!colorOptions.contains(loadedColor)) {
@@ -417,7 +419,7 @@ class MarketingUploadController extends GetxController {
           "neckType": item.selectedNeckType.value ?? 'Not Specified',
           "productType": item.selectedProductType.value ?? 'Not Specified',
           "color": finalColor,
-          "fabricType": item.selectedFabric.value ?? 'Not Specified', // ✅ SAVING FABRIC TO DATABASE
+          "fabricType": item.selectedFabric.value ?? 'Not Specified',
         });
       }
 
@@ -431,6 +433,10 @@ class MarketingUploadController extends GetxController {
         "clientAddress": address.text.trim(),
         "pincode": pincode.text.trim(),
         "state": selectedState.value,
+
+        // ✅ NEW: Saves the GST Number into the database map
+        "clientGstNumber": clientGstNumber.text.trim(),
+
         "productCode": items.first.productCode.text.trim(),
         "productDetails": rootProductName,
         "productName": rootProductName,
@@ -550,6 +556,9 @@ class MarketingUploadController extends GetxController {
     advanceAmount.clear();
     pincode.clear();
     selectedState.value = "";
+
+    // ✅ NEW: Clears GST field
+    clientGstNumber.clear();
 
     items.clear();
     addNewItem();

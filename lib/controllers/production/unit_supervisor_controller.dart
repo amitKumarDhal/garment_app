@@ -47,32 +47,66 @@ class UnitSupervisorController extends GetxController {
   }
 
   // ===========================================================================
+  // ✅ UPDATED FABRIC YIELD CALCULATOR
+  // ===========================================================================
+  /// Returns a formatted string like "28.5 KG" or "Not Specified"
+  String getFabricRequiredText(int totalPieces, String fabricOrProductName) {
+    String normalized = fabricOrProductName.toLowerCase().trim();
+    double yieldPerKg = 0.0;
+
+    // Matching exact fabric types from your dropdown
+    if (normalized.contains('pc matty')) {
+      yieldPerKg = 3.2;
+    } else if (normalized.contains('spun') || normalized.contains('spun matty')) {
+      yieldPerKg = 3.5;
+    } else if (normalized.contains('nokia')) {
+      yieldPerKg = 6.0;
+    } else if (normalized.contains('dotknit') || normalized.contains('dot')) {
+      yieldPerKg = 4.0;
+    } else if (normalized.contains('matty')) {
+      // General fallback if they just type "matty"
+      yieldPerKg = 3.5;
+    }
+
+    // If the string doesn't contain a known fabric name
+    if (yieldPerKg == 0.0) {
+      return "Not Specified";
+    }
+
+    // Calculate absolute KG needed
+    double kgRequired = totalPieces / yieldPerKg;
+
+    // Add a standard 2% cutting/waste buffer, round up to 1 decimal point
+    double finalRequirement = kgRequired * 1.02;
+
+    return "${finalRequirement.toStringAsFixed(1)} KG";
+  }
+
+  // ===========================================================================
   // ✅ REAL-TIME INVENTORY LOG AGGREGATOR
   // ===========================================================================
   void listenToInventoryLogs() {
-    // Listens to the exact collection from your screenshot
     _inventorySubscription = _db.collection('inventory_logs').snapshots().listen((snapshot) {
       Map<String, double> calculatedStock = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        String rawProduct = (data['product'] ?? '').toString().toLowerCase();
-        String rawColor = (data['color'] ?? 'Not Specified').toString().toLowerCase();
+        String rawProduct = (data['product'] ?? '').toString().toLowerCase().trim();
+        String rawColor = (data['color'] ?? 'Not Specified').toString().toLowerCase().trim();
         String type = (data['type'] ?? 'IN').toString().toUpperCase();
         double qty = double.tryParse(data['qty']?.toString() ?? '0') ?? 0.0;
 
-        // Standardize the fabric name for easy matching
-        String baseFabric = "unknown";
-        if (rawProduct.contains('dot')) baseFabric = "dotknit";
-        else if (rawProduct.contains('spun') || rawProduct.contains('matty')) baseFabric = "spun matty";
-        else if (rawProduct.contains('nokia')) baseFabric = "nokia";
-        else if (rawProduct.contains('collar')) baseFabric = "collar";
-        else baseFabric = rawProduct;
+        // Leave the fabric name EXACTLY as it comes from the dropdown
+        // (e.g., "pc matty (240 gsm)") so it matches the Sales Order string perfectly.
+        String baseFabric = rawProduct;
 
-        // Create a unique key like: "dotknit_navy blue"
+        // Standardize collars just in case they are typed differently
+        if (rawProduct.contains('collar')) {
+          baseFabric = "collar";
+        }
+
         String key = "${baseFabric}_$rawColor";
 
-        // Aggregate IN and OUT
         if (type == 'IN') {
           calculatedStock[key] = (calculatedStock[key] ?? 0.0) + qty;
         } else if (type == 'OUT') {

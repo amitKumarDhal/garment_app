@@ -25,8 +25,7 @@ class SalesDashboard extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (FirebaseAuth.instance.currentUser != null) {
         if (controller.leaderboardData.isEmpty) {
-          controller.fetchAgentStats();
-          controller.fetchLeaderboard();
+          controller.loadDashboardData();
         }
       }
     });
@@ -144,8 +143,7 @@ class SalesDashboard extends StatelessWidget {
         color: TColors.primary,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         onRefresh: () async {
-          await controller.fetchAgentStats();
-          await controller.fetchLeaderboard();
+          await controller.loadDashboardData();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -158,35 +156,52 @@ class SalesDashboard extends StatelessWidget {
                 Icons.track_changes_rounded,
                 isDark,
                 trailingWidget: Obx(() {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
+                  return Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       GestureDetector(
-                        onTap: () => controller.changeMonth(-1),
+                        onTap: () => _showTimeframeSelector(context, controller, isDark),
                         child: Container(
-                          padding: const EdgeInsets.all(4),
-                          color: Colors.transparent,
-                          child: Icon(Icons.chevron_left_rounded, size: 24, color: isDark ? Colors.white70 : Colors.black54),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white10 : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                controller.selectedTimeframe.value,
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white : Colors.black87),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        DateFormat('MMM yyyy').format(controller.selectedMonth.value),
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => controller.changeMonth(1),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          color: Colors.transparent,
-                          child: Icon(Icons.chevron_right_rounded, size: 24, color: isDark ? Colors.white70 : Colors.black54),
-                        ),
-                      ),
+
+                      if (controller.selectedTimeframe.value == 'Monthly')
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: () => controller.changeMonth(-1),
+                              child: Container(padding: const EdgeInsets.all(4), color: Colors.transparent, child: Icon(Icons.chevron_left_rounded, size: 24, color: isDark ? Colors.white70 : Colors.black54)),
+                            ),
+                            Text(
+                              DateFormat('MMM yyyy').format(controller.selectedMonth.value),
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12, fontWeight: FontWeight.w800),
+                            ),
+                            GestureDetector(
+                              onTap: () => controller.changeMonth(1),
+                              child: Container(padding: const EdgeInsets.all(4), color: Colors.transparent, child: Icon(Icons.chevron_right_rounded, size: 24, color: isDark ? Colors.white70 : Colors.black54)),
+                            ),
+                          ],
+                        )
                     ],
                   );
                 }),
@@ -203,7 +218,12 @@ class SalesDashboard extends StatelessWidget {
                     child: const Center(child: CircularProgressIndicator()),
                   );
                 }
-                return _buildMyPerformanceCard(isDark, controller);
+                return Column(
+                  children: [
+                    _buildMyPerformanceCard(isDark, controller),
+                    _buildPromotionCard(isDark, controller), // ✅ INLINE PROMOTION CARD
+                  ],
+                );
               }),
 
               const SizedBox(height: 32),
@@ -219,6 +239,120 @@ class SalesDashboard extends StatelessWidget {
               const SizedBox(height: 40),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+
+  // ✅ NEW: INLINE PROMOTION CARD (Slim & Compact)
+  Widget _buildPromotionCard(bool isDark, SalesAgentController controller) {
+    if (controller.selectedTimeframe.value != 'Monthly') return const SizedBox.shrink();
+    if (controller.isSalesManager.value) return const SizedBox.shrink();
+
+    final net = controller.netAchievement.value;
+    final debt = controller.prevMonthPendingAmount.value;
+    final role = controller.userRole.value;
+
+    // The agent must be a JSA, have 0 dues, and have hit the 1.5L mark this month.
+    if (role == 'JSA' && debt <= 0 && net >= 150000) {
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.purple.shade600, Colors.deepPurple.shade900],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), shape: BoxShape.circle),
+              child: const Icon(Icons.workspace_premium_rounded, size: 24, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "🎉 Promotion Unlocked!",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.3),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Target hit! You will be upgraded to SSA next month.",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.9)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  void _showTimeframeSelector(BuildContext context, SalesAgentController controller, bool isDark) {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Select Timeframe", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: controller.timeframes.map((tf) {
+                return Obx(() {
+                  bool isSelected = controller.selectedTimeframe.value == tf;
+                  return GestureDetector(
+                    onTap: () {
+                      controller.setTimeframe(tf);
+                      Get.back();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.grey.shade100),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? TColors.primary : Colors.transparent),
+                      ),
+                      child: Text(
+                        tf,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                });
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
@@ -246,18 +380,22 @@ class SalesDashboard extends StatelessWidget {
               color: isDark ? Colors.white : Colors.black87,
             ),
           ),
-          const Spacer(),
-          if (trailingWidget != null)
-            trailingWidget
-          else if (trailing != null)
-            Text(
-              trailing,
-              style: TextStyle(
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            )
+          const SizedBox(width: 10),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: trailingWidget ?? (trailing != null
+                  ? Text(
+                trailing,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+                  : const SizedBox.shrink()),
+            ),
+          ),
         ],
       ),
     );
@@ -269,15 +407,19 @@ class SalesDashboard extends StatelessWidget {
 
       final gross = controller.grossSales.value;
       final net = controller.netAchievement.value;
+
+      // ✅ FIX: Strictly use the standard 1 Lakh / 1.5 Lakh Base Target for the UI
       final baseTarget = controller.baseTarget.value;
+      final dynamicTarget = controller.currentDynamicTarget.value; // Used only for bonus math
+
+      // ✅ FIX: Progress ring now fills based on the strict Base Target
       final percentage = baseTarget > 0 ? (gross / baseTarget).clamp(0.0, 1.0) : 0.0;
 
       final prevPendingAmount = controller.prevMonthPendingAmount.value;
-      final totalRequiredToClearEverything = baseTarget + prevPendingAmount;
-      final remainingToClear = totalRequiredToClearEverything - net;
-
+      final remainingToClear = dynamicTarget - net;
       final bool bonusUnlocked = remainingToClear <= 0;
       final double extraEarning = controller.calculateTieredBonus();
+      final bool isMonthly = controller.selectedTimeframe.value == 'Monthly';
 
       return Container(
         padding: const EdgeInsets.all(20),
@@ -347,9 +489,10 @@ class SalesDashboard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         "₹${formatCurrency.format(gross)}",
-                        overflow: TextOverflow.ellipsis, // ✅ Safety for large amounts
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: Colors.white, letterSpacing: -1),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 30, color: Colors.white, letterSpacing: -1),
                       ),
+                      // ✅ FIX: Text now says "Target: ₹1,00,000" permanently
                       Text(
                         "Target: ₹${formatCurrency.format(baseTarget)}",
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w600),
@@ -375,88 +518,50 @@ class SalesDashboard extends StatelessWidget {
                 child: Column(
                   children: [
                     if (!bonusUnlocked) ...[
-                      // ✅ NEW: Current Month Target Row
-                      Row(
-                        children: [
-                          const Icon(Icons.ads_click_rounded, color: Colors.blueAccent, size: 18),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              "Current month remaining:",
-                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "₹${formatCurrency.format((baseTarget - net).clamp(0, double.infinity))}",
-                            style: const TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.w900),
-                          ),
-                        ],
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: Divider(color: Colors.white10, height: 1),
-                      ),
-
-                      // Previous Pending Row
-                      Row(
-                        children: [
-                          Icon(Icons.history_toggle_off_rounded, color: Colors.amberAccent.withValues(alpha: 0.8), size: 18),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              "Previous month pending:",
-                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "₹${formatCurrency.format(prevPendingAmount)}",
-                            style: const TextStyle(color: Colors.amberAccent, fontSize: 14, fontWeight: FontWeight.w900),
-                          ),
-                        ],
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: Divider(color: Colors.white10, height: 1),
-                      ),
-
-                      // Required Row (The Total Gap)
+                      if (isMonthly) ...[
+                        Row(
+                          children: [
+                            const Icon(Icons.ads_click_rounded, color: Colors.blueAccent, size: 18),
+                            const SizedBox(width: 10),
+                            const Expanded(child: Text("Current month remaining:", style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600))),
+                            Text("₹${formatCurrency.format((controller.baseTarget.value - net).clamp(0, double.infinity))}", style: const TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.w900)),
+                          ],
+                        ),
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(color: Colors.white10, height: 1)),
+                        Row(
+                          children: [
+                            Icon(Icons.history_toggle_off_rounded, color: Colors.amberAccent.withValues(alpha: 0.8), size: 18),
+                            const SizedBox(width: 10),
+                            const Expanded(child: Text("Previous month pending:", style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600))),
+                            Text("₹${formatCurrency.format(prevPendingAmount)}", style: const TextStyle(color: Colors.amberAccent, fontSize: 14, fontWeight: FontWeight.w900)),
+                          ],
+                        ),
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(color: Colors.white10, height: 1)),
+                      ],
                       Row(
                         children: [
                           const Icon(Icons.track_changes_rounded, color: Colors.redAccent, size: 18),
                           const SizedBox(width: 10),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              "Remaining after adjustment:",
-                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              isMonthly ? "Remaining after adjustment:" : "Total Target Remaining:",
+                              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "₹${formatCurrency.format(remainingToClear)}",
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.w900),
-                          ),
+                          Text("₹${formatCurrency.format(remainingToClear)}", style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.w900)),
                         ],
                       ),
                     ] else ...[
-                      // Success Message
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(Icons.stars_rounded, color: Colors.greenAccent, size: 20),
                           const SizedBox(width: 10),
-                          Flexible(
+                          const Flexible(
                             child: Text(
                               "ALL DUES & TARGETS CLEARED!",
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                              style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
                             ),
                           ),
                         ],
@@ -467,6 +572,7 @@ class SalesDashboard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
+
             // --- NET ACHIEVEMENT PILL ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -477,7 +583,7 @@ class SalesDashboard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded( // ✅ Added Expanded
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -495,7 +601,7 @@ class SalesDashboard extends StatelessWidget {
                     ),
                   ),
                   Container(height: 30, width: 1, color: Colors.white10, margin: const EdgeInsets.symmetric(horizontal: 10)),
-                  Expanded( // ✅ Added Expanded
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -516,8 +622,8 @@ class SalesDashboard extends StatelessWidget {
               ),
             ),
 
-            // --- BONUS CALCULATOR ROW ---
-            if (!controller.isSalesManager.value) ...[
+            // --- SIMPLIFIED BONUS ROW (No Popup) ---
+            if (!controller.isSalesManager.value && isMonthly) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -542,7 +648,7 @@ class SalesDashboard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            bonusUnlocked ? "TIERED EXTRA EARNINGS" : "BONUS LOCKED",
+                            bonusUnlocked ? "EXTRA EARNINGS" : "BONUS LOCKED",
                             style: TextStyle(
                               color: bonusUnlocked ? Colors.amberAccent : Colors.white38,
                               fontSize: 10,
@@ -574,7 +680,6 @@ class SalesDashboard extends StatelessWidget {
       );
     });
   }
-
   Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       if (controller.isLoading.value && controller.leaderboardData.isEmpty) {
@@ -603,7 +708,7 @@ class SalesDashboard extends StatelessWidget {
               Icon(Icons.bar_chart_rounded, size: 40, color: Colors.grey.shade400),
               const SizedBox(height: 8),
               Text(
-                "No approved sales for this month.",
+                "No approved sales for this period.",
                 style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500),
               ),
             ],

@@ -284,18 +284,18 @@ class SalesManagerController extends GetxController {
           else r = 'JSA';
 
           roleMap[n] = r;
-          // Set Base Target per Role
           baseTargetMap[n] = (r == 'SC') ? 200000.0 : ((r == 'SSA' || r == 'SM') ? 150000.0 : 100000.0);
         }
       }
 
-      // 2. Fetch ALL historical orders to calculate cumulative debt
+      // 2. Fetch ALL historical orders to calculate cumulative debt & dynamic ranks
       final snapshot = await _db.collection('orders')
           .where('orderDate', isLessThanOrEqualTo: end)
           .get();
 
+      // ✅ FIX: Added 'pending' and 'placed' so math perfectly matches Associate Dashboard
       List<String> validStatuses = [
-        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'pending', 'placed', 'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
@@ -306,7 +306,6 @@ class SalesManagerController extends GetxController {
       double gstTotal = 0.0;
       int unitsCount = 0;
 
-      // agentName -> { monthKey -> revenue }
       Map<String, Map<String, double>> agentHistory = {};
       Map<String, int> currentPeriodCount = {};
       Map<String, double> currentPeriodSales = {};
@@ -314,8 +313,9 @@ class SalesManagerController extends GetxController {
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
-        bool isDeleteRequested = data['isDeleteRequested'] == true;
-        bool isDeleted = data['isDeleted'] == true;
+
+        bool isDeleted = data['isDeleted'] == true || data['isDeleted'] == "true";
+        bool isDeleteRequested = data['isDeleteRequested'] == true || data['isDeleteRequested'] == "true";
 
         if (validStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
           DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
@@ -324,28 +324,23 @@ class SalesManagerController extends GetxController {
 
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
-
-          // Use Net Achievement (ER) if available, otherwise Gross
           double finalAmount = (effRev > 0) ? effRev : totalAmt;
 
           // Track Historical Revenue per Agent
           agentHistory.putIfAbsent(agent, () => {});
           agentHistory[agent]![monthKey] = (agentHistory[agent]![monthKey] ?? 0.0) + finalAmount;
 
-          // If the order belongs to the currently viewed timeframe, add it to Global Stats
+          // If the order belongs to the currently viewed timeframe, add to Global Stats
           if (orderDate.isAfter(start.subtract(const Duration(seconds: 1))) &&
               orderDate.isBefore(end.add(const Duration(seconds: 1)))) {
 
             validOrderCount++;
             total += finalAmount;
 
-            // Current Period Agent Stats
             currentPeriodSales[agent] = (currentPeriodSales[agent] ?? 0) + finalAmount;
             currentPeriodCount[agent] = (currentPeriodCount[agent] ?? 0) + 1;
 
-            // Global Shipping Tracking
-            double shipping = _parseAmount(data['shippingCharge']);
-            shippingTotal += shipping;
+            shippingTotal += _parseAmount(data['shippingCharge']);
 
             // Exact GST Extraction
             double orderGst = 0.0;
@@ -383,33 +378,54 @@ class SalesManagerController extends GetxController {
       totalShippingCollected.value = shippingTotal;
       totalGstCollected.value = gstTotal;
 
-      // 3. Process Leaderboard with Cumulative Debt Logic
+      // 3. Process Leaderboard with DYNAMIC RANKS & Cumulative Debt Logic
       List<Map<String, dynamic>> leaderboardList = [];
 
       for (String agent in agentHistory.keys) {
-        // Only show agents on the board who have sales in the current viewing period
         if (!currentPeriodSales.containsKey(agent)) continue;
 
         double currentSales = currentPeriodSales[agent] ?? 0.0;
-        String role = roleMap[agent] ?? 'JSA';
-        double baseTarget = baseTargetMap[agent] ?? 100000.0;
-        bool isSM = role == 'SM';
+        String dbRole = roleMap[agent] ?? 'JSA';
+        bool isSM = dbRole == 'SM';
 
+        // ✅ DYNAMIC RANK ALGORITHM
+        String calculatedRank = dbRole;
+        double currentTarget = baseTargetMap[agent] ?? 100000.0;
         double accumulatedDue = 0.0;
 
-        // Calculate historical cumulative debt ONLY if looking at 'Monthly' timeframe
         if (selectedTimeframe.value == 'Monthly') {
           List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
+
+          // Approximate training month as their first month of sales
+          String firstMonth = sortedKeys.isNotEmpty ? sortedKeys.first : targetMonthKey;
+
           for (String mKey in sortedKeys) {
-            if (mKey == targetMonthKey) break; // Stop accumulating before current month
+            if (mKey == targetMonthKey) break;
+
+            // ✅ SKIP TRAINING MONTH (Grace Period)
+            if (mKey == firstMonth) continue;
+
             double monthRev = agentHistory[agent]![mKey] ?? 0.0;
-            accumulatedDue += (baseTarget - monthRev);
-            if (accumulatedDue < 0) accumulatedDue = 0; // Surplus does not carry forward
+            accumulatedDue += (currentTarget - monthRev);
+            if (accumulatedDue < 0) accumulatedDue = 0; // Surplus doesn't carry over
+
+            // ✅ CHECK DYNAMIC PROMOTION
+            if (accumulatedDue <= 0 && !isSM) {
+              if (calculatedRank == 'JSA' && monthRev >= 150000) {
+                calculatedRank = 'SSA';
+                currentTarget = 150000.0;
+              } else if (calculatedRank == 'SSA' && monthRev >= 200000) {
+                calculatedRank = 'SC';
+                currentTarget = 200000.0;
+              }
+            }
           }
+        } else {
+          currentTarget = baseTargetMap[agent] ?? 100000.0;
         }
 
-        // Apply the Dynamic Target (Scaled by multiplier)
-        double dynamicTarget = (baseTarget * multiplier) + accumulatedDue;
+        // Apply Dynamic Target
+        double dynamicTarget = (currentTarget * multiplier) + accumulatedDue;
         double progress = dynamicTarget > 0 ? (currentSales / dynamicTarget) : 0.0;
 
         String greeting = "";
@@ -425,21 +441,17 @@ class SalesManagerController extends GetxController {
           'greeting': greeting,
           'count': currentPeriodCount[agent] ?? 0,
           'isSM': isSM,
-          'rank': role,
+          'rank': calculatedRank, // ✅ PASSES THE DYNAMIC RANK TO THE UI!
         });
       }
 
-      // Sort the list so highest earners are at the top
       leaderboardList.sort((a, b) => b['amount'].compareTo(a['amount']));
-
-      // Update UI state
       topAgents.value = leaderboardList.take(10).toList();
 
     } catch (e) {
       print("❌ STATS ERROR: $e");
     }
   }
-
   Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
   }

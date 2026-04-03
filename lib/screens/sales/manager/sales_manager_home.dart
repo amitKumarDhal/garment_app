@@ -690,7 +690,11 @@ class SalesManagerHome extends StatelessWidget {
                 final agent = controller.topAgents[index];
                 int rankNum = index + 1;
                 final String name = agent['name'];
-                final String formattedAmt = agent['formatted'];
+
+                // ✅ FIX: Extract raw amount and format it to show the full exact total
+                final double rawAmount = (agent['amount'] as num).toDouble();
+                final String formattedAmt = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(rawAmount);
+
                 final double progress = agent['progress'];
                 final int ordersCount = agent['count'];
 
@@ -853,7 +857,6 @@ class SalesManagerHome extends StatelessWidget {
       ),
     );
   }
-
   Color _getRankColor(String rank) {
     switch (rank.toUpperCase()) {
       case "SM": return Colors.blueAccent;

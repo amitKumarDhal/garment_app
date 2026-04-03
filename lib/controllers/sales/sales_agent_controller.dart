@@ -12,41 +12,52 @@ class SalesAgentController extends GetxController {
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
 
-  // Observables
+  // --- UI State Observables ---
   final leaderboardData = <Map<String, dynamic>>[].obs;
   final isLoading = true.obs;
   final agentName = "".obs;
 
-  // User Role Observable
+  // ✅ NEW: Tracks the official DB role vs the Displayed Dynamic Role
+  String dbBaseRole = "JSA";
   final userRole = "JSA".obs;
 
-  // Observables for Gross vs Net
+  var isSalesManager = false.obs;
+  final agentCreatedAt = Rx<DateTime?>(null);
+
+  // --- Financial Observables ---
   final grossSales = 0.0.obs;
   final netAchievement = 0.0.obs;
   final totalOrders = 0.obs;
-
-  // Observable to track if personal margin is pending
   final hasPendingER = false.obs;
 
-  // Dynamic Target Observables (UPDATED FOR CUMULATIVE LOGIC)
+  // --- Target Logic Observables ---
   final baseTarget = 100000.0.obs;
   final currentDynamicTarget = 100000.0.obs;
-  final prevMonthPendingAmount = 0.0.obs; // Represents "Accumulated Lifetime Due"
-  final isPrevMonthCompleted = true.obs; // True if accumulated due is 0
+  final prevMonthPendingAmount = 0.0.obs;
+  final isPrevMonthCompleted = true.obs;
   final hasPrevMonthData = false.obs;
 
-  var isSalesManager = false.obs;
   var selectedMonth = DateTime.now().obs;
+  var selectedTimeframe = 'Monthly'.obs;
+  final List<String> timeframes = [
+    'Monthly', 'Last 3 Months', 'Last 6 Months', 'Last 9 Months', 'Last 12 Months', 'This FY'
+  ];
+
+  void setTimeframe(String tf) {
+    HapticFeedback.selectionClick();
+    selectedTimeframe.value = tf;
+    loadDashboardData();
+  }
 
   void changeMonth(int offset) {
     HapticFeedback.selectionClick();
     DateTime current = selectedMonth.value;
     selectedMonth.value = DateTime(current.year, current.month + offset, 1);
 
-    isLoading.value = true;
-    Future.wait([fetchAgentStats(), fetchLeaderboard()]).then((_) {
-      isLoading.value = false;
-    });
+    if (selectedTimeframe.value != 'Monthly') {
+      selectedTimeframe.value = 'Monthly';
+    }
+    loadDashboardData();
   }
 
   Future<void> fetchAgentIdentity() async {
@@ -60,14 +71,22 @@ class SalesAgentController extends GetxController {
           name = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? name;
           String role = (userDoc.data()?['Role'] ?? userDoc.data()?['role'] ?? '').toString().toLowerCase();
 
-          userRole.value = _parseRoleAcronym(role);
+          dbBaseRole = _parseRoleAcronym(role);
+          userRole.value = dbBaseRole; // Fallback
 
           if (role.contains('manager') || role == 'sales manager') {
             baseTarget.value = 150000.0;
             isSalesManager.value = true;
           } else {
-            baseTarget.value = _getTargetForRole(userRole.value);
+            baseTarget.value = _getTargetForRole(dbBaseRole);
             isSalesManager.value = false;
+          }
+
+          var createdRaw = userDoc.data()?['createdAt'];
+          if (createdRaw != null && createdRaw is Timestamp) {
+            agentCreatedAt.value = createdRaw.toDate();
+          } else {
+            agentCreatedAt.value = user.metadata.creationTime ?? DateTime.now();
           }
         }
         agentName.value = name;
@@ -99,15 +118,64 @@ class SalesAgentController extends GetxController {
     isLoading.value = false;
   }
 
+  Map<String, dynamic> _getDateRange() {
+    DateTime now = DateTime.now();
+    DateTime start;
+    DateTime end;
+    int monthsInPeriod = 1;
+
+    switch (selectedTimeframe.value) {
+      case 'Last 3 Months':
+        start = DateTime(now.year, now.month - 2, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 3;
+        break;
+      case 'Last 6 Months':
+        start = DateTime(now.year, now.month - 5, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 6;
+        break;
+      case 'Last 9 Months':
+        start = DateTime(now.year, now.month - 8, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 9;
+        break;
+      case 'Last 12 Months':
+        start = DateTime(now.year, now.month - 11, 1);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        monthsInPeriod = 12;
+        break;
+      case 'This FY':
+        int startYear = now.month >= 4 ? now.year : now.year - 1;
+        start = DateTime(startYear, 4, 1);
+        end = DateTime(startYear + 1, 3, 31, 23, 59, 59);
+        monthsInPeriod = 12;
+        break;
+      case 'Monthly':
+      default:
+        start = DateTime(selectedMonth.value.year, selectedMonth.value.month, 1);
+        end = DateTime(selectedMonth.value.year, selectedMonth.value.month + 1, 0, 23, 59, 59, 999);
+        monthsInPeriod = 1;
+        break;
+    }
+    return {'start': start, 'end': end, 'multiplier': monthsInPeriod};
+  }
+
   // =====================================================================
-  // ✅ STATS WITH CUMULATIVE DEBT (Career Path Upgrade Logic Removed!)
+  // ✅ PERSONAL STATS WITH DYNAMIC PROMOTION LOGIC
   // =====================================================================
   Future<void> fetchAgentStats() async {
     if (agentName.value.isEmpty) await fetchAgentIdentity();
     if (agentName.value.isEmpty) return;
 
     try {
-      DateTime targetMonth = selectedMonth.value;
+      final rangeData = _getDateRange();
+      DateTime start = rangeData['start'];
+      DateTime end = rangeData['end'];
+      int multiplier = rangeData['multiplier'];
+
+      DateTime joinedDate = agentCreatedAt.value ?? DateTime.now();
+      DateTime officialStartMonth = DateTime(joinedDate.year, joinedDate.month + 1, 1);
 
       final allOrdersSnap = await _db.collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
@@ -115,24 +183,27 @@ class SalesAgentController extends GetxController {
           .get();
 
       List<String> validStatuses = [
-        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'pending', 'placed', 'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
-        'shipping', 'shipped', 'delivered', 'completed'
+        'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
 
       Map<String, double> monthlySalesMap = {};
-      double currentMonthGross = 0.0;
-      double currentMonthNet = 0.0;
-      int currentMonthOrderCount = 0;
-      bool currentMonthMissingMargin = false;
+      double periodGross = 0.0;
+      double periodNet = 0.0;
+      int periodOrderCount = 0;
+      bool periodMissingMargin = false;
 
-      String targetMonthKey = DateFormat('yyyy-MM').format(targetMonth);
+      String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
 
       for (var doc in allOrdersSnap.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'pending').toString().toLowerCase();
 
-        if (validStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
+        bool isDeleted = data['isDeleted'] == true || data['isDeleted'] == "true";
+        bool isDeleteRequested = data['isDeleteRequested'] == true || data['isDeleteRequested'] == "true";
+
+        if (validStatuses.contains(status) && !isDeleted && !isDeleteRequested) {
           DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
           String monthKey = DateFormat('yyyy-MM').format(orderDate);
 
@@ -142,46 +213,63 @@ class SalesAgentController extends GetxController {
 
           monthlySalesMap[monthKey] = (monthlySalesMap[monthKey] ?? 0.0) + finalAmount;
 
-          if (monthKey == targetMonthKey) {
-            currentMonthOrderCount++;
-            currentMonthGross += totalAmt;
-            currentMonthNet += finalAmount;
-            if (effRev <= 0) currentMonthMissingMargin = true;
+          if (orderDate.isAfter(start.subtract(const Duration(seconds: 1))) && orderDate.isBefore(end.add(const Duration(seconds: 1)))) {
+            periodOrderCount++;
+            periodGross += totalAmt;
+            periodNet += finalAmount;
+            if (effRev <= 0) periodMissingMargin = true;
           }
         }
       }
 
+      // ✅ DYNAMIC RANK ALGORITHM
+      String calculatedRank = dbBaseRole;
+      double currentTarget = _getTargetForRole(calculatedRank);
       double accumulatedDue = 0.0;
+
       List<String> sortedKeys = monthlySalesMap.keys.toList()..sort();
       hasPrevMonthData.value = sortedKeys.isNotEmpty;
 
-      for (String mKey in sortedKeys) {
-        if (mKey == targetMonthKey) break;
+      if (selectedTimeframe.value == 'Monthly') {
+        for (String mKey in sortedKeys) {
+          if (mKey == targetMonthKey) break;
 
-        double monthRevenue = monthlySalesMap[mKey] ?? 0.0;
+          DateTime loopMonth = DateFormat('yyyy-MM').parse(mKey);
+          if (loopMonth.isBefore(officialStartMonth)) continue; // Grace period
 
-        // Cumulative Debt Formula
-        accumulatedDue = accumulatedDue + (baseTarget.value - monthRevenue);
+          double monthNet = monthlySalesMap[mKey] ?? 0.0;
+          accumulatedDue += (currentTarget - monthNet);
+          if (accumulatedDue < 0) accumulatedDue = 0;
 
-        if (accumulatedDue < 0) {
-          accumulatedDue = 0;
+          // ✅ CHECK PROMOTION AT THE END OF PAST MONTH
+          if (accumulatedDue <= 0 && !isSalesManager.value) {
+            if (calculatedRank == 'JSA' && monthNet >= 150000) {
+              calculatedRank = 'SSA';
+              currentTarget = 150000.0; // Target increases
+            } else if (calculatedRank == 'SSA' && monthNet >= 200000) {
+              calculatedRank = 'SC';
+              currentTarget = 200000.0;
+            }
+          }
         }
       }
 
-      // Set the Observables for the UI
-      grossSales.value = currentMonthGross;
-      netAchievement.value = currentMonthNet;
-      totalOrders.value = currentMonthOrderCount;
-      hasPendingER.value = currentMonthMissingMargin;
+      // Apply the dynamic calculated rank & target to the UI!
+      userRole.value = calculatedRank;
+      baseTarget.value = currentTarget;
 
-      if (accumulatedDue <= 0) {
-        isPrevMonthCompleted.value = true;
-        prevMonthPendingAmount.value = 0.0;
-        currentDynamicTarget.value = baseTarget.value;
-      } else {
-        isPrevMonthCompleted.value = false;
+      grossSales.value = periodGross;
+      netAchievement.value = periodNet;
+      totalOrders.value = periodOrderCount;
+      hasPendingER.value = periodMissingMargin;
+
+      if (selectedTimeframe.value == 'Monthly') {
         prevMonthPendingAmount.value = accumulatedDue;
-        currentDynamicTarget.value = baseTarget.value + accumulatedDue;
+        currentDynamicTarget.value = currentTarget + accumulatedDue;
+        isPrevMonthCompleted.value = accumulatedDue <= 0;
+      } else {
+        prevMonthPendingAmount.value = 0.0;
+        currentDynamicTarget.value = currentTarget * multiplier;
       }
 
     } catch (e) {
@@ -189,13 +277,9 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // =====================================================================
-  // ✅ TIERED COMMISSION CALCULATOR (Extra Earning Logic)
-  // =====================================================================
   double calculateTieredBonus() {
-    if (netAchievement.value < currentDynamicTarget.value) {
-      return 0.0;
-    }
+    if (selectedTimeframe.value != 'Monthly') return 0.0;
+    if (netAchievement.value < currentDynamicTarget.value) return 0.0;
 
     double surplusAmount = netAchievement.value - currentDynamicTarget.value;
     if (surplusAmount <= 0) return 0.0;
@@ -208,28 +292,29 @@ class SalesAgentController extends GetxController {
       bonus += (slab1Amount * 0.02);
       remainingSurplus -= slab1Amount;
     }
-
     if (remainingSurplus > 0) {
       double slab2Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
       bonus += (slab2Amount * 0.015);
       remainingSurplus -= slab2Amount;
     }
-
     if (remainingSurplus > 0) {
       bonus += (remainingSurplus * 0.01);
     }
-
     return bonus;
   }
 
-  // --- Calculate Team Leaderboard ---
+  // =====================================================================
+  // ✅ TEAM LEADERBOARD WITH DYNAMIC RANKS
+  // =====================================================================
   Future<void> fetchLeaderboard() async {
     try {
       isLoading.value = true;
 
-      DateTime targetMonth = selectedMonth.value;
-      DateTime start = DateTime(targetMonth.year, targetMonth.month, 1);
-      DateTime end = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
+      final rangeData = _getDateRange();
+      DateTime start = rangeData['start'];
+      DateTime end = rangeData['end'];
+      int multiplier = rangeData['multiplier'];
+      String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
 
       final usersSnap = await _db.collection('users').get();
       Map<String, String> userRoleMap = {};
@@ -244,53 +329,94 @@ class SalesAgentController extends GetxController {
       }
 
       List<String> revenueStatuses = [
-        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'pending', 'placed', 'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
-        'shipping', 'shipped', 'delivered', 'completed'
+        'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
+
+      // ✅ FIX: Fetch ALL historical orders to calculate dynamic ranks for the team
       final snapshot = await _db
           .collection('orders')
-          .where('orderDate', isGreaterThanOrEqualTo: start)
           .where('orderDate', isLessThanOrEqualTo: end)
           .get();
 
-      Map<String, double> salesMap = {};
-      Map<String, int> countMap = {};
+      Map<String, Map<String, double>> agentHistory = {};
+      Map<String, double> currentPeriodSales = {};
+      Map<String, int> currentPeriodCount = {};
       Map<String, bool> pendingERMap = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String status = (data['status'] ?? 'Pending').toString().toLowerCase();
 
-        if (revenueStatuses.contains(status) && data['isDeleteRequested'] != true && data['isDeleted'] != true) {
+        bool isDeleted = data['isDeleted'] == true || data['isDeleted'] == "true";
+        bool isDeleteRequested = data['isDeleteRequested'] == true || data['isDeleteRequested'] == "true";
+
+        if (revenueStatuses.contains(status) && !isDeleted && !isDeleteRequested) {
           String agent = data['marketingPersonName'] ?? 'Unknown';
+          DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
+          String monthKey = DateFormat('yyyy-MM').format(orderDate);
 
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
+          if (effRev <= 0) pendingERMap[agent] = true;
+          double finalAmount = (effRev > 0) ? effRev : totalAmt;
 
-          if (effRev <= 0) {
-            pendingERMap[agent] = true;
+          // Build History for Rank Calculation
+          agentHistory.putIfAbsent(agent, () => {});
+          agentHistory[agent]![monthKey] = (agentHistory[agent]![monthKey] ?? 0.0) + finalAmount;
+
+          // Accumulate Current Period Sales
+          if (orderDate.isAfter(start.subtract(const Duration(seconds: 1))) && orderDate.isBefore(end.add(const Duration(seconds: 1)))) {
+            currentPeriodSales[agent] = (currentPeriodSales[agent] ?? 0) + finalAmount;
+            currentPeriodCount[agent] = (currentPeriodCount[agent] ?? 0) + 1;
           }
-
-          double amountToCount = (effRev > 0) ? effRev : totalAmt;
-
-          salesMap[agent] = (salesMap[agent] ?? 0) + amountToCount;
-          countMap[agent] = (countMap[agent] ?? 0) + 1;
         }
       }
 
-      var sortedEntries = salesMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      List<Map<String, dynamic>> tempList = [];
 
-      leaderboardData.value = sortedEntries.map((e) {
-        String name = e.key;
-        double amount = e.value;
-        int count = countMap[name] ?? 0;
+      for (String agent in currentPeriodSales.keys) {
+        String dbRole = userRoleMap[agent] ?? 'JSA';
+        bool isSM = dbRole == 'SM';
 
-        String role = userRoleMap[name] ?? 'JSA';
-        bool isSM = role == 'SM';
-        double targetAmount = _getTargetForRole(role);
+        // ✅ CALCULATE DYNAMIC RANK FOR EACH AGENT
+        String calculatedRank = dbRole;
+        double currentTarget = _getTargetForRole(calculatedRank);
+        double accumulatedDue = 0.0;
 
-        double progress = amount / targetAmount;
+        if (agentHistory.containsKey(agent) && selectedTimeframe.value == 'Monthly') {
+          List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
+
+          // Approximate training month as their first month of sales for the leaderboard
+          String firstMonth = sortedKeys.isNotEmpty ? sortedKeys.first : targetMonthKey;
+
+          for (String mKey in sortedKeys) {
+            if (mKey == targetMonthKey) break;
+            if (mKey == firstMonth) continue; // Training month skip
+
+            double monthNet = agentHistory[agent]![mKey] ?? 0.0;
+            accumulatedDue += (currentTarget - monthNet);
+            if (accumulatedDue < 0) accumulatedDue = 0;
+
+            if (accumulatedDue <= 0 && !isSM) {
+              if (calculatedRank == 'JSA' && monthNet >= 150000) {
+                calculatedRank = 'SSA';
+                currentTarget = 150000.0;
+              } else if (calculatedRank == 'SSA' && monthNet >= 200000) {
+                calculatedRank = 'SC';
+                currentTarget = 200000.0;
+              }
+            }
+          }
+        } else if (selectedTimeframe.value != 'Monthly') {
+          // Fallback to base role target if not looking at monthly
+          currentTarget = _getTargetForRole(dbRole);
+        }
+
+        double amount = currentPeriodSales[agent] ?? 0.0;
+        double targetAmount = currentTarget * multiplier;
+        double progress = targetAmount > 0 ? (amount / targetAmount) : 0.0;
 
         String greeting = "";
         if (progress >= 1.5) greeting = "Unstoppable! 🚀";
@@ -299,17 +425,21 @@ class SalesAgentController extends GetxController {
         else if (progress >= 0.5) greeting = "Halfway point 💪";
         else greeting = "Keep Pushing 📉";
 
-        return {
-          'name': name,
+        tempList.add({
+          'name': agent,
           'amount': amount,
-          'count': count,
+          'count': currentPeriodCount[agent] ?? 0,
           'progress': progress,
           'greeting': greeting,
           'isSM': isSM,
-          'roleStr': role,
-          'hasPendingER': pendingERMap[name] ?? false,
-        };
-      }).toList();
+          'roleStr': calculatedRank, // ✅ SENDS THE UPGRADED RANK TO THE UI
+          'hasPendingER': pendingERMap[agent] ?? false,
+        });
+      }
+
+      tempList.sort((a, b) => b['amount'].compareTo(a['amount']));
+      leaderboardData.value = tempList;
+
     } catch (e) {
       debugPrint("Error fetching leaderboard: $e");
     } finally {
@@ -317,7 +447,6 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- UPDATE ORDER ---
   Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
     try {
       isLoading.value = true;
@@ -359,7 +488,6 @@ class SalesAgentController extends GetxController {
     }
   }
 
-  // --- REQUEST DELETE ---
   Future<void> deleteOrder(String orderId, String currentStatus) async {
     final lockedStatuses = [
       'fab ready', 'cutting', 'cutting done', 'printing', 'printed',
@@ -394,7 +522,7 @@ class SalesAgentController extends GetxController {
         }
       } catch (e) {}
 
-      await fetchAgentStats();
+      await loadDashboardData();
       Get.snackbar("Request Sent", "Deletion request sent to manager.", backgroundColor: Colors.orange.withValues(alpha: 0.1), colorText: Colors.orange);
     } catch (e) {
       Get.snackbar("Error", "Could not send request: $e", backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
@@ -412,10 +540,5 @@ class SalesAgentController extends GetxController {
       return double.tryParse(clean) ?? 0.0;
     }
     return 0.0;
-  }
-
-  double get achievementPercentage {
-    if (baseTarget.value <= 0) return 0.0;
-    return (grossSales.value / baseTarget.value).clamp(0.0, 1.0);
   }
 }

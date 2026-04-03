@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -333,13 +335,20 @@ class StockInOutScreen extends StatelessWidget {
     );
   }
 
+  // ✅ UPDATED: Premium Recent Activity Feed UI
   Widget _buildRecentActivity(StockInOutController controller, bool isDark) {
     return Obx(() {
       if (controller.recentHistory.isEmpty) {
         return Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Text("No recent activity found.", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600)),
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              children: [
+                Icon(Icons.history_rounded, size: 48, color: isDark ? Colors.white24 : Colors.black12),
+                const SizedBox(height: 12),
+                Text("No recent stock activity.", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600)),
+              ],
+            ),
           ),
         );
       }
@@ -348,11 +357,12 @@ class StockInOutScreen extends StatelessWidget {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: controller.recentHistory.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
           var log = controller.recentHistory[index];
           bool isIn = log['type'] == 'IN';
           Color actionColor = isIn ? Colors.green : Colors.redAccent;
+          Color bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
           String product = log['product'] ?? '';
           String colorName = log['color'] ?? '';
@@ -360,6 +370,7 @@ class StockInOutScreen extends StatelessWidget {
           double qty = (log['qty'] as num?)?.toDouble() ?? 0.0;
           String unit = log['unit'] ?? '';
           String supervisor = log['supervisorName'] ?? 'Unknown';
+          String vendor = log['vendorName'] ?? '';
 
           DateTime date = DateTime.now();
           if (log['timestamp'] != null) {
@@ -370,41 +381,138 @@ class StockInOutScreen extends StatelessWidget {
           String dateStr = DateFormat('dd MMM, hh:mm a').format(date);
 
           return Container(
-            padding: const EdgeInsets.all(16),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: bgColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: actionColor.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(isIn ? Icons.arrow_downward : Icons.arrow_upward, color: actionColor, size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Showing color, product, and style (if collar)
-                      Text("$colorName $product$style", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 4),
-                      Text("$dateStr • $supervisor", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black54)),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text("${isIn ? '+' : '-'}$qty $unit", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: actionColor)),
-                  ],
-                ),
+              boxShadow: [
+                if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
               ],
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Left Accent Line
+                  Container(width: 5, color: actionColor),
+
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          // Action Icon Box
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: actionColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              isIn ? Icons.add_to_photos_rounded : Icons.outbox_rounded,
+                              color: actionColor,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Middle Info Area
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "$colorName $product$style",
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.white54 : Colors.black54),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        supervisor,
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black54),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.access_time_filled_rounded, size: 12, color: isDark ? Colors.white38 : Colors.black38),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      dateStr,
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : Colors.black38),
+                                    ),
+                                  ],
+                                ),
+                                if (isIn && vendor.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.local_shipping_rounded, size: 12, color: Colors.blueAccent),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          vendor,
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.blueAccent),
+                                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ]
+                              ],
+                            ),
+                          ),
+
+                          // Right Quantities & Badge Area
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: actionColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isIn ? "STOCK IN" : "STOCK OUT",
+                                  style: TextStyle(color: actionColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Text(
+                                    "${isIn ? '+' : '-'}${qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)}",
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    unit,
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: isDark ? Colors.white54 : Colors.black54),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
