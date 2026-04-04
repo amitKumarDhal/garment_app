@@ -13,9 +13,6 @@ import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../services/pdf_invoice_service.dart';
-import '../../floor_management/marketing_upload_screen.dart';
-import '../../../controllers/floor_management/marketing_upload_controller.dart';
-import '../../../controllers/sales/sales_history_controller.dart';
 
 class SalesManagerOrderDetails extends StatefulWidget {
   final OrderModel order;

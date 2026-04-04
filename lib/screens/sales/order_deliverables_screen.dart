@@ -526,7 +526,7 @@ class OrderDeliverablesScreen extends StatelessWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         padding: const EdgeInsets.all(16),
                         itemCount: controller.ordersForSelectedDate.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           var order = controller.ordersForSelectedDate[index];
                           Color statusColor = _getStatusColor(order.status);

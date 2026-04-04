@@ -1,16 +1,11 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../data/models/order_model.dart';
-import '../../utils/constants/colors.dart';
-import '../../utils/widgets/custom_text_field.dart';
 
 // =========================================================================
 // ✅ 1. HELPER CLASS FOR DYNAMIC ITEMS
