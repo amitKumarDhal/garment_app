@@ -244,18 +244,16 @@ class SalesDashboard extends StatelessWidget {
     );
   }
 
-
-  // ✅ NEW: INLINE PROMOTION CARD (Slim & Compact)
+  // ✅ NEW: DYNAMIC PROMOTION CARD
   Widget _buildPromotionCard(bool isDark, SalesAgentController controller) {
     if (controller.selectedTimeframe.value != 'Monthly') return const SizedBox.shrink();
     if (controller.isSalesManager.value) return const SizedBox.shrink();
 
-    final net = controller.netAchievement.value;
-    final debt = controller.prevMonthPendingAmount.value;
-    final role = controller.userRole.value;
+    final originalRole = controller.dbBaseRole;
+    final currentRole = controller.userRole.value;
 
-    // The agent must be a JSA, have 0 dues, and have hit the 1.5L mark this month.
-    if (role == 'JSA' && debt <= 0 && net >= 150000) {
+    // If the dynamic calculated role is different from the base role in the DB, a promotion happened!
+    if (originalRole != currentRole) {
       return Container(
         margin: const EdgeInsets.only(top: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -293,7 +291,7 @@ class SalesDashboard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    "Target hit! You will be upgraded to SSA next month.",
+                    "Target hit! You have been upgraded to $currentRole.",
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.9)),
                   ),
                 ],
@@ -408,17 +406,18 @@ class SalesDashboard extends StatelessWidget {
       final gross = controller.grossSales.value;
       final net = controller.netAchievement.value;
 
-      // ✅ FIX: Strictly use the standard 1 Lakh / 1.5 Lakh Base Target for the UI
       final baseTarget = controller.baseTarget.value;
-      final dynamicTarget = controller.currentDynamicTarget.value; // Used only for bonus math
+      final dynamicTarget = controller.currentDynamicTarget.value;
 
-      // ✅ FIX: Progress ring now fills based on the strict Base Target
       final percentage = baseTarget > 0 ? (gross / baseTarget).clamp(0.0, 1.0) : 0.0;
 
       final prevPendingAmount = controller.prevMonthPendingAmount.value;
       final remainingToClear = dynamicTarget - net;
       final bool bonusUnlocked = remainingToClear <= 0;
-      final double extraEarning = controller.calculateTieredBonus();
+
+      // ✅ FIX: Directly observe the variable since the controller updates it automatically
+      final double extraEarning = controller.extraEarningAmount.value;
+
       final bool isMonthly = controller.selectedTimeframe.value == 'Monthly';
 
       return Container(
@@ -492,7 +491,6 @@ class SalesDashboard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 30, color: Colors.white, letterSpacing: -1),
                       ),
-                      // ✅ FIX: Text now says "Target: ₹1,00,000" permanently
                       Text(
                         "Target: ₹${formatCurrency.format(baseTarget)}",
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w600),
@@ -622,7 +620,7 @@ class SalesDashboard extends StatelessWidget {
               ),
             ),
 
-            // --- SIMPLIFIED BONUS ROW (No Popup) ---
+            // --- SIMPLIFIED BONUS ROW ---
             if (!controller.isSalesManager.value && isMonthly) ...[
               const SizedBox(height: 12),
               Container(
@@ -680,6 +678,7 @@ class SalesDashboard extends StatelessWidget {
       );
     });
   }
+
   Widget _buildTeamLeaderboard(bool isDark, SalesAgentController controller) {
     return Obx(() {
       if (controller.isLoading.value && controller.leaderboardData.isEmpty) {

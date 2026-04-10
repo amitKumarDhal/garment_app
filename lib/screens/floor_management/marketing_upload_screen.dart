@@ -170,7 +170,12 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                       hintText: isEditMode ? "" : "Syncing..."
                   ),
                   const SizedBox(height: 16),
-                  TCustomTextField(label: "Client Name", controller: controller.clientName, prefixIcon: Icons.person_outline_rounded, validator: (val) => val!.isEmpty ? "Required" : null),
+                  TCustomTextField(
+                      label: "Client Name *", // ✅ Required visually
+                      controller: controller.clientName,
+                      prefixIcon: Icons.person_outline_rounded,
+                      validator: (val) => val!.isEmpty ? "Required" : null
+                  ),
                   const SizedBox(height: 16),
 
                   Row(
@@ -179,7 +184,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                       Expanded(
                         flex: 2,
                         child: TCustomTextField(
-                          label: "PIN Code",
+                          label: "PIN Code *", // ✅ Required visually
                           controller: controller.pincode,
                           prefixIcon: Icons.pin_drop_rounded,
                           keyboardType: TextInputType.number,
@@ -234,12 +239,17 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   GestureDetector(
                     onTap: () => controller.chooseDate(context),
                     child: AbsorbPointer(
-                      child: TCustomTextField(label: "Delivery Deadline", controller: controller.deadline, prefixIcon: Icons.calendar_month_rounded, validator: (val) => val!.isEmpty ? "Date required" : null),
+                      child: TCustomTextField(
+                          label: "Delivery Deadline *", // ✅ Required visually
+                          controller: controller.deadline,
+                          prefixIcon: Icons.calendar_month_rounded,
+                          validator: (val) => val!.isEmpty ? "Date required" : null
+                      ),
                     ),
                   ),
                 ]),
 
-                // ✅ NEW: GST Toggle Section (Right Below Client Info)
+                // GST Toggle Section
                 Obx(() {
                   if (showGstField.value) {
                     return Padding(
@@ -338,7 +348,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 const SizedBox(height: 16),
 
                                 TCustomTextField(
-                                    label: "Product Name / Details",
+                                    label: "Product Name / Details *", // ✅ Required visually
                                     controller: itemForm.productDetails,
                                     prefixIcon: Icons.notes_rounded,
                                     maxLines: 2,
@@ -363,7 +373,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Obx(() => _buildDropdown(
-                                        label: "Category",
+                                        label: "Category *", // ✅ Required visually
                                         value: itemForm.selectedProductType.value,
                                         items: controller.productTypes,
                                         icon: Icons.category_rounded,
@@ -381,7 +391,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                   children: [
                                     Expanded(
                                       child: Obx(() => _buildDropdown(
-                                        label: "Fabric Type",
+                                        label: "Fabric Type *", // ✅ Required visually
                                         value: itemForm.selectedFabric.value,
                                         items: controller.fabricOptions,
                                         icon: Icons.texture_rounded,
@@ -548,13 +558,17 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   }) {
     final safeValue = (value != null && items.contains(value)) ? value : null;
 
+    // ✅ Render the label nicely even if it has an asterisk
+    final displayLabel = label.contains('*')
+        ? RichText(text: TextSpan(text: label.replaceAll('*', ''), style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12), children: const [TextSpan(text: '*', style: TextStyle(color: Colors.redAccent))]))
+        : Text(label, style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12));
+
     return DropdownButtonFormField<String>(
       initialValue: safeValue,
       isExpanded: true,
       icon: Icon(Icons.keyboard_arrow_down_rounded, color: isDark ? Colors.white70 : Colors.black54, size: 18),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12),
+        label: displayLabel,
         prefixIcon: Icon(icon, color: isDark ? Colors.white70 : Colors.black54, size: 18),
         filled: true,
         fillColor: isDark ? Colors.black26 : Colors.grey.shade50,

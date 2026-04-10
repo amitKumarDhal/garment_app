@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -49,11 +51,11 @@ class AgentDetailScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: TColors.marketing.withValues(alpha:0.3), width: 1.5),
+              border: Border.all(color: TColors.primary.withValues(alpha:0.3), width: 1.5),
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: TColors.marketing.withValues(alpha:0.08),
+                    color: TColors.primary.withValues(alpha:0.08),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -61,20 +63,30 @@ class AgentDetailScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Profile Avatar
+                // --- DYNAMIC GRADIENT AVATAR WITH GLOW ---
                 Container(
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
-                    color: TColors.marketing.withValues(alpha:0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: TColors.marketing.withValues(alpha:0.5), width: 2),
+                      gradient: LinearGradient(
+                        colors: [TColors.primary, TColors.primary.withValues(alpha: 0.6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: TColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
                   ),
                   child: Center(
                     child: Text(
                       _getInitials(agent['name'] ?? "??"),
                       style: const TextStyle(
-                        color: TColors.marketing,
+                        color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 24,
                       ),
@@ -141,7 +153,7 @@ class AgentDetailScreen extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: "Search Client or Organization...",
                 hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-                prefixIcon: const Icon(Icons.search_rounded, color: TColors.marketing, size: 20),
+                prefixIcon: const Icon(Icons.search_rounded, color: TColors.primary, size: 20),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
@@ -185,7 +197,7 @@ class AgentDetailScreen extends StatelessWidget {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.only(left: 20, right: 20, bottom: 40, top: 8),
                 itemCount: controller.filteredClients.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final order = controller.filteredClients[index];
                   final status = order['status'] ?? "Pending";
@@ -254,7 +266,7 @@ class AgentDetailScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                "₹${formatCurrency.format(order['totalAmount'] ?? 0)}",
+                                "₹${formatCurrency.format((order['effectiveRevenue'] != null && order['effectiveRevenue'] > 0) ? order['effectiveRevenue'] : (order['totalAmount'] ?? 0))}",
                                 style: const TextStyle(fontSize: 15, color: Colors.green, fontWeight: FontWeight.w900),
                               ),
                               const SizedBox(height: 6),
@@ -325,9 +337,9 @@ class AgentDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
-        color: isHighlight ? TColors.marketing.withValues(alpha:0.1) : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100),
+        color: isHighlight ? TColors.primary.withValues(alpha:0.1) : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isHighlight ? TColors.marketing.withValues(alpha:0.2) : (isDark ? Colors.white10 : Colors.grey.shade200)),
+        border: Border.all(color: isHighlight ? TColors.primary.withValues(alpha:0.2) : (isDark ? Colors.white10 : Colors.grey.shade200)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -336,7 +348,7 @@ class AgentDetailScreen extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               label,
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: isHighlight ? TColors.marketing.withValues(alpha:0.8) : Colors.grey.shade500, letterSpacing: 0.5),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: isHighlight ? TColors.primary.withValues(alpha:0.8) : Colors.grey.shade500, letterSpacing: 0.5),
             ),
           ),
           const SizedBox(height: 2),
@@ -344,7 +356,7 @@ class AgentDetailScreen extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               value,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isHighlight ? TColors.marketing : (isDark ? Colors.white : Colors.black87)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isHighlight ? TColors.primary : (isDark ? Colors.white : Colors.black87)),
             ),
           ),
         ],

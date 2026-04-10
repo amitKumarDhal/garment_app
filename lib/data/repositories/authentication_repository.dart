@@ -100,21 +100,19 @@ class AuthenticationRepository extends GetxController {
 
   Future<void> logout() async {
     try {
+      // 1. First, tell Firebase to sign out.
+      // (This will automatically trigger your stream and push the user to Login)
+      await _auth.signOut();
+
+      // 2. THE NUKE: This instantly destroys ALL controllers in memory.
+      // You no longer need to manually list them one by one!
+      Get.deleteAll(force: true);
+
+      // 3. Clear the UI stack just to be 100% safe
       Get.offAllNamed(AppRouteNames.login);
 
-      if (Get.isRegistered<NavigationController>()) Get.delete<NavigationController>(force: true);
-      if (Get.isRegistered<InventoryController>()) Get.delete<InventoryController>(force: true);
-      if (Get.isRegistered<AdminController>()) Get.delete<AdminController>(force: true);
-      if (Get.isRegistered<WorkerReportController>()) Get.delete<WorkerReportController>(force: true);
-
-      if (Get.isRegistered<UnitSupervisorController>()) Get.delete<UnitSupervisorController>(force: true);
-      if (Get.isRegistered<StockSummaryController>()) Get.delete<StockSummaryController>(force: true);
-      if (Get.isRegistered<StockInOutController>()) Get.delete<StockInOutController>(force: true);
-
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _auth.signOut();
     } catch (e) {
-      Get.snackbar("Error", "Logout failed: $e");
+      debugPrint("Logout Error: $e");
+      Get.snackbar("Error", "Logout failed: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
     }
-  }
-}
+  }}

@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -19,7 +21,7 @@ class AgentListScreen extends StatelessWidget {
 
       // ✅ 1. SLEEK TRANSPARENT APP BAR
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
         elevation: 0,
         centerTitle: true,
         iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
@@ -62,7 +64,7 @@ class AgentListScreen extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: "Search Agent Name...",
                 hintStyle: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500),
-                prefixIcon: const Icon(Icons.search_rounded, color: TColors.marketing, size: 22),
+                prefixIcon: const Icon(Icons.search_rounded, color: TColors.primary, size: 22),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
@@ -75,7 +77,7 @@ class AgentListScreen extends StatelessWidget {
               // Show loader while Firestore aggregator is working
               if (controller.isLoading.value) {
                 return const Center(
-                  child: CircularProgressIndicator(color: TColors.marketing),
+                  child: CircularProgressIndicator(color: TColors.primary),
                 );
               }
 
@@ -109,7 +111,6 @@ class AgentListScreen extends StatelessWidget {
                 itemCount: controller.filteredAgents.length,
                 itemBuilder: (context, index) {
                   final agent = controller.filteredAgents[index];
-
                   return _buildAgentCard(agent, isDark);
                 },
               );
@@ -146,20 +147,30 @@ class AgentListScreen extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- DYNAMIC AVATAR WITH STATUS GLOW ---
+            // --- DYNAMIC GRADIENT AVATAR WITH GLOW ---
             Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: TColors.marketing.withValues(alpha:0.1),
-                shape: BoxShape.circle,
-                border: Border.all(color: TColors.marketing.withValues(alpha:0.3), width: 1.5),
+                  gradient: LinearGradient(
+                    colors: [TColors.primary, TColors.primary.withValues(alpha: 0.6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: TColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
               ),
               child: Center(
                 child: Text(
                   agent['avatar'] ?? "??",
                   style: const TextStyle(
-                    color: TColors.marketing,
+                    color: Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
                   ),
@@ -223,12 +234,12 @@ class AgentListScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         color: isHighlight
-            ? TColors.marketing.withValues(alpha:0.1)
+            ? TColors.primary.withValues(alpha:0.1)
             : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isHighlight
-              ? TColors.marketing.withValues(alpha:0.2)
+              ? TColors.primary.withValues(alpha:0.2)
               : (isDark ? Colors.white10 : Colors.grey.shade200),
         ),
       ),
@@ -242,7 +253,7 @@ class AgentListScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
-                color: isHighlight ? TColors.marketing.withValues(alpha:0.8) : Colors.grey.shade500,
+                color: isHighlight ? TColors.primary.withValues(alpha:0.8) : Colors.grey.shade500,
                 letterSpacing: 0.5,
               ),
             ),
@@ -255,7 +266,7 @@ class AgentListScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
-                color: isHighlight ? TColors.marketing : (isDark ? Colors.white : Colors.black87),
+                color: isHighlight ? TColors.primary : (isDark ? Colors.white : Colors.black87),
               ),
             ),
           ),

@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +15,8 @@ import 'admin_profile_screen.dart';
 import 'worker_list_screen.dart';
 import 'inventory_screen.dart';
 import '../floor_management/agent_list_screen.dart';
+// ✅ ADDED IMPORT FOR THE NEW ANALYTICS SCREEN
+import 'admin_analytics_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -132,12 +136,10 @@ class AdminDashboard extends StatelessWidget {
                       value: "₹${formatCurrency.format(controller.totalDailyProduction.value)}",
                       icon: Icons.today_rounded,
                       gradientColors: [const Color(0xFF6A1B9A), const Color(0xFF9C27B0)],
-                      isDark: isDark,
                     )),
                   ),
                   const SizedBox(width: 16),
 
-                  // ✅ NEW: Tappable Monthly Revenue Card triggers Month Picker
                   Expanded(
                     child: GestureDetector(
                       onTap: () => controller.selectMonthYear(context),
@@ -146,7 +148,6 @@ class AdminDashboard extends StatelessWidget {
                         value: "₹${formatCurrency.format(controller.totalMonthlyRevenue.value)}",
                         icon: Icons.calendar_month_rounded,
                         gradientColors: [const Color(0xFF00796B), const Color(0xFF009688)],
-                        isDark: isDark,
                       )),
                     ),
                   ),
@@ -155,34 +156,53 @@ class AdminDashboard extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // --- FACTORY HEALTH CARD ---
-              Obx(() {
-                double eff = controller.averageEfficiency.value;
-                Color effColor = eff >= 80 ? const Color(0xFF43A047) : (eff >= 50 ? Colors.orange : Colors.redAccent);
-                return Container(
+              // --- PRODUCT ANALYTICS LAUNCHER BAR ---
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Get.to(() => const AdminAnalyticsScreen());
+                },
+                child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1E88E5), Color(0xFF1565C0)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: effColor.withValues(alpha: 0.3)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.blue.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5))
+                    ],
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.speed_rounded, color: effColor),
-                      const SizedBox(width: 12),
-                      Text("Factory Efficiency", style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black54)),
-                      const Spacer(),
-                      Text("${eff.toStringAsFixed(1)}%", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: effColor)),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                        child: const Icon(Icons.troubleshoot_rounded, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Deep Product Analytics", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                            SizedBox(height: 2),
+                            Text("Revenue & Regional Trends", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
                     ],
                   ),
-                );
-              }),
+                ),
+              ),
 
               const SizedBox(height: 24),
 
               // --- 2. SECONDARY KPI GRID ---
-              // ✅ UPDATED: Section Header with Calendar Action
               Padding(
                 padding: const EdgeInsets.only(right: 4.0),
                 child: Row(
@@ -212,7 +232,6 @@ class AdminDashboard extends StatelessWidget {
               // --- 3. QUICK ACTIONS ---
               _buildSectionHeader("Quick Actions", Icons.bolt_rounded, isDark, iconColor: Colors.orange),
               Obx(() => _buildActionCard(
-                context: context,
                 title: "Pending Approvals",
                 subtitle: "${controller.pendingApprovalsCount.value} requests waiting for verification",
                 icon: Icons.verified_user_rounded,
@@ -284,7 +303,7 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildPrimaryHighlightCard({required String title, required String value, required IconData icon, required List<Color> gradientColors, required bool isDark}) {
+  Widget _buildPrimaryHighlightCard({required String title, required String value, required IconData icon, required List<Color> gradientColors}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -326,7 +345,6 @@ class AdminDashboard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -340,13 +358,11 @@ class AdminDashboard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
             ),
-
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -358,7 +374,7 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildActionCard({required BuildContext context, required String title, required String subtitle, required IconData icon, required Color color, required bool isDark, required VoidCallback onTap}) {
+  Widget _buildActionCard({required String title, required String subtitle, required IconData icon, required Color color, required bool isDark, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -395,7 +411,6 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-// --- 5. PREMIUM VERTICAL TIMELINE FEED (WITH DATE) ---
   Widget _buildActivityFeed(bool isDark, AdminController controller) {
     return Obx(() {
       if (controller.isLoading.value) {
@@ -550,6 +565,8 @@ class AdminDashboard extends StatelessWidget {
       );
     });
   }
+
+  // ✅ ADDED MISSING GREETING FUNCTION
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return "Good Morning,";

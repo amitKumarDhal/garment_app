@@ -689,16 +689,19 @@ class SalesManagerHome extends StatelessWidget {
               itemBuilder: (context, index) {
                 final agent = controller.topAgents[index];
                 int rankNum = index + 1;
-                final String name = agent['name'];
 
-                // ✅ FIX: Extract raw amount and format it to show the full exact total
-                final double rawAmount = (agent['amount'] as num).toDouble();
+                // ✅ ADDED NULL SAFETY
+                final String name = agent['name'] ?? 'Unknown';
+
+                // ✅ FIX: Extract raw amount and format it to show the full exact total safely
+                final double rawAmount = (agent['amount'] as num?)?.toDouble() ?? 0.0;
                 final String formattedAmt = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(rawAmount);
 
-                final double progress = agent['progress'];
-                final int ordersCount = agent['count'];
+                final double progress = (agent['progress'] as num?)?.toDouble() ?? 0.0;
+                final int ordersCount = agent['count'] ?? 0;
 
-                final String rankBadge = agent['rank'] ?? 'JSA';
+                // ✅ CRITICAL FIX: Looks for 'roleStr' first to get the dynamic calculated rank!
+                final String rankBadge = agent['roleStr'] ?? agent['rank'] ?? 'JSA';
                 final Color badgeColor = _getRankColor(rankBadge);
 
                 final double displayProgress = progress.clamp(0.0, 1.0);
@@ -856,8 +859,7 @@ class SalesManagerHome extends StatelessWidget {
         ],
       ),
     );
-  }
-  Color _getRankColor(String rank) {
+  }  Color _getRankColor(String rank) {
     switch (rank.toUpperCase()) {
       case "SM": return Colors.blueAccent;
       case "SC": return Colors.teal;

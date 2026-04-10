@@ -7,6 +7,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../data/models/order_model.dart';
 
+// ✅ IMPORT THE NEW STATS SERVICE
+import '../../services/stats_service.dart';
+
 // =========================================================================
 // ✅ 1. HELPER CLASS FOR DYNAMIC ITEMS
 // =========================================================================
@@ -230,7 +233,7 @@ class MarketingUploadController extends GetxController {
     pincode.text = orderJson['pincode'] ?? "";
     selectedState.value = orderJson['state'] ?? "";
 
-    // ✅ NEW: Load the GST Number safely from the database
+    // Load the GST Number safely from the database
     clientGstNumber.text = orderJson['clientGstNumber'] ?? "";
 
     uploadedMockupUrl.value = order.mockupUrl ?? orderJson['designMockupUrl'] ?? '';
@@ -359,11 +362,64 @@ class MarketingUploadController extends GetxController {
   }
 
   void submitOrder() async {
+    // 1. Basic Form Validation (Checks if standard text fields are empty)
     if (!uploadFormKey.currentState!.validate()) return;
-    if (_selectedDeadline == null) {
-      Get.snackbar("Missing Date", "Please select a delivery deadline.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent);
+
+    // =========================================================================
+    // ✅ NEW STRICT VALIDATIONS (The Gatekeeper)
+    // =========================================================================
+
+    // Check Pincode
+    if (pincode.text.trim().length < 6) {
+      Get.snackbar(
+        "Missing Pincode",
+        "Please enter a valid 6-digit Pincode.",
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+        colorText: Colors.redAccent,
+        snackPosition: SnackPosition.BOTTOM,
+      );
       return;
     }
+
+    // Check Delivery Deadline
+    if (_selectedDeadline == null) {
+      Get.snackbar(
+        "Missing Date",
+        "Please select a delivery deadline.",
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+        colorText: Colors.redAccent,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    // Check Fabric and Category for EVERY dynamic item
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+
+      if (item.selectedProductType.value == null || item.selectedProductType.value!.isEmpty) {
+        Get.snackbar(
+          "Missing Category",
+          "Please select a Category (Product Type) for Item ${i + 1}.",
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+          colorText: Colors.redAccent,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      if (item.selectedFabric.value == null || item.selectedFabric.value!.isEmpty) {
+        Get.snackbar(
+          "Missing Fabric",
+          "Please select a Fabric Type for Item ${i + 1}.",
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+          colorText: Colors.redAccent,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+    }
+    // =========================================================================
 
     try {
       isLoading.value = true;
@@ -429,7 +485,7 @@ class MarketingUploadController extends GetxController {
         "pincode": pincode.text.trim(),
         "state": selectedState.value,
 
-        // ✅ NEW: Saves the GST Number into the database map
+        // Saves the GST Number into the database map
         "clientGstNumber": clientGstNumber.text.trim(),
 
         "productCode": items.first.productCode.text.trim(),
@@ -440,7 +496,13 @@ class MarketingUploadController extends GetxController {
         "priority": "Medium",
         "deliveryDate": Timestamp.fromDate(_selectedDeadline!),
         "shippingCharge": double.tryParse(shippingCharge.text.trim()) ?? 0.0,
+
         "totalAmount": grandTotal.value,
+
+        // ✅ 1. THE MATH FIX: Push the recalculated financials directly into the map!
+        "balanceDue": balanceDue.value,
+        "effectiveRevenue": grandTotal.value,
+
         "marketingPersonName": agentName,
         "marketingPersonId": userId,
         "products": productsList,
@@ -449,6 +511,11 @@ class MarketingUploadController extends GetxController {
 
       if (isEditing.value && editingOrderId != null) {
         orderMap['manualOrderNo'] = orderNo.text.trim();
+
+        // ✅ 2. THE STATUS FIX: Revert to pending and flag it as an edited order!
+        orderMap['status'] = 'Pending';
+        orderMap['isEdited'] = true;
+
         await _db.collection('orders').doc(editingOrderId).update(orderMap);
 
         try {
@@ -457,7 +524,7 @@ class MarketingUploadController extends GetxController {
             await _db.collection('notifications').add({
               'targetUserId': managerDoc.id,
               'title': 'Order Updated 🔄',
-              'message': '$agentName modified the details for Order ${orderNo.text.trim()}.',
+              'message': '$agentName modified the details for Order ${orderNo.text.trim()}. It requires re-approval.',
               'orderId': editingOrderId,
               'timestamp': FieldValue.serverTimestamp(),
               'isRead': false,
@@ -465,7 +532,7 @@ class MarketingUploadController extends GetxController {
           }
         } catch (e) {}
 
-        Get.snackbar("Success", "Order updated successfully!", backgroundColor: Colors.green, colorText: Colors.white);
+        Get.snackbar("Success", "Order updated and sent for re-approval!", backgroundColor: Colors.green, colorText: Colors.white);
       }
       else {
         String newOrderId = "";
@@ -492,6 +559,17 @@ class MarketingUploadController extends GetxController {
           generatedDocId = newOrderRef.id;
           transaction.set(newOrderRef, orderMap);
         });
+
+        // =====================================================================
+        // ✅ TRIGGER A: UPDATE THE LEADERBOARD INSTANTLY FOR NEW ORDERS
+        // =====================================================================
+        await StatsService.updateMonthlyStats(
+          agentName: agentName,
+          orderDate: DateTime.now(),
+          amountChange: grandTotal.value,
+          countChange: 1,
+        );
+        // =====================================================================
 
         if (advance > 0 && generatedDocId.isNotEmpty) {
           await _db.collection('payment_requests').add({
@@ -539,7 +617,6 @@ class MarketingUploadController extends GetxController {
       isLoading.value = false;
     }
   }
-
   void clearForm() {
     orderNo.clear();
     clientName.clear();
@@ -552,7 +629,6 @@ class MarketingUploadController extends GetxController {
     pincode.clear();
     selectedState.value = "";
 
-    // ✅ NEW: Clears GST field
     clientGstNumber.clear();
 
     items.clear();

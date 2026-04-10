@@ -12,11 +12,10 @@ class SalesManagerController extends GetxController {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ✅ Centralized list now includes "Out SRC" before Shipping
   final List<String> productionStages = [
     'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
     'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
-    'Out SRC', // 🏢 New Stage
+    'Out SRC',
     'Shipping', 'Shipped', 'Delivered'
   ];
 
@@ -57,7 +56,6 @@ class SalesManagerController extends GetxController {
   var totalOrdersCount = 0.obs;
   var totalUnitsSold = 0.obs;
 
-  // ✅ TIMEFRAME OBSERVABLES
   var selectedMonth = DateTime.now().obs;
   var selectedTimeframe = 'Monthly'.obs;
   final List<String> timeframes = [
@@ -93,7 +91,6 @@ class SalesManagerController extends GetxController {
     }
   }
 
-  // ✅ TIMEFRAME HELPER FUNCTIONS
   void setTimeframe(String tf) {
     HapticFeedback.selectionClick();
     selectedTimeframe.value = tf;
@@ -103,7 +100,7 @@ class SalesManagerController extends GetxController {
   void changeMonth(DateTime newMonth) {
     selectedMonth.value = newMonth;
     if (selectedTimeframe.value != 'Monthly') {
-      selectedTimeframe.value = 'Monthly'; // Auto-revert to monthly if a specific month is picked
+      selectedTimeframe.value = 'Monthly';
     }
     fetchAllData();
   }
@@ -197,7 +194,7 @@ class SalesManagerController extends GetxController {
         .where('status', whereIn: [
       'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
       'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
-      'Out SRC', 'Shipping' // Included Out SRC here
+      'Out SRC', 'Shipping'
     ])
         .orderBy('orderDate', descending: true)
         .snapshots()
@@ -256,7 +253,6 @@ class SalesManagerController extends GetxController {
     return 0.0;
   }
 
-  // ✅ UPDATED: Integrates Timeframe scaling and cumulative logic
   Future<void> fetchMonthlyStats() async {
     if (_auth.currentUser == null) return;
     try {
@@ -267,10 +263,9 @@ class SalesManagerController extends GetxController {
 
       String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
 
-      // 1. Fetch Users & Identify Roles/Base Targets
+      // 1. Fetch Users & Identify Roles
       final usersSnap = await _db.collection('users').get();
       Map<String, String> roleMap = {};
-      Map<String, double> baseTargetMap = {};
 
       for (var doc in usersSnap.docs) {
         final d = doc.data();
@@ -284,18 +279,17 @@ class SalesManagerController extends GetxController {
           else r = 'JSA';
 
           roleMap[n] = r;
-          baseTargetMap[n] = (r == 'SC') ? 200000.0 : ((r == 'SSA' || r == 'SM') ? 150000.0 : 100000.0);
         }
       }
 
-      // 2. Fetch ALL historical orders to calculate cumulative debt & dynamic ranks
       final snapshot = await _db.collection('orders')
           .where('orderDate', isLessThanOrEqualTo: end)
           .get();
 
-      // ✅ FIX: Added 'pending' and 'placed' so math perfectly matches Associate Dashboard
+      // ✅ FIX APPLIED: 'pending' and 'placed' have been REMOVED!
+      // Now, only orders that the Manager has Approved will count toward revenue and targets.
       List<String> validStatuses = [
-        'pending', 'placed', 'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
@@ -326,11 +320,9 @@ class SalesManagerController extends GetxController {
           double effRev = _parseAmount(data['effectiveRevenue']);
           double finalAmount = (effRev > 0) ? effRev : totalAmt;
 
-          // Track Historical Revenue per Agent
           agentHistory.putIfAbsent(agent, () => {});
           agentHistory[agent]![monthKey] = (agentHistory[agent]![monthKey] ?? 0.0) + finalAmount;
 
-          // If the order belongs to the currently viewed timeframe, add to Global Stats
           if (orderDate.isAfter(start.subtract(const Duration(seconds: 1))) &&
               orderDate.isBefore(end.add(const Duration(seconds: 1)))) {
 
@@ -342,7 +334,6 @@ class SalesManagerController extends GetxController {
 
             shippingTotal += _parseAmount(data['shippingCharge']);
 
-            // Exact GST Extraction
             double orderGst = 0.0;
             if (data['products'] != null && data['products'] is List) {
               for (var item in data['products']) {
@@ -358,7 +349,6 @@ class SalesManagerController extends GetxController {
             }
             gstTotal += orderGst;
 
-            // Unit Count Tracking
             int orderQty = 0;
             if (data['products'] != null && data['products'] is List) {
               for (var item in data['products']) {
@@ -378,55 +368,54 @@ class SalesManagerController extends GetxController {
       totalShippingCollected.value = shippingTotal;
       totalGstCollected.value = gstTotal;
 
-      // 3. Process Leaderboard with DYNAMIC RANKS & Cumulative Debt Logic
+      // 3. Process Leaderboard with EXACT logic from Agent Dashboard
       List<Map<String, dynamic>> leaderboardList = [];
 
-      for (String agent in agentHistory.keys) {
-        if (!currentPeriodSales.containsKey(agent)) continue;
-
-        double currentSales = currentPeriodSales[agent] ?? 0.0;
+      for (String agent in currentPeriodSales.keys) {
         String dbRole = roleMap[agent] ?? 'JSA';
         bool isSM = dbRole == 'SM';
 
-        // ✅ DYNAMIC RANK ALGORITHM
         String calculatedRank = dbRole;
-        double currentTarget = baseTargetMap[agent] ?? 100000.0;
+        double currentTarget = (dbRole == 'SC') ? 200000.0 : ((dbRole == 'SSA' || dbRole == 'SM') ? 150000.0 : 100000.0);
         double accumulatedDue = 0.0;
 
-        if (selectedTimeframe.value == 'Monthly') {
+        if (agentHistory.containsKey(agent) && selectedTimeframe.value == 'Monthly') {
           List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
 
-          // Approximate training month as their first month of sales
+          // ✅ EXACT MATCH: Uses the first logged month instead of join date
           String firstMonth = sortedKeys.isNotEmpty ? sortedKeys.first : targetMonthKey;
 
           for (String mKey in sortedKeys) {
             if (mKey == targetMonthKey) break;
 
-            // ✅ SKIP TRAINING MONTH (Grace Period)
-            if (mKey == firstMonth) continue;
+            // ✅ EXACT MATCH: The Feb 2026 No-Grace-Period Rule
+            if (mKey == firstMonth && firstMonth != '2026-02') continue;
 
-            double monthRev = agentHistory[agent]![mKey] ?? 0.0;
-            accumulatedDue += (currentTarget - monthRev);
-            if (accumulatedDue < 0) accumulatedDue = 0; // Surplus doesn't carry over
+            double monthNet = agentHistory[agent]![mKey] ?? 0.0;
 
-            // ✅ CHECK DYNAMIC PROMOTION
+            // ✅ EXACT MATCH: Deduct debt BEFORE checking promotion
+            double effectiveForPromotion = monthNet - accumulatedDue;
+
+            accumulatedDue += (currentTarget - monthNet);
+            if (accumulatedDue < 0) accumulatedDue = 0;
+
             if (accumulatedDue <= 0 && !isSM) {
-              if (calculatedRank == 'JSA' && monthRev >= 150000) {
+              if (calculatedRank == 'JSA' && effectiveForPromotion >= 150000) {
                 calculatedRank = 'SSA';
                 currentTarget = 150000.0;
-              } else if (calculatedRank == 'SSA' && monthRev >= 200000) {
+              } else if (calculatedRank == 'SSA' && effectiveForPromotion >= 200000) {
                 calculatedRank = 'SC';
                 currentTarget = 200000.0;
               }
             }
           }
-        } else {
-          currentTarget = baseTargetMap[agent] ?? 100000.0;
+        } else if (selectedTimeframe.value != 'Monthly') {
+          currentTarget = (dbRole == 'SC') ? 200000.0 : ((dbRole == 'SSA' || dbRole == 'SM') ? 150000.0 : 100000.0);
         }
 
-        // Apply Dynamic Target
-        double dynamicTarget = (currentTarget * multiplier) + accumulatedDue;
-        double progress = dynamicTarget > 0 ? (currentSales / dynamicTarget) : 0.0;
+        double amount = currentPeriodSales[agent] ?? 0.0;
+        double targetAmount = currentTarget * multiplier;
+        double progress = targetAmount > 0 ? (amount / targetAmount) : 0.0;
 
         String greeting = "";
         if (progress >= 1.0) greeting = "Target Smashed! 🏆";
@@ -435,13 +424,13 @@ class SalesManagerController extends GetxController {
 
         leaderboardList.add({
           'name': agent,
-          'amount': currentSales,
-          'formatted': NumberFormat.compactCurrency(symbol: '₹', locale: 'en_IN', decimalDigits: 1).format(currentSales),
+          'amount': amount,
+          'formatted': NumberFormat.compactCurrency(symbol: '₹', locale: 'en_IN', decimalDigits: 1).format(amount),
           'progress': progress,
           'greeting': greeting,
           'count': currentPeriodCount[agent] ?? 0,
           'isSM': isSM,
-          'rank': calculatedRank, // ✅ PASSES THE DYNAMIC RANK TO THE UI!
+          'roleStr': calculatedRank, // Passes exact dynamic rank
         });
       }
 

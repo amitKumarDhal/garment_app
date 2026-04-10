@@ -38,20 +38,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  String _getFormattedSizes(OrderModel order) {
-    List<String> sizes = [];
-    if (order.products.isNotEmpty) {
-      for (var p in order.products) {
-        if (p['sizeDescription'] != null && p['sizeDescription'].toString().trim().isNotEmpty) {
-          sizes.add(p['sizeDescription'].toString().trim());
-        }
-      }
-    }
-    if (sizes.isNotEmpty) return sizes.join(" | ");
-    if (order.sizeDescription != null && order.sizeDescription!.trim().isNotEmpty) return order.sizeDescription!;
-    return "Not Specified";
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(UnitSupervisorController());
@@ -671,29 +657,89 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
-                      // ✅ UPDATED MATERIAL CARD WITH CALCULATION
+                      // ✅ MATERIAL CARD
                       _buildMaterialRequirementCard(order, isDark, textColor, controller),
 
+                      // ✅ DETAILED PRODUCT LIST
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
                             color: isDark ? Colors.black26 : TColors.light,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: TColors.getBorderColor(context))
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildInfoRow(isDark, Icons.business_rounded, "Client", order.clientName, textColor),
                             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                            _buildInfoRow(isDark, Icons.category_rounded, "Product", "${order.productName} (${order.quantity} pcs)", textColor),
-                            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                            _buildInfoRow(isDark, Icons.straighten_rounded, "Sizes", _getFormattedSizes(order), textColor),
+
+                            Row(
+                              children: [
+                                const Icon(Icons.inventory_2_rounded, size: 14, color: TColors.textSecondary),
+                                const SizedBox(width: 8),
+                                const Text("Products Details:", style: TextStyle(color: TColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+                                const Spacer(),
+                                Text("Total: ${order.quantity} pcs", style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w800)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            ...order.products.map((prod) {
+                              String name = prod['productName'] ?? prod['productDetails'] ?? 'Unknown Product';
+                              String qty = (prod['qty'] ?? 0).toString();
+                              String fabric = prod['fabricType'] ?? 'Not Specified';
+                              String color = prod['color'] ?? 'Not Specified';
+                              String sizes = prod['sizeDescription'] ?? 'Not Specified';
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8, left: 12),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(child: Text(name, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w800))),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                                          child: Text("$qty pcs", style: const TextStyle(color: TColors.primary, fontSize: 10, fontWeight: FontWeight.w900)),
+                                        )
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text("Fabric: $fabric • Color: $color", style: const TextStyle(fontSize: 11, color: TColors.textSecondary)),
+                                    if (sizes.isNotEmpty && sizes != 'Not Specified')
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text("Sizes: $sizes", style: const TextStyle(fontSize: 11, color: TColors.textSecondary)),
+                                      )
+                                  ],
+                                ),
+                              );
+                            }).toList(),
                           ],
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Stage Progression", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: textColor)),
+                          GestureDetector(
+                            onTap: () => _showHistoryDialog(context, order, isDark, textColor),
+                            child: const Text("View All", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: TColors.primary)),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       _buildHorizontalTimeline(order, isDark, textColor),
                       const SizedBox(height: 24),

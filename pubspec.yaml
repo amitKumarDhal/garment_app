@@ -59,6 +59,8 @@ dependencies:
   cached_network_image: ^3.4.1
   gal: ^2.3.2
   path_provider: ^2.1.5
+  excel: ^4.0.6
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

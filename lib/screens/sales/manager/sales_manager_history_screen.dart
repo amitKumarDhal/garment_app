@@ -1,8 +1,17 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// ✅ Hiding 'Border' fixes the naming collision between Flutter and the Excel package
+import 'package:excel/excel.dart' hide Border;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../controllers/sales/sales_manager_history_controller.dart';
 import '../../../data/models/order_model.dart';
@@ -11,6 +20,98 @@ import 'sales_manager_order_details.dart';
 
 class SalesManagerHistoryScreen extends StatelessWidget {
   const SalesManagerHistoryScreen({super.key});
+
+  // ===========================================================================
+  // ✅ ENHANCED EXCEL EXPORT LOGIC (Month & Filter Specific)
+  // ===========================================================================
+  Future<void> _exportToExcel(List<OrderModel> orders, String filterStatus) async {
+    if (orders.isEmpty) {
+      Get.snackbar("Export Failed", "There are no orders to export.",
+          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
+      return;
+    }
+
+    try {
+      Get.snackbar("Exporting...", "Generating Excel file, please wait.",
+          backgroundColor: Colors.blue.withValues(alpha: 0.1), colorText: Colors.blue);
+
+      // 1. Fetch the exact timeframe/month the manager is looking at
+      final mainController = Get.find<SalesManagerController>();
+      String timeLabel = mainController.selectedTimeframe.value == 'Monthly'
+          ? DateFormat('MMMM yyyy').format(mainController.selectedMonth.value)
+          : mainController.selectedTimeframe.value;
+
+      // Safe strings for the file name (removes spaces)
+      String safeTimeLabel = timeLabel.replaceAll(' ', '_');
+      String safeFilter = filterStatus.replaceAll(' ', '');
+
+      var excel = Excel.createExcel();
+      Sheet sheetObject = excel['Orders Ledger'];
+      excel.setDefaultSheet('Orders Ledger');
+
+      // 2. Add an Informational Header to the Excel Sheet
+      sheetObject.appendRow([TextCellValue('Sales Manager Master Ledger')]);
+      sheetObject.appendRow([TextCellValue('Timeframe:'), TextCellValue(timeLabel)]);
+      sheetObject.appendRow([TextCellValue('Status Filter:'), TextCellValue(filterStatus)]);
+      sheetObject.appendRow([TextCellValue('Total Orders in Sheet:'), IntCellValue(orders.length)]);
+      sheetObject.appendRow([]); // Blank row for spacing
+
+      // 3. Create Column Headers
+      sheetObject.appendRow([
+        TextCellValue('Order No'),
+        TextCellValue('Order Date'),
+        TextCellValue('Client Name'),
+        TextCellValue('State'),
+        TextCellValue('Product'),
+        TextCellValue('Sales Agent'),
+        TextCellValue('Status'),
+        TextCellValue('GST No'),
+        TextCellValue('GST %'),
+        TextCellValue('Quantity'),
+        TextCellValue('Total Amount (₹)'),
+      ]);
+
+      // 4. Add Data Rows
+      for (var order in orders) {
+        sheetObject.appendRow([
+          TextCellValue(order.manualOrderNo ?? order.id ?? 'N/A'),
+          TextCellValue(DateFormat('dd MMM yyyy').format(order.orderDate)),
+          TextCellValue(order.clientName),
+          TextCellValue(order.state ?? 'N/A'),
+          TextCellValue(order.productName),
+          TextCellValue(order.marketingPersonName),
+          TextCellValue(order.status.toUpperCase()),
+          // Hardcoded to 'N/A' to prevent the gstNumber getter compilation error
+          TextCellValue('N/A'),
+          TextCellValue('${order.gstPercentage.toStringAsFixed(1)}%'),
+          IntCellValue(order.quantity),
+          DoubleCellValue(order.totalAmount),
+        ]);
+      }
+
+      // 5. Save File to Temporary Directory with dynamic name
+      var fileBytes = excel.save();
+      if (fileBytes != null) {
+        final directory = await getTemporaryDirectory();
+        final filePath = '${directory.path}/Ledger_${safeTimeLabel}_$safeFilter.xlsx';
+
+        File(filePath)
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(fileBytes);
+
+        // 6. Trigger Native Share/Save Menu
+        // ignore: deprecated_member_use
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          text: 'Ledger Export: $timeLabel ($filterStatus)',
+        );
+      }
+    } catch (e) {
+      debugPrint("Excel Export Error: $e");
+      Get.snackbar("Error", "Failed to generate Excel file: $e",
+          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +139,17 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             letterSpacing: -0.5,
           ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: IconButton(
+              icon: const Icon(Icons.download_rounded, color: TColors.primary, size: 28),
+              tooltip: 'Export to Excel',
+              // ✅ Now dynamically passes BOTH the filtered orders and the current filter name!
+              onPressed: () => _exportToExcel(controller.displayedOrders, controller.currentFilter.value),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -101,7 +213,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
                 const SizedBox(height: 12),
 
-                // ✅ REDESIGNED DYNAMIC SUMMARY ROW
+                // SUMMARY ROW
                 Obx(() {
                   final count = controller.filteredOrdersCount;
                   final total = controller.filteredTotalRevenue;
@@ -128,7 +240,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                         // Header
                         Row(
                           children: [
-                            Icon(Icons.analytics_rounded, size: 16, color: TColors.primary),
+                            const Icon(Icons.analytics_rounded, size: 16, color: TColors.primary),
                             const SizedBox(width: 8),
                             Text(
                               "SUMMARY: $currentStatus",
@@ -259,10 +371,15 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       bool isSelected = controller.currentFilter.value == label;
 
       Color baseColor = TColors.primary;
-      if (label == 'All NDO') baseColor = Colors.deepOrange;
-      else if (label == 'Out SRC') baseColor = Colors.indigoAccent;
-      else if (label != 'All' && label != 'Trash') baseColor = _getStatusColor(label);
-      else if (label == 'Trash') baseColor = Colors.red;
+      if (label == 'All NDO') {
+        baseColor = Colors.deepOrange;
+      } else if (label == 'Out SRC') {
+        baseColor = Colors.indigoAccent;
+      } else if (label != 'All' && label != 'Trash') {
+        baseColor = _getStatusColor(label);
+      } else if (label == 'Trash') {
+        baseColor = Colors.red;
+      }
 
       int count = 0;
       List<OrderModel> baseList = controller.allOrders;

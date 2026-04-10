@@ -17,7 +17,7 @@ class SalesAgentController extends GetxController {
   final isLoading = true.obs;
   final agentName = "".obs;
 
-  // ✅ NEW: Tracks the official DB role vs the Displayed Dynamic Role
+  // Tracks the official DB role vs the Displayed Dynamic Role
   String dbBaseRole = "JSA";
   final userRole = "JSA".obs;
 
@@ -29,6 +29,9 @@ class SalesAgentController extends GetxController {
   final netAchievement = 0.0.obs;
   final totalOrders = 0.obs;
   final hasPendingER = false.obs;
+
+  // Observable for the UI to display the calculated bonus
+  final extraEarningAmount = 0.0.obs;
 
   // --- Target Logic Observables ---
   final baseTarget = 100000.0.obs;
@@ -175,15 +178,22 @@ class SalesAgentController extends GetxController {
       int multiplier = rangeData['multiplier'];
 
       DateTime joinedDate = agentCreatedAt.value ?? DateTime.now();
-      DateTime officialStartMonth = DateTime(joinedDate.year, joinedDate.month + 1, 1);
+      DateTime officialStartMonth;
+
+      if (joinedDate.year == 2026 && joinedDate.month == 2) {
+        officialStartMonth = DateTime(joinedDate.year, joinedDate.month, 1);
+      } else {
+        officialStartMonth = DateTime(joinedDate.year, joinedDate.month + 1, 1);
+      }
 
       final allOrdersSnap = await _db.collection('orders')
           .where('marketingPersonName', isEqualTo: agentName.value)
           .orderBy('orderDate', descending: false)
           .get();
 
+      // ✅ FIX: 'pending' and 'placed' REMOVED! Only approved orders count for the agent now.
       List<String> validStatuses = [
-        'pending', 'placed', 'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
@@ -222,7 +232,6 @@ class SalesAgentController extends GetxController {
         }
       }
 
-      // ✅ DYNAMIC RANK ALGORITHM
       String calculatedRank = dbBaseRole;
       double currentTarget = _getTargetForRole(calculatedRank);
       double accumulatedDue = 0.0;
@@ -235,18 +244,22 @@ class SalesAgentController extends GetxController {
           if (mKey == targetMonthKey) break;
 
           DateTime loopMonth = DateFormat('yyyy-MM').parse(mKey);
-          if (loopMonth.isBefore(officialStartMonth)) continue; // Grace period
+          if (loopMonth.isBefore(officialStartMonth)) continue;
 
           double monthNet = monthlySalesMap[mKey] ?? 0.0;
+
+          // ✅ FIX: Calculate effective achievement by deducting past dues FIRST
+          double effectiveForPromotion = monthNet - accumulatedDue;
+
           accumulatedDue += (currentTarget - monthNet);
           if (accumulatedDue < 0) accumulatedDue = 0;
 
-          // ✅ CHECK PROMOTION AT THE END OF PAST MONTH
+          // ✅ PROMOTION LOGIC: Now uses the adjusted amount (183k - 59k = 124k)
           if (accumulatedDue <= 0 && !isSalesManager.value) {
-            if (calculatedRank == 'JSA' && monthNet >= 150000) {
+            if (calculatedRank == 'JSA' && effectiveForPromotion >= 150000) {
               calculatedRank = 'SSA';
-              currentTarget = 150000.0; // Target increases
-            } else if (calculatedRank == 'SSA' && monthNet >= 200000) {
+              currentTarget = 150000.0;
+            } else if (calculatedRank == 'SSA' && effectiveForPromotion >= 200000) {
               calculatedRank = 'SC';
               currentTarget = 200000.0;
             }
@@ -254,7 +267,6 @@ class SalesAgentController extends GetxController {
         }
       }
 
-      // Apply the dynamic calculated rank & target to the UI!
       userRole.value = calculatedRank;
       baseTarget.value = currentTarget;
 
@@ -272,35 +284,51 @@ class SalesAgentController extends GetxController {
         currentDynamicTarget.value = currentTarget * multiplier;
       }
 
+      calculateTieredBonus();
+
     } catch (e) {
       debugPrint("❌ Stats Error: $e");
     }
   }
+  // =====================================================================
+  // ✅ TIERED SLAB BONUS LOGIC
+  // =====================================================================
+  void calculateTieredBonus() {
+    if (selectedTimeframe.value != 'Monthly') {
+      extraEarningAmount.value = 0.0;
+      return;
+    }
 
-  double calculateTieredBonus() {
-    if (selectedTimeframe.value != 'Monthly') return 0.0;
-    if (netAchievement.value < currentDynamicTarget.value) return 0.0;
+    double x = netAchievement.value - currentDynamicTarget.value;
 
-    double surplusAmount = netAchievement.value - currentDynamicTarget.value;
-    if (surplusAmount <= 0) return 0.0;
+    if (x <= 0) {
+      extraEarningAmount.value = 0.0;
+      return;
+    }
 
     double bonus = 0.0;
-    double remainingSurplus = surplusAmount;
+    double remainingSurplus = x;
 
+    // SLAB 1: First ₹50,000 gets 2%
     if (remainingSurplus > 0) {
       double slab1Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
       bonus += (slab1Amount * 0.02);
       remainingSurplus -= slab1Amount;
     }
+
+    // SLAB 2: Next ₹50,000 (between 50k to 100k) gets 1.5%
     if (remainingSurplus > 0) {
       double slab2Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
       bonus += (slab2Amount * 0.015);
       remainingSurplus -= slab2Amount;
     }
+
+    // SLAB 3: Anything above ₹1,00,000 gets 1%
     if (remainingSurplus > 0) {
       bonus += (remainingSurplus * 0.01);
     }
-    return bonus;
+
+    extraEarningAmount.value = bonus;
   }
 
   // =====================================================================
@@ -334,7 +362,6 @@ class SalesAgentController extends GetxController {
         'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
 
-      // ✅ FIX: Fetch ALL historical orders to calculate dynamic ranks for the team
       final snapshot = await _db
           .collection('orders')
           .where('orderDate', isLessThanOrEqualTo: end)
@@ -362,11 +389,9 @@ class SalesAgentController extends GetxController {
           if (effRev <= 0) pendingERMap[agent] = true;
           double finalAmount = (effRev > 0) ? effRev : totalAmt;
 
-          // Build History for Rank Calculation
           agentHistory.putIfAbsent(agent, () => {});
           agentHistory[agent]![monthKey] = (agentHistory[agent]![monthKey] ?? 0.0) + finalAmount;
 
-          // Accumulate Current Period Sales
           if (orderDate.isAfter(start.subtract(const Duration(seconds: 1))) && orderDate.isBefore(end.add(const Duration(seconds: 1)))) {
             currentPeriodSales[agent] = (currentPeriodSales[agent] ?? 0) + finalAmount;
             currentPeriodCount[agent] = (currentPeriodCount[agent] ?? 0) + 1;
@@ -380,7 +405,6 @@ class SalesAgentController extends GetxController {
         String dbRole = userRoleMap[agent] ?? 'JSA';
         bool isSM = dbRole == 'SM';
 
-        // ✅ CALCULATE DYNAMIC RANK FOR EACH AGENT
         String calculatedRank = dbRole;
         double currentTarget = _getTargetForRole(calculatedRank);
         double accumulatedDue = 0.0;
@@ -388,29 +412,32 @@ class SalesAgentController extends GetxController {
         if (agentHistory.containsKey(agent) && selectedTimeframe.value == 'Monthly') {
           List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
 
-          // Approximate training month as their first month of sales for the leaderboard
           String firstMonth = sortedKeys.isNotEmpty ? sortedKeys.first : targetMonthKey;
 
           for (String mKey in sortedKeys) {
             if (mKey == targetMonthKey) break;
-            if (mKey == firstMonth) continue; // Training month skip
+
+            if (mKey == firstMonth && firstMonth != '2026-02') continue;
 
             double monthNet = agentHistory[agent]![mKey] ?? 0.0;
+
+            // ✅ FIX: Calculate effective achievement by deducting past dues FIRST
+            double effectiveForPromotion = monthNet - accumulatedDue;
+
             accumulatedDue += (currentTarget - monthNet);
             if (accumulatedDue < 0) accumulatedDue = 0;
 
             if (accumulatedDue <= 0 && !isSM) {
-              if (calculatedRank == 'JSA' && monthNet >= 150000) {
+              if (calculatedRank == 'JSA' && effectiveForPromotion >= 150000) {
                 calculatedRank = 'SSA';
                 currentTarget = 150000.0;
-              } else if (calculatedRank == 'SSA' && monthNet >= 200000) {
+              } else if (calculatedRank == 'SSA' && effectiveForPromotion >= 200000) {
                 calculatedRank = 'SC';
                 currentTarget = 200000.0;
               }
             }
           }
         } else if (selectedTimeframe.value != 'Monthly') {
-          // Fallback to base role target if not looking at monthly
           currentTarget = _getTargetForRole(dbRole);
         }
 
@@ -432,7 +459,7 @@ class SalesAgentController extends GetxController {
           'progress': progress,
           'greeting': greeting,
           'isSM': isSM,
-          'roleStr': calculatedRank, // ✅ SENDS THE UPGRADED RANK TO THE UI
+          'roleStr': calculatedRank,
           'hasPendingER': pendingERMap[agent] ?? false,
         });
       }

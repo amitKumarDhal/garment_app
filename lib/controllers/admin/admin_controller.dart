@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,17 @@ class AdminController extends GetxController {
   var totalMonthlyRevenue = 0.0.obs;
   var selectedMonth = DateTime.now().obs;
 
+  // 🛡️ Memory Leak Protection (All Streams)
+  StreamSubscription? _monthlyRevenueSubscription;
+  StreamSubscription? _requestsSub;
+  StreamSubscription? _workersSub;
+  StreamSubscription? _staffSub;
+  StreamSubscription? _ordersSub;
+  StreamSubscription? _cuttingSub;
+  StreamSubscription? _printingSub;
+  StreamSubscription? _stitchingSub;
+  StreamSubscription? _packingSub;
+
   // --- REPORTING VARIABLES ---
   var reportDate = DateTime.now().obs;
   var reportSection = 'All'.obs;
@@ -32,6 +44,11 @@ class AdminController extends GetxController {
   // --- Lists ---
   RxList<Map<String, dynamic>> pendingRequests = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> allApprovedWorkers = <Map<String, dynamic>>[].obs;
+
+  // REAL DATA LISTS FOR SUPERVISORS & MANAGERS
+  RxList<Map<String, dynamic>> unitSupervisors = <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> shiftSupervisors = <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> salesManagers = <Map<String, dynamic>>[].obs;
 
   RxList<OrderModel> recentOrders = <OrderModel>[].obs;
   RxList<Map<String, dynamic>> recentCuttingEntries = <Map<String, dynamic>>[].obs;
@@ -46,17 +63,29 @@ class AdminController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // ✅ Automatically fetch the admin's name when the controller boots up
     fetchAdminIdentity();
     startAdminListeners();
   }
 
-  // ✅ Fetch the exact name set during ID Creation
+  @override
+  void onClose() {
+    // 🛡️ CRITICAL: Kill all active listeners to save battery and Firebase costs
+    _monthlyRevenueSubscription?.cancel();
+    _requestsSub?.cancel();
+    _workersSub?.cancel();
+    _staffSub?.cancel();
+    _ordersSub?.cancel();
+    _cuttingSub?.cancel();
+    _printingSub?.cancel();
+    _stitchingSub?.cancel();
+    _packingSub?.cancel();
+    super.onClose();
+  }
+
   Future<void> fetchAdminIdentity() async {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        // 1. First, check the 'users' collection
         final userDoc = await _db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           String dbName = userDoc.data()?['FullName'] ?? userDoc.data()?['Name'] ?? userDoc.data()?['name'] ?? '';
@@ -66,7 +95,6 @@ class AdminController extends GetxController {
           }
         }
 
-        // 2. If not in 'users', check the 'id_requests' collection
         final idDoc = await _db.collection('id_requests').doc(user.uid).get();
         if (idDoc.exists) {
           String reqName = idDoc.data()?['name'] ?? idDoc.data()?['FullName'] ?? '';
@@ -76,21 +104,20 @@ class AdminController extends GetxController {
           }
         }
 
-        // 3. Fallback to Google Auth name or default
         adminName.value = user.displayName ?? "Super Admin";
       }
     } catch (e) {
       debugPrint("Error fetching admin name: $e");
-      adminName.value = "Super Admin"; // Safe fallback
+      adminName.value = "Super Admin";
     }
   }
 
-  // ✅ MASTER START FUNCTION
   void startAdminListeners() {
     if (_auth.currentUser == null) return;
 
     _bindPendingRequests();
     _bindApprovedWorkers();
+    _bindStaffDirectory();
     _bindTodayOrders();
     _bindCuttingStream();
     _bindPrintingStream();
@@ -101,7 +128,6 @@ class AdminController extends GetxController {
   }
 
   // --- MONTH SELECTION & REVENUE LOGIC ---
-// ✅ Function to open a Custom Month/Year Picker
   Future<void> selectMonthYear(BuildContext context) async {
     int tempYear = selectedMonth.value.year;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -120,7 +146,7 @@ class AdminController extends GetxController {
                 children: [
                   IconButton(
                     icon: Icon(Icons.chevron_left_rounded, color: isDark ? Colors.white : Colors.black87),
-                    onPressed: () => setState(() => tempYear--), // Go to previous year
+                    onPressed: () => setState(() => tempYear--),
                   ),
                   Text(
                       tempYear.toString(),
@@ -128,7 +154,6 @@ class AdminController extends GetxController {
                   ),
                   IconButton(
                     icon: Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white : Colors.black87),
-                    // Prevent going to future years (optional, remove if you want future forecasting)
                     onPressed: tempYear < DateTime.now().year
                         ? () => setState(() => tempYear++)
                         : null,
@@ -149,18 +174,15 @@ class AdminController extends GetxController {
                   itemCount: 12,
                   itemBuilder: (context, index) {
                     DateTime monthDate = DateTime(tempYear, index + 1, 1);
-                    // Use intl package to get month names (Jan, Feb, etc.)
                     String monthName = DateFormat('MMM').format(monthDate);
 
                     bool isSelected = selectedMonth.value.year == tempYear && selectedMonth.value.month == index + 1;
-
-                    // Disable future months in the current year
                     bool isFuture = monthDate.isAfter(DateTime.now());
 
                     return GestureDetector(
                       onTap: isFuture ? null : () {
-                        selectedMonth.value = monthDate; // ✅ Update the observable
-                        Get.back(); // ✅ Close the dialog
+                        selectedMonth.value = monthDate;
+                        Get.back();
                       },
                       child: Container(
                         alignment: Alignment.center,
@@ -177,7 +199,7 @@ class AdminController extends GetxController {
                             color: isSelected
                                 ? Colors.white
                                 : (isFuture
-                                ? Colors.grey // Grey out future months
+                                ? Colors.grey
                                 : (isDark ? Colors.white70 : Colors.black87)),
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                           ),
@@ -196,44 +218,83 @@ class AdminController extends GetxController {
 
   void _bindMonthlyRevenue() {
     if (_auth.currentUser == null) return;
-
-    // ✅ Listen to changes in selectedMonth. When it changes, update the stream!
     ever(selectedMonth, (_) => _updateMonthlyStream());
-
-    // Call it once immediately for the current month
     _updateMonthlyStream();
   }
 
-  void _updateMonthlyStream() {
-    // Determine the start and end of the currently selected month
+  Future<void> _updateMonthlyStream() async {
+    await _monthlyRevenueSubscription?.cancel();
+
     DateTime startOfMonth = DateTime(selectedMonth.value.year, selectedMonth.value.month, 1);
     DateTime endOfMonth = DateTime(selectedMonth.value.year, selectedMonth.value.month + 1, 0, 23, 59, 59);
 
-    _db.collection('orders')
+    _monthlyRevenueSubscription = _db.collection('orders')
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
         .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
         .snapshots()
         .listen((snapshot) {
 
-      // ✅ Sum up all non-deleted orders for the selected month
-      double monthlySum = snapshot.docs.fold(0.0, (acc, doc) {
-        final data = doc.data();
-        // Skip soft-deleted orders
-        if (data['isDeleted'] == true) return acc;
+      double monthlySum = 0.0;
+      List<String> ignoredStatuses = ['pending', 'placed', 'rejected', 'deleted', 'cancelled'];
 
-        // Use effectiveRevenue if available, else use totalAmount
-        double amount = (data['effectiveRevenue'] as num? ?? data['totalAmount'] as num? ?? 0).toDouble();
-        return acc + amount;
-      });
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        String status = (data['status'] ?? '').toString().toLowerCase();
+
+        if (data['isDeleted'] == true || ignoredStatuses.contains(status)) continue;
+
+        double totalAmt = 0.0;
+        if (data['totalAmount'] is num) {
+          totalAmt = (data['totalAmount'] as num).toDouble();
+        } else if (data['totalAmount'] is String) {
+          totalAmt = double.tryParse(data['totalAmount'].toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+        }
+
+        double effRev = 0.0;
+        if (data['effectiveRevenue'] is num) {
+          effRev = (data['effectiveRevenue'] as num).toDouble();
+        } else if (data['effectiveRevenue'] is String) {
+          effRev = double.tryParse(data['effectiveRevenue'].toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+        }
+
+        double finalAmount = (effRev > 0) ? effRev : totalAmt;
+        monthlySum += finalAmount;
+      }
 
       totalMonthlyRevenue.value = monthlySum;
     });
   }
 
-  // --- 1. WORKFORCE STREAMS ---
+  // --- 1. WORKFORCE & STAFF STREAMS ---
+
+  void _bindStaffDirectory() {
+    if (_auth.currentUser == null) return;
+    _staffSub = _db.collection('users').where('status', isEqualTo: 'Approved').snapshots().listen((snapshot) {
+      var uSupervisors = <Map<String, dynamic>>[];
+      var sSupervisors = <Map<String, dynamic>>[];
+      var sManagers = <Map<String, dynamic>>[];
+
+      for (var doc in snapshot.docs) {
+        var data = doc.data();
+        data['id'] = doc.id;
+
+        // 🛡️ SAFE ROLE CHECK: Trim spaces and convert to lowercase
+        String role = (data['role'] ?? data['Role'] ?? '').toString().trim().toLowerCase();
+
+        if (role.contains('unit supervisor')) uSupervisors.add(data);
+        else if (role.contains('shift supervisor')) sSupervisors.add(data);
+        else if (role.contains('sales manager')) sManagers.add(data);
+      }
+
+      unitSupervisors.assignAll(uSupervisors);
+      shiftSupervisors.assignAll(sSupervisors);
+      salesManagers.assignAll(sManagers);
+    });
+  }
+
   void _bindApprovedWorkers() {
     if (_auth.currentUser == null) return;
-    _db.collection('id_requests')
+    _workersSub = _db.collection('id_requests')
         .where('status', isEqualTo: 'Approved')
         .snapshots()
         .listen((snapshot) {
@@ -250,7 +311,7 @@ class AdminController extends GetxController {
 
   void _bindPendingRequests() {
     if (_auth.currentUser == null) return;
-    _db.collection('id_requests')
+    _requestsSub = _db.collection('id_requests')
         .where('status', isEqualTo: 'Pending')
         .snapshots()
         .listen((snapshot) {
@@ -261,24 +322,31 @@ class AdminController extends GetxController {
     });
   }
 
-  // --- 2. DEPARTMENT STREAMS (Dashboard) ---
+  // --- 2. DEPARTMENT STREAMS ---
 
   void _bindTodayOrders() {
     if (_auth.currentUser == null) return;
     DateTime now = DateTime.now();
     DateTime startOfDay = DateTime(now.year, now.month, now.day);
 
-    _db.collection('orders')
+    _ordersSub = _db.collection('orders')
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
 
-      // ✅ SOFT DELETE PROTECTION: Filter out deleted orders locally
-      final validOrders = snapshot.docs
-          .map((doc) => OrderModel.fromSnapshot(doc))
-          .where((order) => order.toJson()['isDeleted'] != true)
-          .toList();
+      List<OrderModel> validOrders = [];
+      for (var doc in snapshot.docs) {
+        // 🛡️ CRITICAL TRY/CATCH: Prevents a single corrupt order from crashing the entire feed
+        try {
+          final order = OrderModel.fromSnapshot(doc);
+          if (order.toJson()['isDeleted'] != true) {
+            validOrders.add(order);
+          }
+        } catch (e) {
+          debugPrint("Skipped corrupt daily order doc: ${doc.id}");
+        }
+      }
 
       recentOrders.assignAll(validOrders);
       _calculateProductionTotal();
@@ -287,56 +355,32 @@ class AdminController extends GetxController {
 
   void _bindCuttingStream() {
     if (_auth.currentUser == null) return;
-    _db.collection('cutting_entries')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .snapshots()
-        .listen((snapshot) {
-      recentCuttingEntries.assignAll(
-        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-      );
+    _cuttingSub = _db.collection('cutting_entries').orderBy('timestamp', descending: true).limit(10).snapshots().listen((snapshot) {
+      recentCuttingEntries.assignAll(snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
       _calculateGlobalStats();
     });
   }
 
   void _bindPrintingStream() {
     if (_auth.currentUser == null) return;
-    _db.collection('printing_entries')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .snapshots()
-        .listen((snapshot) {
-      recentPrintingEntries.assignAll(
-        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-      );
+    _printingSub = _db.collection('printing_entries').orderBy('timestamp', descending: true).limit(10).snapshots().listen((snapshot) {
+      recentPrintingEntries.assignAll(snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
       _calculateGlobalStats();
     });
   }
 
   void _bindStitchingStream() {
     if (_auth.currentUser == null) return;
-    _db.collection('stitching_entries')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .snapshots()
-        .listen((snapshot) {
-      recentStitchingEntries.assignAll(
-        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-      );
+    _stitchingSub = _db.collection('stitching_entries').orderBy('timestamp', descending: true).limit(10).snapshots().listen((snapshot) {
+      recentStitchingEntries.assignAll(snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
       _calculateGlobalStats();
     });
   }
 
   void _bindPackingStream() {
     if (_auth.currentUser == null) return;
-    _db.collection('packing_entries')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .snapshots()
-        .listen((snapshot) {
-      recentPackingEntries.assignAll(
-        snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
-      );
+    _packingSub = _db.collection('packing_entries').orderBy('timestamp', descending: true).limit(10).snapshots().listen((snapshot) {
+      recentPackingEntries.assignAll(snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
       _calculateGlobalStats();
     });
   }
@@ -346,7 +390,6 @@ class AdminController extends GetxController {
     double totalScoreSum = 0.0;
     int activeDepartments = 0;
 
-    // A. STITCHING
     if (recentStitchingEntries.isNotEmpty) {
       double stitchEff = 0.0;
       for (var entry in recentStitchingEntries) {
@@ -356,7 +399,6 @@ class AdminController extends GetxController {
       activeDepartments++;
     }
 
-    // B. PRINTING
     if (recentPrintingEntries.isNotEmpty) {
       double printQualityScore = 0.0;
       for (var entry in recentPrintingEntries) {
@@ -372,13 +414,11 @@ class AdminController extends GetxController {
       activeDepartments++;
     }
 
-    // C. CUTTING (Baseline)
     if (recentCuttingEntries.isNotEmpty) {
       totalScoreSum += 100.0;
       activeDepartments++;
     }
 
-    // D. PACKING (Baseline)
     if (recentPackingEntries.isNotEmpty) {
       totalScoreSum += 100.0;
       activeDepartments++;
@@ -390,18 +430,23 @@ class AdminController extends GetxController {
       averageEfficiency.value = 0.0;
     }
 
-    // Damages
-    int pDamages = recentPrintingEntries.fold(
-      0, (acc, item) => acc + (item['totalDamaged'] as int? ?? 0),
-    );
-    int sDamages = recentStitchingEntries.fold(
-      0, (acc, item) => acc + (item['rejectedQty'] as int? ?? 0),
-    );
+    int pDamages = recentPrintingEntries.fold(0, (acc, item) => acc + (item['totalDamaged'] as int? ?? 0));
+    int sDamages = recentStitchingEntries.fold(0, (acc, item) => acc + (item['rejectedQty'] as int? ?? 0));
     totalDamages.value = pDamages + sDamages;
   }
 
   void _calculateProductionTotal() {
-    double total = recentOrders.fold(0, (acc, item) => acc + item.totalAmount);
+    List<String> ignoredStatuses = ['pending', 'placed', 'rejected', 'deleted', 'cancelled'];
+
+    double total = recentOrders.fold(0.0, (acc, item) {
+      if (ignoredStatuses.contains(item.status.toLowerCase())) {
+        return acc;
+      }
+      double effRev = item.effectiveRevenue;
+      double amount = (effRev > 0) ? effRev : item.totalAmount;
+      return acc + amount;
+    });
+
     totalDailyProduction.value = total;
   }
 
@@ -411,19 +456,13 @@ class AdminController extends GetxController {
     isLoading.value = true;
     List<ActivityItem> allActivities = [];
     try {
-      var orders = await _db.collection('orders')
-          .orderBy('createdAt', descending: true)
-          .limit(10) // Fetch extra to account for filtering deleted ones
-          .get();
+      var orders = await _db.collection('orders').orderBy('createdAt', descending: true).limit(10).get();
 
       int orderCount = 0;
       for (var doc in orders.docs) {
         final data = doc.data();
-
-        // Skip soft-deleted orders in the activity feed
         if (data['isDeleted'] == true) continue;
-
-        if (orderCount >= 3) break; // Only show 3 valid orders
+        if (orderCount >= 3) break;
         orderCount++;
 
         Timestamp? ts = data['createdAt'] as Timestamp?;
@@ -456,10 +495,7 @@ class AdminController extends GetxController {
       List<ActivityItem> list, String collection, String deptName, IconData icon, Color color,
       ) async {
     try {
-      var snap = await _db.collection(collection)
-          .orderBy('timestamp', descending: true)
-          .limit(3)
-          .get();
+      var snap = await _db.collection(collection).orderBy('timestamp', descending: true).limit(3).get();
       for (var doc in snap.docs) {
         final data = doc.data();
         Timestamp? ts = data['timestamp'] as Timestamp?;
@@ -508,14 +544,17 @@ class AdminController extends GetxController {
 
         for (var doc in snap.docs) {
           var data = doc.data();
-          // Skip deleted orders from the official report
           if (data['isDeleted'] == true) continue;
+
+          // 🛡️ SAFE FALLBACK: Prevents crash if 'createdAt' is randomly missing
+          Timestamp? ts = data['createdAt'] as Timestamp?;
+          DateTime time = ts?.toDate() ?? DateTime.now();
 
           tempResults.add(
             ActivityItem(
-              title: "Order: ${data['clientName']}",
-              subtitle: "${data['productName']} - ${data['quantity']} pcs",
-              time: (data['createdAt'] as Timestamp).toDate(),
+              title: "Order: ${data['clientName'] ?? 'Unknown'}",
+              subtitle: "${data['productName'] ?? 'Item'} - ${data['quantity'] ?? 0} pcs",
+              time: time,
               icon: Icons.shopping_bag,
               color: TColors.marketing,
             ),
@@ -556,11 +595,15 @@ class AdminController extends GetxController {
     for (var doc in snap.docs) {
       var data = doc.data();
       String qty = (data['completedQty'] ?? data['totalQty'] ?? '0').toString();
+
+      Timestamp? ts = data['timestamp'] as Timestamp?;
+      DateTime time = ts?.toDate() ?? DateTime.now();
+
       list.add(
         ActivityItem(
           title: "$title Entry",
           subtitle: "Order #${data['orderId'] ?? '?'} - $qty pcs",
-          time: (data['timestamp'] as Timestamp).toDate(),
+          time: time,
           icon: icon,
           color: color,
         ),
@@ -569,34 +612,46 @@ class AdminController extends GetxController {
   }
 
   // --- 6. ACTIONS ---
-  Future<void> approveNextStage(String docId, Map<String, dynamic> user) async {
+
+  Future<void> approveNextStage(String docId, Map<String, dynamic> user, {String? assignedSupervisorId, String? assignedSupervisorName}) async {
     try {
       final docRef = _db.collection('id_requests').doc(docId);
+
+      Map<String, dynamic> updates = {};
+      if (assignedSupervisorId != null) updates['assignedSupervisorId'] = assignedSupervisorId;
+      if (assignedSupervisorName != null) updates['assignedSupervisorName'] = assignedSupervisorName;
+
       if (user['unitApproved'] == false) {
-        await docRef.update({'unitApproved': true});
+        updates['unitApproved'] = true;
+        await docRef.update(updates);
       } else if (user['shiftApproved'] == false) {
-        await docRef.update({'shiftApproved': true});
+        updates['shiftApproved'] = true;
+        await docRef.update(updates);
       } else if (user['adminApproved'] == false) {
         // 1. Update id_requests
-        await docRef.update({'adminApproved': true, 'status': 'Approved'});
+        updates['adminApproved'] = true;
+        updates['status'] = 'Approved';
+        await docRef.update(updates);
 
-        // 2. CRITICAL FIX: Create/Update the official 'users' document
+        // 2. Create/Update the official 'users' document
         await _db.collection('users').doc(docId).set({
           'name': user['name'] ?? user['FullName'] ?? 'Unknown',
           'email': user['email'] ?? user['Email'] ?? '',
           'role': user['role'] ?? user['Role'] ?? 'Worker',
           'status': 'Approved',
-          // Duplicates to prevent case-sensitive crashes on older screens
+          'assignedSupervisorId': assignedSupervisorId ?? user['assignedSupervisorId'] ?? '',
+          'assignedSupervisorName': assignedSupervisorName ?? user['assignedSupervisorName'] ?? '',
           'FullName': user['name'] ?? user['FullName'] ?? 'Unknown',
           'Role': user['role'] ?? user['Role'] ?? 'Worker',
           'Status': 'Approved',
           'updatedAt': FieldValue.serverTimestamp(),
+          'approvedByAdmin': adminName.value,
         }, SetOptions(merge: true));
 
         Get.snackbar("Approved", "${user['name'] ?? 'User'} access granted", backgroundColor: Colors.green, colorText: Colors.white);
       }
     } catch (e) {
-      Get.snackbar("Error", e.toString());
+      Get.snackbar("Error", e.toString(), backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
@@ -606,6 +661,16 @@ class AdminController extends GetxController {
       Get.snackbar("Deleted", "Request removed", backgroundColor: Colors.orange, colorText: Colors.white);
     } catch (e) {
       Get.snackbar("Error", e.toString());
+    }
+  }
+
+  Future<void> removeApprovedWorker(String uid) async {
+    try {
+      await _db.collection('users').doc(uid).delete();
+      await _db.collection('id_requests').doc(uid).delete();
+      Get.snackbar("Worker Removed", "User has been successfully removed from the system.", backgroundColor: Colors.orange, colorText: Colors.white);
+    } catch (e) {
+      Get.snackbar("Error", "Could not remove worker: $e", backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
