@@ -22,7 +22,6 @@ class MarketingUploadScreen extends StatefulWidget {
 class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   final controller = Get.put(MarketingUploadController());
 
-  // ✅ NEW: Local state to toggle the GST field visibility
   final RxBool showGstField = false.obs;
 
   Color _getColorFromString(String colorName) {
@@ -61,7 +60,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.existingOrder != null) {
         controller.loadOrderData(widget.existingOrder!);
-        // ✅ If the existing order has a GST number, show the field automatically!
         if (widget.existingOrder!.clientGstNumber?.isNotEmpty == true) {
           showGstField.value = true;
         }
@@ -171,7 +169,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                   ),
                   const SizedBox(height: 16),
                   TCustomTextField(
-                      label: "Client Name *", // ✅ Required visually
+                      label: "Client Name *",
                       controller: controller.clientName,
                       prefixIcon: Icons.person_outline_rounded,
                       validator: (val) => val!.isEmpty ? "Required" : null
@@ -184,7 +182,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                       Expanded(
                         flex: 2,
                         child: TCustomTextField(
-                          label: "PIN Code *", // ✅ Required visually
+                          label: "PIN Code *",
                           controller: controller.pincode,
                           prefixIcon: Icons.pin_drop_rounded,
                           keyboardType: TextInputType.number,
@@ -195,33 +193,17 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
+
+                      // ✅ FIX: Replaced the static Container with your dropdown helper!
                       Expanded(
                         flex: 3,
-                        child: Obx(() => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.black26 : Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                  Icons.map_rounded,
-                                  size: 20,
-                                  color: controller.selectedState.value.isEmpty ? Colors.grey : TColors.primary
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                controller.selectedState.value.isEmpty ? "State" : controller.selectedState.value,
-                                style: TextStyle(
-                                  color: controller.selectedState.value.isEmpty ? Colors.grey : (isDark ? Colors.white : Colors.black87),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: Obx(() => _buildDropdown(
+                          label: "State *",
+                          value: controller.selectedState.value,
+                          items: controller.indianStates,
+                          icon: Icons.map_rounded,
+                          isDark: isDark,
+                          onChanged: (val) => controller.selectedState.value = val,
                         )),
                       ),
                     ],
@@ -240,7 +222,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                     onTap: () => controller.chooseDate(context),
                     child: AbsorbPointer(
                       child: TCustomTextField(
-                          label: "Delivery Deadline *", // ✅ Required visually
+                          label: "Delivery Deadline *",
                           controller: controller.deadline,
                           prefixIcon: Icons.calendar_month_rounded,
                           validator: (val) => val!.isEmpty ? "Date required" : null
@@ -348,7 +330,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                 const SizedBox(height: 16),
 
                                 TCustomTextField(
-                                    label: "Product Name / Details *", // ✅ Required visually
+                                    label: "Product Name / Details *",
                                     controller: itemForm.productDetails,
                                     prefixIcon: Icons.notes_rounded,
                                     maxLines: 2,
@@ -373,7 +355,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Obx(() => _buildDropdown(
-                                        label: "Category *", // ✅ Required visually
+                                        label: "Category *",
                                         value: itemForm.selectedProductType.value,
                                         items: controller.productTypes,
                                         icon: Icons.category_rounded,
@@ -391,7 +373,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                                   children: [
                                     Expanded(
                                       child: Obx(() => _buildDropdown(
-                                        label: "Fabric Type *", // ✅ Required visually
+                                        label: "Fabric Type *",
                                         value: itemForm.selectedFabric.value,
                                         items: controller.fabricOptions,
                                         icon: Icons.texture_rounded,
@@ -558,7 +540,6 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   }) {
     final safeValue = (value != null && items.contains(value)) ? value : null;
 
-    // ✅ Render the label nicely even if it has an asterisk
     final displayLabel = label.contains('*')
         ? RichText(text: TextSpan(text: label.replaceAll('*', ''), style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12), children: const [TextSpan(text: '*', style: TextStyle(color: Colors.redAccent))]))
         : Text(label, style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12));

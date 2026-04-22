@@ -252,7 +252,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
 
                     Color urgencyColor = isDone ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : TColors.textSecondary)));
 
-                    // Calculate required fabric immediately for the quick view
                     String fabricRequired = controller.getFabricRequiredText(order.quantity, order.productName);
 
                     return Container(
@@ -309,7 +308,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                                 const SizedBox(height: 6),
                                 _buildInfoRow(isDark, Icons.layers_outlined, "Quantity", "${order.quantity} Units", textColor),
 
-                                // ✅ NEW: Instantly visible fabric requirement calculation!
                                 if (fabricRequired != "Not Specified") ...[
                                   const SizedBox(height: 6),
                                   _buildInfoRow(isDark, Icons.calculate_rounded, "Est. Fabric", fabricRequired, Colors.blueAccent),
@@ -462,51 +460,52 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
 
     if (materials.isEmpty && estimatedKg == "Not Specified") return const SizedBox.shrink();
 
-    return Obx(() {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 24),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2C2C2E) : Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.inventory_2_rounded, color: Colors.blue, size: 18),
-                const SizedBox(width: 8),
-                Text("Material Requirements", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
-              ],
+    // ✅ THE FIX: We removed the outer Obx() here so it doesn't crash when materials is empty!
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2C2E) : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.inventory_2_rounded, color: Colors.blue, size: 18),
+              const SizedBox(width: 8),
+              Text("Material Requirements", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          if (estimatedKg != "Not Specified") ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calculate_rounded, size: 16, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text("Total Fabric Needed: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                  const Spacer(),
+                  Text(estimatedKg, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.blue)),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
+          ],
 
-            // ✅ Prominent banner showing the exact requirement math
-            if (estimatedKg != "Not Specified") ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calculate_rounded, size: 16, color: Colors.blue),
-                    const SizedBox(width: 8),
-                    Text("Total Fabric Needed: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-                    const Spacer(),
-                    Text(estimatedKg, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.blue)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Live Stock list
-            ...materials.values.map((mat) {
+          // Live Stock list
+          ...materials.values.map((mat) {
+            // ✅ THE FIX: We only wrap the specific list item in Obx() so it safely accesses the observable!
+            return Obx(() {
               double inStock = controller.inventoryStock[mat['lookupKey']] ?? 0.0;
               String displayStock = mat['unit'] == 'pcs' ? inStock.toInt().toString() : inStock.toStringAsFixed(1);
 
@@ -535,11 +534,11 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   ],
                 ),
               );
-            }),
-          ],
-        ),
-      );
-    });
+            });
+          }),
+        ],
+      ),
+    );
   }
 
   void _showUpdateStageDialog(BuildContext context, OrderModel order, UnitSupervisorController controller, bool isDark, Color textColor) {
@@ -657,7 +656,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
-                      // ✅ MATERIAL CARD
+                      // ✅ MATERIAL CARD (Now totally Crash-Free!)
                       _buildMaterialRequirementCard(order, isDark, textColor, controller),
 
                       // ✅ DETAILED PRODUCT LIST

@@ -23,6 +23,9 @@ class AuthenticationRepository extends GetxController {
   final _db = FirebaseFirestore.instance;
   late final Rx<User?> firebaseUser;
 
+  // 🛡️ MEMORY VAULT: Securely hold the role
+  String currentLoggedInRole = 'worker';
+
   @override
   void onReady() {
     firebaseUser = Rx<User?>(_auth.currentUser);
@@ -39,12 +42,10 @@ class AuthenticationRepository extends GetxController {
     try {
       Map<String, dynamic>? userData;
 
-      // 1. Try to get user from 'users' collection
       DocumentSnapshot userDoc = await _db.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         userData = userDoc.data() as Map<String, dynamic>;
       } else {
-        // 2. Try to get user from 'id_requests' collection
         DocumentSnapshot requestDoc = await _db.collection('id_requests').doc(user.uid).get();
         if (requestDoc.exists) {
           userData = requestDoc.data() as Map<String, dynamic>;
@@ -52,31 +53,24 @@ class AuthenticationRepository extends GetxController {
       }
 
       if (userData != null) {
-        // 🚨 BULLETPROOF DATA EXTRACTION 🚨
-        // Get the role, checking both 'role' and 'Role' keys, default to 'worker'
         String rawRole = (userData['role'] ?? userData['Role'] ?? 'worker').toString();
-        // Get the status, checking both 'status' and 'Status' keys, default to 'pending'
         String rawStatus = (userData['status'] ?? userData['Status'] ?? 'pending').toString();
 
-        // Convert everything to lowercase and trim spaces to ensure perfect matching
         String cleanRole = rawRole.toLowerCase().trim();
         String cleanStatus = rawStatus.toLowerCase().trim();
 
+        // 🛡️ LOCK ROLE INTO MEMORY
+        currentLoggedInRole = cleanRole;
+
         debugPrint("🔐 AUTH CHECK -> Role: $cleanRole | Status: $cleanStatus");
 
-        // Check if the user is allowed in
         if (cleanStatus == 'pending' || cleanStatus == 'rejected') {
-          // Send to Status screen, but DO NOT sign them out here!
-          // The Status Screen needs them logged in to check their status stream.
           Get.offAll(() => const StatusCheckScreen());
           return;
         }
 
-        // If they are approved, send them to the correct dashboard
         _navigateToDashboard(cleanRole);
       } else {
-        // No document found at all
-        debugPrint("🚨 Auth Check: No profile found in DB for ${user.uid}");
         await _auth.signOut();
         Get.offAllNamed(AppRouteNames.login);
       }
@@ -88,31 +82,30 @@ class AuthenticationRepository extends GetxController {
   }
 
   void _navigateToDashboard(String role) {
-    // Remove all spaces for exact matching (e.g., 'sales manager' -> 'salesmanager')
     String exactRole = role.replaceAll(' ', '');
 
     if (exactRole == 'salesmanager') {
       Get.offAll(() => const SalesManagerDashboard());
     } else {
-      Get.offAllNamed(AppRouteNames.mainWrapper);
+      // 🛡️ TRIPLE-THREAT FIX:
+      // 1. Force the controller to update if it's already awake
+      if (Get.isRegistered<NavigationController>()) {
+        Get.find<NavigationController>().updateRole(role);
+      }
+
+      // 2. Pass the argument in the route just in case
+      Get.offAllNamed(AppRouteNames.mainWrapper, arguments: {'role': role});
     }
   }
 
   Future<void> logout() async {
     try {
-      // 1. First, tell Firebase to sign out.
-      // (This will automatically trigger your stream and push the user to Login)
+      // Clears the memory vault on logout
+      currentLoggedInRole = 'worker';
       await _auth.signOut();
-
-      // 2. THE NUKE: This instantly destroys ALL controllers in memory.
-      // You no longer need to manually list them one by one!
-      Get.deleteAll(force: true);
-
-      // 3. Clear the UI stack just to be 100% safe
-      Get.offAllNamed(AppRouteNames.login);
-
     } catch (e) {
       debugPrint("Logout Error: $e");
       Get.snackbar("Error", "Logout failed: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
     }
-  }}
+  }
+}

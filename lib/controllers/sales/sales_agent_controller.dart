@@ -191,7 +191,6 @@ class SalesAgentController extends GetxController {
           .orderBy('orderDate', descending: false)
           .get();
 
-      // ✅ FIX: 'pending' and 'placed' REMOVED! Only approved orders count for the agent now.
       List<String> validStatuses = [
         'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
@@ -248,13 +247,11 @@ class SalesAgentController extends GetxController {
 
           double monthNet = monthlySalesMap[mKey] ?? 0.0;
 
-          // ✅ FIX: Calculate effective achievement by deducting past dues FIRST
           double effectiveForPromotion = monthNet - accumulatedDue;
 
           accumulatedDue += (currentTarget - monthNet);
           if (accumulatedDue < 0) accumulatedDue = 0;
 
-          // ✅ PROMOTION LOGIC: Now uses the adjusted amount (183k - 59k = 124k)
           if (accumulatedDue <= 0 && !isSalesManager.value) {
             if (calculatedRank == 'JSA' && effectiveForPromotion >= 150000) {
               calculatedRank = 'SSA';
@@ -290,6 +287,7 @@ class SalesAgentController extends GetxController {
       debugPrint("❌ Stats Error: $e");
     }
   }
+
   // =====================================================================
   // ✅ TIERED SLAB BONUS LOGIC
   // =====================================================================
@@ -309,21 +307,18 @@ class SalesAgentController extends GetxController {
     double bonus = 0.0;
     double remainingSurplus = x;
 
-    // SLAB 1: First ₹50,000 gets 2%
     if (remainingSurplus > 0) {
       double slab1Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
       bonus += (slab1Amount * 0.02);
       remainingSurplus -= slab1Amount;
     }
 
-    // SLAB 2: Next ₹50,000 (between 50k to 100k) gets 1.5%
     if (remainingSurplus > 0) {
       double slab2Amount = remainingSurplus > 50000 ? 50000 : remainingSurplus;
       bonus += (slab2Amount * 0.015);
       remainingSurplus -= slab2Amount;
     }
 
-    // SLAB 3: Anything above ₹1,00,000 gets 1%
     if (remainingSurplus > 0) {
       bonus += (remainingSurplus * 0.01);
     }
@@ -333,6 +328,9 @@ class SalesAgentController extends GetxController {
 
   // =====================================================================
   // ✅ TEAM LEADERBOARD WITH DYNAMIC RANKS
+  // =====================================================================
+// =====================================================================
+  // ✅ TEAM LEADERBOARD WITH DYNAMIC RANKS (Synced with Manager Logic)
   // =====================================================================
   Future<void> fetchLeaderboard() async {
     try {
@@ -347,17 +345,28 @@ class SalesAgentController extends GetxController {
       final usersSnap = await _db.collection('users').get();
       Map<String, String> userRoleMap = {};
 
+      // ✅ Master list to hold ALL sales agents
+      Set<String> allSalesAgents = {};
+
       for (var doc in usersSnap.docs) {
         final d = doc.data();
-        String n = d['FullName'] ?? d['Name'] ?? '';
-        String r = (d['Role'] ?? d['role'] ?? '').toString().toLowerCase();
+
+        // ✅ Case-sensitivity and trimming fix
+        String n = (d['FullName'] ?? d['Name'] ?? d['name'] ?? '').toString().trim();
+        String rawRole = (d['Role'] ?? d['role'] ?? '').toString().toUpperCase();
+
         if (n.isNotEmpty) {
-          userRoleMap[n] = _parseRoleAcronym(r);
+          // ✅ Ensuring Manager & Admin are explicitly grabbed
+          if (rawRole.contains('SALES') || rawRole.contains('AGENT') || rawRole.contains('MARKETING') || rawRole.contains('ASSOCIATE') || rawRole.contains('MANAGER') || rawRole.contains('ADMIN') || ['SM', 'SSA', 'SC', 'JSA'].contains(rawRole)) {
+            allSalesAgents.add(n);
+            userRoleMap[n] = _parseRoleAcronym(rawRole);
+          }
         }
       }
 
+      // ✅ THE FIX: Removed 'pending' and 'placed'. Only approved orders count now!
       List<String> revenueStatuses = [
-        'pending', 'placed', 'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
+        'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
         'out src', 'shipping', 'shipped', 'delivered', 'completed'
       ];
@@ -380,9 +389,11 @@ class SalesAgentController extends GetxController {
         bool isDeleteRequested = data['isDeleteRequested'] == true || data['isDeleteRequested'] == "true";
 
         if (revenueStatuses.contains(status) && !isDeleted && !isDeleteRequested) {
-          String agent = data['marketingPersonName'] ?? 'Unknown';
+          String agent = (data['marketingPersonName'] ?? 'Unknown').toString().trim();
           DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
           String monthKey = DateFormat('yyyy-MM').format(orderDate);
+
+          allSalesAgents.add(agent);
 
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
@@ -401,7 +412,8 @@ class SalesAgentController extends GetxController {
 
       List<Map<String, dynamic>> tempList = [];
 
-      for (String agent in currentPeriodSales.keys) {
+      // ✅ Loop through ALL known sales agents (Not just currentPeriodSales.keys)
+      for (String agent in allSalesAgents) {
         String dbRole = userRoleMap[agent] ?? 'JSA';
         bool isSM = dbRole == 'SM';
 
@@ -411,17 +423,13 @@ class SalesAgentController extends GetxController {
 
         if (agentHistory.containsKey(agent) && selectedTimeframe.value == 'Monthly') {
           List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
-
           String firstMonth = sortedKeys.isNotEmpty ? sortedKeys.first : targetMonthKey;
 
           for (String mKey in sortedKeys) {
             if (mKey == targetMonthKey) break;
-
             if (mKey == firstMonth && firstMonth != '2026-02') continue;
 
             double monthNet = agentHistory[agent]![mKey] ?? 0.0;
-
-            // ✅ FIX: Calculate effective achievement by deducting past dues FIRST
             double effectiveForPromotion = monthNet - accumulatedDue;
 
             accumulatedDue += (currentTarget - monthNet);
@@ -442,6 +450,12 @@ class SalesAgentController extends GetxController {
         }
 
         double amount = currentPeriodSales[agent] ?? 0.0;
+
+        // ✅ TRUE COMPETITOR RULE: Hide 0-sales agents (Including the Manager)
+        if (amount <= 0) {
+          continue;
+        }
+
         double targetAmount = currentTarget * multiplier;
         double progress = targetAmount > 0 ? (amount / targetAmount) : 0.0;
 
@@ -465,7 +479,9 @@ class SalesAgentController extends GetxController {
       }
 
       tempList.sort((a, b) => b['amount'].compareTo(a['amount']));
-      leaderboardData.value = tempList;
+
+      // ✅ Displays everyone, no limits!
+      leaderboardData.value = tempList.toList();
 
     } catch (e) {
       debugPrint("Error fetching leaderboard: $e");
@@ -473,11 +489,14 @@ class SalesAgentController extends GetxController {
       isLoading.value = false;
     }
   }
-
+  // =====================================================================
+  // ✅ FIX: ENHANCED QUICK UPDATE ORDER (MATH & APPROVAL FIXES)
+  // =====================================================================
   Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
     try {
       isLoading.value = true;
 
+      // 1. Recalculate Totals
       double subTotal = newQty * newPrice;
       double gstAmount = (subTotal * originalOrder.gstPercentage) / 100;
       double newTotal = subTotal + gstAmount + originalOrder.shippingCharge;
@@ -489,22 +508,47 @@ class SalesAgentController extends GetxController {
         'balanceDue': newBalance,
         'productDetails': newDetails,
         'updatedAt': FieldValue.serverTimestamp(),
+        'status': 'Pending',            // ✅ Force manager to re-approve
+        'isEdited': true,               // ✅ Flag it for the manager's UI
+        'effectiveRevenue': newTotal,   // ✅ Reset Margin so Manager inputs it again!
       };
 
+      // 2. Fix inner product array Math
       if (originalOrder.products.isNotEmpty) {
         List<dynamic> updatedProducts = List.from(originalOrder.products);
         if (updatedProducts[0] is Map) {
           Map<String, dynamic> firstProduct = Map<String, dynamic>.from(updatedProducts[0]);
           firstProduct['price'] = newPrice;
+          firstProduct['qty'] = newQty;                    // ✅ Now QTY updates correctly!
+          firstProduct['total'] = subTotal + gstAmount;    // ✅ Now Item Total updates correctly!
           updatedProducts[0] = firstProduct;
         }
         updateData['products'] = updatedProducts;
       }
 
+      // 3. Update DB
       await _db.collection('orders').doc(originalOrder.id).update(updateData);
+
+      // 4. Alert Manager
+      try {
+        final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
+        for (var managerDoc in managerSnapshot.docs) {
+          await _db.collection('notifications').add({
+            'targetUserId': managerDoc.id,
+            'title': 'Quick Edit Alert ✏️',
+            'message': '${agentName.value} changed Qty/Price for Order ${originalOrder.manualOrderNo}. Requires re-approval.',
+            'orderId': originalOrder.id,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isRead': false,
+          });
+        }
+      } catch (e) {
+        debugPrint("Notification to manager failed: $e");
+      }
+
       await fetchAgentStats();
 
-      Get.snackbar("Success", "Order updated successfully!",
+      Get.snackbar("Success", "Order updated and sent for re-approval!",
           backgroundColor: Colors.green.withValues(alpha:0.1), colorText: Colors.green);
 
     } catch (e) {

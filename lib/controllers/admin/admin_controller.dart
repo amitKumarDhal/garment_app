@@ -20,12 +20,20 @@ class AdminController extends GetxController {
   var totalDamages = 0.obs;
   var adminName = "".obs;
 
-  // --- Monthly Revenue Observables ---
-  var totalMonthlyRevenue = 0.0.obs;
-  var selectedMonth = DateTime.now().obs;
+  // --- NEW: Dynamic Timeframe Observables ---
+  var periodRevenue = 0.0.obs;
+  var periodOrders = 0.obs;
+  var periodUnits = 0.obs; // Tracks total garments for the period
+
+  var todayOrders = 0.obs;
+  var todayUnits = 0.obs; // Tracks total garments ordered today
+
+  var timeframeLabel = "".obs;
+  var startDate = DateTime(DateTime.now().year, DateTime.now().month, 1).obs;
+  var endDate = DateTime(DateTime.now().year, DateTime.now().month + 1, 0, 23, 59, 59).obs;
 
   // 🛡️ Memory Leak Protection (All Streams)
-  StreamSubscription? _monthlyRevenueSubscription;
+  StreamSubscription? _periodMetricsSubscription;
   StreamSubscription? _requestsSub;
   StreamSubscription? _workersSub;
   StreamSubscription? _staffSub;
@@ -44,8 +52,6 @@ class AdminController extends GetxController {
   // --- Lists ---
   RxList<Map<String, dynamic>> pendingRequests = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> allApprovedWorkers = <Map<String, dynamic>>[].obs;
-
-  // REAL DATA LISTS FOR SUPERVISORS & MANAGERS
   RxList<Map<String, dynamic>> unitSupervisors = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> shiftSupervisors = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> salesManagers = <Map<String, dynamic>>[].obs;
@@ -63,14 +69,16 @@ class AdminController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    // Initialize default label
+    timeframeLabel.value = DateFormat('MMM yyyy').format(DateTime.now());
+
     fetchAdminIdentity();
     startAdminListeners();
   }
 
   @override
   void onClose() {
-    // 🛡️ CRITICAL: Kill all active listeners to save battery and Firebase costs
-    _monthlyRevenueSubscription?.cancel();
+    _periodMetricsSubscription?.cancel();
     _requestsSub?.cancel();
     _workersSub?.cancel();
     _staffSub?.cancel();
@@ -94,7 +102,6 @@ class AdminController extends GetxController {
             return;
           }
         }
-
         final idDoc = await _db.collection('id_requests').doc(user.uid).get();
         if (idDoc.exists) {
           String reqName = idDoc.data()?['name'] ?? idDoc.data()?['FullName'] ?? '';
@@ -103,11 +110,9 @@ class AdminController extends GetxController {
             return;
           }
         }
-
         adminName.value = user.displayName ?? "Super Admin";
       }
     } catch (e) {
-      debugPrint("Error fetching admin name: $e");
       adminName.value = "Super Admin";
     }
   }
@@ -124,12 +129,38 @@ class AdminController extends GetxController {
     _bindStitchingStream();
     _bindPackingStream();
     fetchRecentActivities();
-    _bindMonthlyRevenue();
+    _bindPeriodMetrics();
   }
 
-  // --- MONTH SELECTION & REVENUE LOGIC ---
-  Future<void> selectMonthYear(BuildContext context) async {
-    int tempYear = selectedMonth.value.year;
+  // =========================================================================
+  // ✅ NEW: DYNAMIC TIMEFRAME SELECTION LOGIC
+  // =========================================================================
+
+  void setTimeframe(String label, int monthsBack) {
+    DateTime now = DateTime.now();
+    endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59); // End of current month
+    startDate.value = DateTime(now.year, now.month - monthsBack + 1, 1); // Start of X months ago
+    timeframeLabel.value = label;
+    _updatePeriodStream(); // ✅ FORCED REFRESH INSTANTLY
+    Get.back(); // Close bottom sheet
+  }
+
+  void setFinancialYear() {
+    DateTime now = DateTime.now();
+    // Indian FY starts April 1st.
+    int startYear = now.month < 4 ? now.year - 1 : now.year;
+
+    startDate.value = DateTime(startYear, 4, 1);
+    endDate.value = DateTime(startYear + 1, 3, 31, 23, 59, 59);
+    timeframeLabel.value = "FY ${startYear}-${(startYear + 1).toString().substring(2)}";
+    _updatePeriodStream(); // ✅ FORCED REFRESH INSTANTLY
+    Get.back(); // Close bottom sheet
+  }
+
+  Future<void> selectSpecificMonth(BuildContext context) async {
+    Get.back(); // Close bottom sheet first
+
+    int tempYear = DateTime.now().year;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     await showDialog(
@@ -175,33 +206,27 @@ class AdminController extends GetxController {
                   itemBuilder: (context, index) {
                     DateTime monthDate = DateTime(tempYear, index + 1, 1);
                     String monthName = DateFormat('MMM').format(monthDate);
-
-                    bool isSelected = selectedMonth.value.year == tempYear && selectedMonth.value.month == index + 1;
                     bool isFuture = monthDate.isAfter(DateTime.now());
 
                     return GestureDetector(
                       onTap: isFuture ? null : () {
-                        selectedMonth.value = monthDate;
-                        Get.back();
+                        startDate.value = DateTime(tempYear, index + 1, 1);
+                        endDate.value = DateTime(tempYear, index + 2, 0, 23, 59, 59);
+                        timeframeLabel.value = DateFormat('MMM yyyy').format(startDate.value);
+                        _updatePeriodStream(); // ✅ FORCED REFRESH INSTANTLY
+                        Get.back(); // Close dialog
                       },
                       child: Container(
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? TColors.primary
-                              : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100),
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isSelected ? TColors.primary : Colors.transparent),
                         ),
                         child: Text(
                           monthName,
                           style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : (isFuture
-                                ? Colors.grey
-                                : (isDark ? Colors.white70 : Colors.black87)),
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            color: isFuture ? Colors.grey : (isDark ? Colors.white70 : Colors.black87),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -216,25 +241,27 @@ class AdminController extends GetxController {
     );
   }
 
-  void _bindMonthlyRevenue() {
+  // =========================================================================
+
+  void _bindPeriodMetrics() {
     if (_auth.currentUser == null) return;
-    ever(selectedMonth, (_) => _updateMonthlyStream());
-    _updateMonthlyStream();
+    ever(startDate, (_) => _updatePeriodStream());
+    ever(endDate, (_) => _updatePeriodStream());
+    _updatePeriodStream();
   }
 
-  Future<void> _updateMonthlyStream() async {
-    await _monthlyRevenueSubscription?.cancel();
+  Future<void> _updatePeriodStream() async {
+    await _periodMetricsSubscription?.cancel();
 
-    DateTime startOfMonth = DateTime(selectedMonth.value.year, selectedMonth.value.month, 1);
-    DateTime endOfMonth = DateTime(selectedMonth.value.year, selectedMonth.value.month + 1, 0, 23, 59, 59);
-
-    _monthlyRevenueSubscription = _db.collection('orders')
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+    _periodMetricsSubscription = _db.collection('orders')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate.value))
+        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate.value))
         .snapshots()
         .listen((snapshot) {
 
-      double monthlySum = 0.0;
+      double sum = 0.0;
+      int orderCount = 0;
+      int unitCount = 0; // ✅ Tracker for total units (garments)
       List<String> ignoredStatuses = ['pending', 'placed', 'rejected', 'deleted', 'cancelled'];
 
       for (var doc in snapshot.docs) {
@@ -242,6 +269,9 @@ class AdminController extends GetxController {
         String status = (data['status'] ?? '').toString().toLowerCase();
 
         if (data['isDeleted'] == true || ignoredStatuses.contains(status)) continue;
+
+        orderCount++;
+        unitCount += (data['quantity'] as num? ?? 0).toInt();
 
         double totalAmt = 0.0;
         if (data['totalAmount'] is num) {
@@ -258,15 +288,16 @@ class AdminController extends GetxController {
         }
 
         double finalAmount = (effRev > 0) ? effRev : totalAmt;
-        monthlySum += finalAmount;
+        sum += finalAmount;
       }
 
-      totalMonthlyRevenue.value = monthlySum;
+      periodRevenue.value = sum;
+      periodOrders.value = orderCount;
+      periodUnits.value = unitCount; // ✅ Push units to UI
     });
   }
 
   // --- 1. WORKFORCE & STAFF STREAMS ---
-
   void _bindStaffDirectory() {
     if (_auth.currentUser == null) return;
     _staffSub = _db.collection('users').where('status', isEqualTo: 'Approved').snapshots().listen((snapshot) {
@@ -277,8 +308,6 @@ class AdminController extends GetxController {
       for (var doc in snapshot.docs) {
         var data = doc.data();
         data['id'] = doc.id;
-
-        // 🛡️ SAFE ROLE CHECK: Trim spaces and convert to lowercase
         String role = (data['role'] ?? data['Role'] ?? '').toString().trim().toLowerCase();
 
         if (role.contains('unit supervisor')) uSupervisors.add(data);
@@ -323,7 +352,6 @@ class AdminController extends GetxController {
   }
 
   // --- 2. DEPARTMENT STREAMS ---
-
   void _bindTodayOrders() {
     if (_auth.currentUser == null) return;
     DateTime now = DateTime.now();
@@ -336,12 +364,17 @@ class AdminController extends GetxController {
         .listen((snapshot) {
 
       List<OrderModel> validOrders = [];
+      int todayUnitCount = 0; // ✅ Tracker for today's units
+
       for (var doc in snapshot.docs) {
-        // 🛡️ CRITICAL TRY/CATCH: Prevents a single corrupt order from crashing the entire feed
         try {
           final order = OrderModel.fromSnapshot(doc);
           if (order.toJson()['isDeleted'] != true) {
             validOrders.add(order);
+            // ✅ Sum up the valid units ordered today
+            if(!['pending', 'placed', 'rejected', 'deleted', 'cancelled'].contains(order.status.toLowerCase())){
+              todayUnitCount += order.quantity;
+            }
           }
         } catch (e) {
           debugPrint("Skipped corrupt daily order doc: ${doc.id}");
@@ -349,6 +382,8 @@ class AdminController extends GetxController {
       }
 
       recentOrders.assignAll(validOrders);
+      todayOrders.value = validOrders.where((o) => !['pending', 'placed', 'rejected', 'deleted', 'cancelled'].contains(o.status.toLowerCase())).length;
+      todayUnits.value = todayUnitCount; // ✅ Push to UI
       _calculateProductionTotal();
     });
   }
@@ -437,7 +472,6 @@ class AdminController extends GetxController {
 
   void _calculateProductionTotal() {
     List<String> ignoredStatuses = ['pending', 'placed', 'rejected', 'deleted', 'cancelled'];
-
     double total = recentOrders.fold(0.0, (acc, item) {
       if (ignoredStatuses.contains(item.status.toLowerCase())) {
         return acc;
@@ -446,7 +480,6 @@ class AdminController extends GetxController {
       double amount = (effRev > 0) ? effRev : item.totalAmount;
       return acc + amount;
     });
-
     totalDailyProduction.value = total;
   }
 
@@ -546,7 +579,6 @@ class AdminController extends GetxController {
           var data = doc.data();
           if (data['isDeleted'] == true) continue;
 
-          // 🛡️ SAFE FALLBACK: Prevents crash if 'createdAt' is randomly missing
           Timestamp? ts = data['createdAt'] as Timestamp?;
           DateTime time = ts?.toDate() ?? DateTime.now();
 
@@ -612,11 +644,9 @@ class AdminController extends GetxController {
   }
 
   // --- 6. ACTIONS ---
-
   Future<void> approveNextStage(String docId, Map<String, dynamic> user, {String? assignedSupervisorId, String? assignedSupervisorName}) async {
     try {
       final docRef = _db.collection('id_requests').doc(docId);
-
       Map<String, dynamic> updates = {};
       if (assignedSupervisorId != null) updates['assignedSupervisorId'] = assignedSupervisorId;
       if (assignedSupervisorName != null) updates['assignedSupervisorName'] = assignedSupervisorName;
@@ -628,12 +658,10 @@ class AdminController extends GetxController {
         updates['shiftApproved'] = true;
         await docRef.update(updates);
       } else if (user['adminApproved'] == false) {
-        // 1. Update id_requests
         updates['adminApproved'] = true;
         updates['status'] = 'Approved';
         await docRef.update(updates);
 
-        // 2. Create/Update the official 'users' document
         await _db.collection('users').doc(docId).set({
           'name': user['name'] ?? user['FullName'] ?? 'Unknown',
           'email': user['email'] ?? user['Email'] ?? '',

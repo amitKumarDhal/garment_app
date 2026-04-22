@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../data/models/order_model.dart';
+import '../make_quotation_screen.dart';
 import '../order_deliverables_screen.dart';
 import 'order_approval_screen.dart';
 import 'sales_manager_history_screen.dart';
@@ -14,6 +15,7 @@ import 'sales_manager_approvals.dart';
 import '../../notifications/notification_screen.dart';
 import '../../../controllers/notifications/notification_controller.dart';
 import '../../profile/profile_screen.dart';
+
 
 class SalesManagerHome extends StatelessWidget {
   const SalesManagerHome({super.key});
@@ -316,8 +318,53 @@ class SalesManagerHome extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // --- 4. MAKE QUOTATION ROW ---
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Get.to(() => const MakeQuotationScreen());
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00796B), Color(0xFF009688)], // Teal gradient
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.teal.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5))
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                        child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Make Quotation", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                            SizedBox(height: 2),
+                            Text("Generate and send PDF quotes to clients", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                    ],
+                  ),
+                ),
+              ),
 
-              // --- 4. SHIPPING & GST ROW ---
+              const SizedBox(height: 16),
+
+              // --- 5. SHIPPING & GST ROW ---
               Row(
                 children: [
                   Expanded(
@@ -399,7 +446,7 @@ class SalesManagerHome extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // --- 5. UNITS & DELIVERABLES ROW ---
+              // --- 6. UNITS & DELIVERABLES ROW ---
               Row(
                 children: [
                   Expanded(

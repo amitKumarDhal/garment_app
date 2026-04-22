@@ -51,7 +51,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     }
   }
 
-  // ✅ FULL SCREEN IMAGE VIEWER
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
     Get.to(
           () => Scaffold(

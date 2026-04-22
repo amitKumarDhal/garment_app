@@ -6,8 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../data/models/order_model.dart';
-
-// ✅ IMPORT THE NEW STATS SERVICE
 import '../../services/stats_service.dart';
 
 // =========================================================================
@@ -54,16 +52,23 @@ class MarketingUploadController extends GetxController {
   final orderNo = TextEditingController();
   final clientName = TextEditingController();
   final organization = TextEditingController();
-
-  // ✅ NEW: Added GST Controller
   final clientGstNumber = TextEditingController();
-
   final phone = TextEditingController();
   final address = TextEditingController();
   final deadline = TextEditingController();
-
   final pincode = TextEditingController();
-  final selectedState = "".obs;
+
+  final Rx<String?> selectedState = Rx<String?>(null);
+
+  final List<String> indianStates = [
+    'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam',
+    'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
+    'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh',
+    'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha',
+    'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+    'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+  ];
 
   // --- Financial Global Controllers ---
   final shippingCharge = TextEditingController();
@@ -122,32 +127,6 @@ class MarketingUploadController extends GetxController {
     addNewItem();
     shippingCharge.addListener(_calculateTotal);
     advanceAmount.addListener(_calculateTotal);
-
-    pincode.addListener(() {
-      String pin = pincode.text.trim();
-      if (pin.length == 6) {
-        _fetchStateFromPincode(pin);
-      } else if (pin.length < 6) {
-        selectedState.value = "";
-      }
-    });
-  }
-
-  Future<void> _fetchStateFromPincode(String pin) async {
-    try {
-      final response = await GetConnect().get('https://api.postalpincode.in/pincode/$pin');
-
-      if (response.body != null &&
-          response.body is List &&
-          response.body[0]['Status'] == 'Success') {
-        final String fetchedState = response.body[0]['PostOffice'][0]['State'];
-        selectedState.value = fetchedState;
-      } else {
-        selectedState.value = "";
-      }
-    } catch (e) {
-      debugPrint("PIN fetch error: $e");
-    }
   }
 
   void addNewItem() {
@@ -227,15 +206,21 @@ class MarketingUploadController extends GetxController {
     phone.text = order.clientPhone ?? "";
     address.text = order.clientAddress ?? "";
     shippingCharge.text = order.shippingCharge.toString();
-    advanceAmount.text = "0";
+
+    // ✅ FIX 1: Load the actual advance amount so the math doesn't break!
+    advanceAmount.text = order.advanceAmount.toString();
 
     final orderJson = order.toJson();
     pincode.text = orderJson['pincode'] ?? "";
-    selectedState.value = orderJson['state'] ?? "";
 
-    // Load the GST Number safely from the database
+    String loadedState = orderJson['state'] ?? "";
+    if (indianStates.contains(loadedState)) {
+      selectedState.value = loadedState;
+    } else {
+      selectedState.value = null;
+    }
+
     clientGstNumber.text = orderJson['clientGstNumber'] ?? "";
-
     uploadedMockupUrl.value = order.mockupUrl ?? orderJson['designMockupUrl'] ?? '';
 
     _selectedDeadline = order.deliveryDate;
@@ -362,64 +347,34 @@ class MarketingUploadController extends GetxController {
   }
 
   void submitOrder() async {
-    // 1. Basic Form Validation (Checks if standard text fields are empty)
     if (!uploadFormKey.currentState!.validate()) return;
 
-    // =========================================================================
-    // ✅ NEW STRICT VALIDATIONS (The Gatekeeper)
-    // =========================================================================
-
-    // Check Pincode
     if (pincode.text.trim().length < 6) {
-      Get.snackbar(
-        "Missing Pincode",
-        "Please enter a valid 6-digit Pincode.",
-        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-        colorText: Colors.redAccent,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar("Missing Pincode", "Please enter a valid 6-digit Pincode.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent, snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    // Check Delivery Deadline
+    if (selectedState.value == null || selectedState.value!.isEmpty) {
+      Get.snackbar("Missing State", "Please select a state from the dropdown.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent, snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
     if (_selectedDeadline == null) {
-      Get.snackbar(
-        "Missing Date",
-        "Please select a delivery deadline.",
-        backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-        colorText: Colors.redAccent,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar("Missing Date", "Please select a delivery deadline.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent, snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    // Check Fabric and Category for EVERY dynamic item
     for (int i = 0; i < items.length; i++) {
       final item = items[i];
-
       if (item.selectedProductType.value == null || item.selectedProductType.value!.isEmpty) {
-        Get.snackbar(
-          "Missing Category",
-          "Please select a Category (Product Type) for Item ${i + 1}.",
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-          colorText: Colors.redAccent,
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        Get.snackbar("Missing Category", "Please select a Category (Product Type) for Item ${i + 1}.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent, snackPosition: SnackPosition.BOTTOM);
         return;
       }
-
       if (item.selectedFabric.value == null || item.selectedFabric.value!.isEmpty) {
-        Get.snackbar(
-          "Missing Fabric",
-          "Please select a Fabric Type for Item ${i + 1}.",
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-          colorText: Colors.redAccent,
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        Get.snackbar("Missing Fabric", "Please select a Fabric Type for Item ${i + 1}.", backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.redAccent, snackPosition: SnackPosition.BOTTOM);
         return;
       }
     }
-    // =========================================================================
 
     try {
       isLoading.value = true;
@@ -484,10 +439,7 @@ class MarketingUploadController extends GetxController {
         "clientAddress": address.text.trim(),
         "pincode": pincode.text.trim(),
         "state": selectedState.value,
-
-        // Saves the GST Number into the database map
         "clientGstNumber": clientGstNumber.text.trim(),
-
         "productCode": items.first.productCode.text.trim(),
         "productDetails": rootProductName,
         "productName": rootProductName,
@@ -496,13 +448,9 @@ class MarketingUploadController extends GetxController {
         "priority": "Medium",
         "deliveryDate": Timestamp.fromDate(_selectedDeadline!),
         "shippingCharge": double.tryParse(shippingCharge.text.trim()) ?? 0.0,
-
         "totalAmount": grandTotal.value,
-
-        // ✅ 1. THE MATH FIX: Push the recalculated financials directly into the map!
         "balanceDue": balanceDue.value,
         "effectiveRevenue": grandTotal.value,
-
         "marketingPersonName": agentName,
         "marketingPersonId": userId,
         "products": productsList,
@@ -511,12 +459,25 @@ class MarketingUploadController extends GetxController {
 
       if (isEditing.value && editingOrderId != null) {
         orderMap['manualOrderNo'] = orderNo.text.trim();
-
-        // ✅ 2. THE STATUS FIX: Revert to pending and flag it as an edited order!
         orderMap['status'] = 'Pending';
         orderMap['isEdited'] = true;
 
+        // Ensure advance is saved accurately on edit
+        orderMap['advanceAmount'] = advance;
+
         await _db.collection('orders').doc(editingOrderId).update(orderMap);
+
+        // ✅ FIX 2: Generate an explicit approval request for the Sales Manager
+        await _db.collection('payment_requests').add({
+          'orderId': editingOrderId,
+          'manualOrderNo': orderNo.text.trim(),
+          'clientName': clientName.text.trim(),
+          'agentName': agentName,
+          'amount': advance,
+          'status': 'pending',
+          'isEditRequest': true, // Helps manager know it's an edit
+          'requestedAt': FieldValue.serverTimestamp(),
+        });
 
         try {
           final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
@@ -560,16 +521,12 @@ class MarketingUploadController extends GetxController {
           transaction.set(newOrderRef, orderMap);
         });
 
-        // =====================================================================
-        // ✅ TRIGGER A: UPDATE THE LEADERBOARD INSTANTLY FOR NEW ORDERS
-        // =====================================================================
         await StatsService.updateMonthlyStats(
           agentName: agentName,
           orderDate: DateTime.now(),
           amountChange: grandTotal.value,
           countChange: 1,
         );
-        // =====================================================================
 
         if (advance > 0 && generatedDocId.isNotEmpty) {
           await _db.collection('payment_requests').add({
@@ -617,6 +574,7 @@ class MarketingUploadController extends GetxController {
       isLoading.value = false;
     }
   }
+
   void clearForm() {
     orderNo.clear();
     clientName.clear();
@@ -627,7 +585,8 @@ class MarketingUploadController extends GetxController {
     shippingCharge.clear();
     advanceAmount.clear();
     pincode.clear();
-    selectedState.value = "";
+
+    selectedState.value = null;
 
     clientGstNumber.clear();
 

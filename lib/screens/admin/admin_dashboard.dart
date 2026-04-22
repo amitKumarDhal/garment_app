@@ -13,10 +13,14 @@ import '../../routes/route_names.dart';
 import 'admin_notification_screen.dart';
 import 'admin_profile_screen.dart';
 import 'worker_list_screen.dart';
-import 'inventory_screen.dart';
 import '../floor_management/agent_list_screen.dart';
-// ✅ ADDED IMPORT FOR THE NEW ANALYTICS SCREEN
 import 'admin_analytics_screen.dart';
+
+// ✅ IMPORT THE SALES MANAGER HISTORY SCREEN
+import '../sales/manager/sales_manager_history_screen.dart';
+
+// ✅ IMPORT THE UNIT SUPERVISOR ORDERS SCREEN
+import '../production/unit_supervisor_orders_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -37,7 +41,6 @@ class AdminDashboard extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
 
-      // ✅ SLEEK TRANSPARENT APP BAR (Executive Style)
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(90),
         child: Padding(
@@ -78,7 +81,6 @@ class AdminDashboard extends StatelessWidget {
               );
             }),
             actions: [
-              // ✅ DYNAMIC Notification Bell
               Obx(() {
                 final notifController = Get.put(AdminNotificationController());
                 return _buildAppBarAction(
@@ -93,7 +95,6 @@ class AdminDashboard extends StatelessWidget {
               }),
               const SizedBox(width: 12),
 
-              // ✅ FUNCTIONAL Premium Profile Avatar
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -127,32 +128,91 @@ class AdminDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. PRIMARY METRICS (DAILY & MONTHLY) ---
+
+              // =========================================================
+              // ✅ TIMEFRAME SELECTOR HEADER
+              // =========================================================
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                      "Overview",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showTimeframeBottomSheet(context, controller, isDark);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300),
+                        boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2))],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.calendar_month_rounded, size: 14, color: TColors.primary),
+                          const SizedBox(width: 8),
+                          Obx(() => Text(
+                            controller.timeframeLabel.value,
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                          )),
+                          const SizedBox(width: 4),
+                          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black54),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // --- 1. PRIMARY METRICS (DUAL CARDS) ---
               Row(
                 children: [
                   Expanded(
-                    child: Obx(() => _buildPrimaryHighlightCard(
-                      title: "Daily Production",
-                      value: "₹${formatCurrency.format(controller.totalDailyProduction.value)}",
-                      icon: Icons.today_rounded,
+                    child: Obx(() => _buildDualMetricCard(
+                      mainTitle: "Total Revenue",
+                      mainValue: "₹${formatCurrency.format(controller.periodRevenue.value)}",
+                      subTitle: "Today",
+                      subValue: "₹${formatCurrency.format(controller.totalDailyProduction.value)}",
+                      icon: Icons.account_balance_wallet_rounded,
                       gradientColors: [const Color(0xFF6A1B9A), const Color(0xFF9C27B0)],
+                      isDark: isDark,
                     )),
                   ),
                   const SizedBox(width: 16),
 
                   Expanded(
-                    child: GestureDetector(
-                      onTap: () => controller.selectMonthYear(context),
-                      child: Obx(() => _buildPrimaryHighlightCard(
-                        title: "${DateFormat('MMM yyyy').format(controller.selectedMonth.value)} Revenue",
-                        value: "₹${formatCurrency.format(controller.totalMonthlyRevenue.value)}",
-                        icon: Icons.calendar_month_rounded,
-                        gradientColors: [const Color(0xFF00796B), const Color(0xFF009688)],
-                      )),
-                    ),
+                    child: Obx(() => _buildDualMetricCard(
+                      mainTitle: "Total Orders",
+                      mainValue: "${controller.periodOrders.value}",
+                      subTitle: "Today",
+                      subValue: "+${controller.todayOrders.value}",
+                      icon: Icons.shopping_cart_rounded,
+                      gradientColors: [const Color(0xFF00796B), const Color(0xFF009688)],
+                      isDark: isDark,
+                    )),
                   ),
                 ],
               ),
+
+              const SizedBox(height: 16),
+
+              // --- HORIZONTAL UNITS CARD ---
+              Obx(() => _buildHorizontalMetricCard(
+                title: "Total Units (Garments)",
+                mainValue: formatCurrency.format(controller.periodUnits.value),
+                subTitle: "Today",
+                subValue: "+${formatCurrency.format(controller.todayUnits.value)}",
+                icon: Icons.checkroom_rounded,
+                gradientColors: [const Color(0xFF283593), const Color(0xFF1976D2)],
+                isDark: isDark,
+              )),
 
               const SizedBox(height: 16),
 
@@ -222,9 +282,12 @@ class AdminDashboard extends StatelessWidget {
                 childAspectRatio: 1.6,
                 children: [
                   Obx(() => _buildKPICard("Active Workforce", "${controller.activeWorkers.value}", Icons.groups_rounded, Colors.teal, isDark, onTap: () => Get.to(() => const WorkerListScreen()))),
-                  Obx(() => _buildKPICard("Total Damages", "${controller.totalDamages.value}", Icons.warning_rounded, Colors.deepOrange, isDark)),
+
+                  _buildKPICard("Production Pipeline", "Track Orders", Icons.route_rounded, Colors.deepOrange, isDark, onTap: () => Get.to(() => const SalesManagerHistoryScreen())),
+
                   _buildKPICard("Sales Force", "View Agents", Icons.support_agent_rounded, Colors.indigo, isDark, onTap: () => Get.to(() => const AgentListScreen())),
-                  _buildKPICard("Inventory", "Check Stock", Icons.inventory_2_rounded, Colors.blueGrey, isDark, onTap: () => Get.to(() => const InventoryScreen())),
+
+                  _buildKPICard("Factory Orders", "View Floor", Icons.precision_manufacturing_rounded, Colors.blueGrey, isDark, onTap: () => Get.to(() => const UnitSupervisorOrdersScreen())),
                 ],
               ),
               const SizedBox(height: 32),
@@ -239,11 +302,6 @@ class AdminDashboard extends StatelessWidget {
                 isDark: isDark,
                 onTap: () => Get.toNamed(AppRouteNames.pendingApprovals),
               )),
-              const SizedBox(height: 32),
-
-              // --- 4. LIVE ACTIVITY FEED ---
-              _buildSectionHeader("Live Factory Feed", Icons.history_rounded, isDark),
-              _buildActivityFeed(isDark, controller),
 
               const SizedBox(height: 40),
             ],
@@ -254,6 +312,177 @@ class AdminDashboard extends StatelessWidget {
   }
 
   // ===================== WIDGETS =====================
+
+  Widget _buildHorizontalMetricCard({
+    required String title,
+    required String mainValue,
+    required String subTitle,
+    required String subValue,
+    required IconData icon,
+    required List<Color> gradientColors,
+    required bool isDark,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradientColors, begin: Alignment.centerLeft, end: Alignment.centerRight),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: gradientColors.last.withValues(alpha:0.3), blurRadius: 12, offset: const Offset(0, 6))],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: Colors.white.withValues(alpha:0.9), fontSize: 12, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(mainValue, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 26, color: Colors.white, letterSpacing: -0.5)),
+                ],
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha:0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(subTitle, style: TextStyle(color: Colors.white.withValues(alpha:0.8), fontSize: 10, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(subValue, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTimeframeBottomSheet(BuildContext context, AdminController controller, bool isDark) {
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (context) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 20),
+                    Text("Select Metric Timeframe", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 16),
+                    _buildBottomSheetOption("Specific Month...", Icons.calendar_month_rounded, () => controller.selectSpecificMonth(context), isDark),
+                    _buildBottomSheetOption("Last 3 Months", Icons.date_range_rounded, () => controller.setTimeframe("Last 3 Months", 3), isDark),
+                    _buildBottomSheetOption("Last 6 Months", Icons.date_range_rounded, () => controller.setTimeframe("Last 6 Months", 6), isDark),
+                    _buildBottomSheetOption("Last 9 Months", Icons.date_range_rounded, () => controller.setTimeframe("Last 9 Months", 9), isDark),
+                    _buildBottomSheetOption("Last 12 Months", Icons.date_range_rounded, () => controller.setTimeframe("Last 12 Months", 12), isDark),
+                    _buildBottomSheetOption("This Financial Year", Icons.account_balance_rounded, () => controller.setFinancialYear(), isDark),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+    );
+  }
+
+  Widget _buildBottomSheetOption(String title, IconData icon, VoidCallback onTap, bool isDark) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+        child: Icon(icon, color: TColors.primary, size: 20),
+      ),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+      trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Colors.grey),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDualMetricCard({
+    required String mainTitle,
+    required String mainValue,
+    required String subTitle,
+    required String subValue,
+    required IconData icon,
+    required List<Color> gradientColors,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: gradientColors.last.withValues(alpha:0.3), blurRadius: 12, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                child: Icon(icon, color: Colors.white, size: 18),
+              ),
+              Expanded(
+                child: Text(
+                  mainTitle,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(color: Colors.white.withValues(alpha:0.9), fontSize: 11, fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(mainValue, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 26, color: Colors.white, letterSpacing: -0.5)),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha:0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("$subTitle: ", style: TextStyle(color: Colors.white.withValues(alpha:0.8), fontSize: 11, fontWeight: FontWeight.w600)),
+                Text(subValue, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildAppBarAction(IconData icon, bool isDark, VoidCallback onTap, {int badgeCount = 0}) {
     return Stack(
@@ -298,34 +527,6 @@ class AdminDashboard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrimaryHighlightCard({required String title, required String value, required IconData icon, required List<Color> gradientColors}) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: gradientColors.last.withValues(alpha:0.3), blurRadius: 15, offset: const Offset(0, 8))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(height: 16),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.white, letterSpacing: -0.5)),
-          ),
-          const SizedBox(height: 4),
-          Text(title, style: TextStyle(color: Colors.white.withValues(alpha:0.8), fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -411,162 +612,6 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityFeed(bool isDark, AdminController controller) {
-    return Obx(() {
-      if (controller.isLoading.value) {
-        return const Padding(
-          padding: EdgeInsets.all(20),
-          child: Center(child: CircularProgressIndicator()),
-        );
-      }
-
-      if (controller.recentActivities.isEmpty) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
-          ),
-          child: Center(
-            child: Text(
-              "No recent factory activity.",
-              style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600),
-            ),
-          ),
-        );
-      }
-
-      final activities = controller.recentActivities.take(5).toList();
-
-      return Container(
-        padding: const EdgeInsets.only(top: 24, bottom: 8, left: 12, right: 20),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
-          boxShadow: [
-            if (!isDark)
-              BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 15, offset: const Offset(0, 5))
-          ],
-        ),
-        child: Column(
-          children: List.generate(activities.length, (index) {
-            final activity = activities[index];
-            final isLast = index == activities.length - 1;
-
-            return IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // --- LEFT: DATE & TIMESTAMP ---
-                  SizedBox(
-                    width: 65,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        children: [
-                          Text(
-                            DateFormat('MMM d').format(activity.time),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isDark ? Colors.white70 : Colors.black87,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            DateFormat('hh:mm a').format(activity.time),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // --- CENTER: TIMELINE TRACK & ICON ---
-                  Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: activity.color.withValues(alpha:0.15),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: activity.color.withValues(alpha:0.3), width: 1.5),
-                        ),
-                        child: Icon(activity.icon, color: activity.color, size: 14),
-                      ),
-                      if (!isLast)
-                        Expanded(
-                          child: Container(
-                            width: 2,
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-
-                  // --- RIGHT: ACTIVITY BUBBLE ---
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha:0.03) : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              activity.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                color: isDark ? Colors.white : Colors.black87,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              activity.subtitle,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ),
-      );
-    });
-  }
-
-  // ✅ ADDED MISSING GREETING FUNCTION
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return "Good Morning,";

@@ -1,9 +1,9 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ Added for HapticFeedback
+import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:get/get.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // ✅ Added for DateFormat and NumberFormat
 import '../../data/models/order_model.dart';
 
 class SalesManagerController extends GetxController {
@@ -37,7 +37,9 @@ class SalesManagerController extends GetxController {
     return activeOrders.where((order) {
       String status = (order.status).toLowerCase().trim();
 
-      if (safeStatuses.contains(status)) return false;
+      if (safeStatuses.contains(status)) {
+        return false;
+      }
 
       DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
       int daysLeft = deadline.difference(today).inDays;
@@ -70,7 +72,9 @@ class SalesManagerController extends GetxController {
 
   void fetchAllData() async {
     await Future.delayed(const Duration(milliseconds: 800));
-    if (_auth.currentUser == null) return;
+    if (_auth.currentUser == null) {
+      return;
+    }
 
     try {
       isLoading.value = true;
@@ -149,20 +153,27 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchPendingOrders() {
-    if (_auth.currentUser == null) return;
+    if (_auth.currentUser == null) {
+      return;
+    }
     try {
       _db.collection('orders')
-          .where('status', whereIn: ['Placed', 'Pending'])
-          .orderBy('orderDate', descending: true)
+          .where('status', whereIn: ['Placed', 'Pending', 'placed', 'pending'])
           .snapshots()
           .listen((snapshot) {
 
         final validDocs = snapshot.docs.where((doc) {
           final data = doc.data();
           return data['isDeleted'] != true;
+        }).map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+        validDocs.sort((a, b) {
+          DateTime aTime = a.updatedAt ?? a.orderDate;
+          DateTime bTime = b.updatedAt ?? b.orderDate;
+          return bTime.compareTo(aTime);
         });
 
-        pendingOrders.value = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+        pendingOrders.value = validDocs;
 
       }, onError: (e) {
         debugPrint("Stream error fetching pending: $e");
@@ -173,7 +184,9 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchApprovedOrders() {
-    if (_auth.currentUser == null) return;
+    if (_auth.currentUser == null) {
+      return;
+    }
     try {
       _db.collection('orders')
           .where('status', isEqualTo: 'Approved')
@@ -183,12 +196,14 @@ class SalesManagerController extends GetxController {
         approvedOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       });
     } catch (e) {
-      print("Error fetching approved orders: $e");
+      debugPrint("Error fetching approved orders: $e"); // ✅ Changed to debugPrint
     }
   }
 
   void fetchOrderHistory() {
-    if (_auth.currentUser == null) return;
+    if (_auth.currentUser == null) {
+      return;
+    }
 
     _db.collection('orders')
         .where('status', whereIn: [
@@ -215,7 +230,9 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchDeletionRequests() {
-    if (_auth.currentUser == null) return;
+    if (_auth.currentUser == null) {
+      return;
+    }
     try {
       _db.collection('orders')
           .where('isDeleteRequested', isEqualTo: true)
@@ -224,7 +241,7 @@ class SalesManagerController extends GetxController {
         deletionRequests.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       });
     } catch (e) {
-      print("Error fetching deletion requests: $e");
+      debugPrint("Error fetching deletion requests: $e"); // ✅ Changed to debugPrint
     }
   }
 
@@ -239,13 +256,19 @@ class SalesManagerController extends GetxController {
             managerName.value = fullName.trim().split(' ').first;
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        debugPrint("Error fetching manager profile: $e"); // ✅ Handled empty catch
+      }
     }
   }
 
   double _parseAmount(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is num) return value.toDouble();
+    if (value == null) {
+      return 0.0;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
     if (value is String) {
       String clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
       return double.tryParse(clean) ?? 0.0;
@@ -254,7 +277,9 @@ class SalesManagerController extends GetxController {
   }
 
   Future<void> fetchMonthlyStats() async {
-    if (_auth.currentUser == null) return;
+    if (_auth.currentUser == null) {
+      return;
+    }
     try {
       final rangeData = _getDateRange();
       DateTime start = rangeData['start'];
@@ -263,22 +288,32 @@ class SalesManagerController extends GetxController {
 
       String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
 
-      // 1. Fetch Users & Identify Roles
       final usersSnap = await _db.collection('users').get();
       Map<String, String> roleMap = {};
 
+      Set<String> allSalesAgents = {};
+
       for (var doc in usersSnap.docs) {
         final d = doc.data();
-        String n = d['FullName'] ?? d['Name'] ?? '';
-        String r = (d['Role'] ?? d['role'] ?? 'JSA').toString().toUpperCase();
+
+        String n = (d['FullName'] ?? d['Name'] ?? d['name'] ?? '').toString().trim();
+        String rawRole = (d['Role'] ?? d['role'] ?? '').toString().toUpperCase();
 
         if (n.isNotEmpty) {
-          if (r.contains('MANAGER') || r == 'SM') r = 'SM';
-          else if (r.contains('SENIOR') || r == 'SSA') r = 'SSA';
-          else if (r.contains('COORDINATOR') || r == 'SC') r = 'SC';
-          else r = 'JSA';
+          if (rawRole.contains('SALES') || rawRole.contains('AGENT') || rawRole.contains('MARKETING') || rawRole.contains('ASSOCIATE') || rawRole.contains('MANAGER') || rawRole.contains('ADMIN') || ['SM', 'SSA', 'SC', 'JSA'].contains(rawRole)) {
 
-          roleMap[n] = r;
+            allSalesAgents.add(n);
+
+            if (rawRole.contains('MANAGER') || rawRole.contains('ADMIN') || rawRole == 'SM') {
+              roleMap[n] = 'SM';
+            } else if (rawRole.contains('SENIOR') || rawRole == 'SSA') {
+              roleMap[n] = 'SSA';
+            } else if (rawRole.contains('COORDINATOR') || rawRole == 'SC') {
+              roleMap[n] = 'SC';
+            } else {
+              roleMap[n] = 'JSA';
+            }
+          }
         }
       }
 
@@ -286,8 +321,6 @@ class SalesManagerController extends GetxController {
           .where('orderDate', isLessThanOrEqualTo: end)
           .get();
 
-      // ✅ FIX APPLIED: 'pending' and 'placed' have been REMOVED!
-      // Now, only orders that the Manager has Approved will count toward revenue and targets.
       List<String> validStatuses = [
         'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
@@ -314,7 +347,9 @@ class SalesManagerController extends GetxController {
         if (validStatuses.contains(status) && !isDeleteRequested && !isDeleted) {
           DateTime orderDate = (data['orderDate'] as Timestamp).toDate();
           String monthKey = DateFormat('yyyy-MM').format(orderDate);
-          String agent = data['marketingPersonName'] ?? 'Unknown';
+          String agent = (data['marketingPersonName'] ?? 'Unknown').toString().trim();
+
+          allSalesAgents.add(agent);
 
           double totalAmt = _parseAmount(data['totalAmount']);
           double effRev = _parseAmount(data['effectiveRevenue']);
@@ -368,10 +403,9 @@ class SalesManagerController extends GetxController {
       totalShippingCollected.value = shippingTotal;
       totalGstCollected.value = gstTotal;
 
-      // 3. Process Leaderboard with EXACT logic from Agent Dashboard
       List<Map<String, dynamic>> leaderboardList = [];
 
-      for (String agent in currentPeriodSales.keys) {
+      for (String agent in allSalesAgents) {
         String dbRole = roleMap[agent] ?? 'JSA';
         bool isSM = dbRole == 'SM';
 
@@ -382,22 +416,25 @@ class SalesManagerController extends GetxController {
         if (agentHistory.containsKey(agent) && selectedTimeframe.value == 'Monthly') {
           List<String> sortedKeys = agentHistory[agent]!.keys.toList()..sort();
 
-          // ✅ EXACT MATCH: Uses the first logged month instead of join date
           String firstMonth = sortedKeys.isNotEmpty ? sortedKeys.first : targetMonthKey;
 
           for (String mKey in sortedKeys) {
-            if (mKey == targetMonthKey) break;
+            if (mKey == targetMonthKey) {
+              break;
+            }
 
-            // ✅ EXACT MATCH: The Feb 2026 No-Grace-Period Rule
-            if (mKey == firstMonth && firstMonth != '2026-02') continue;
+            if (mKey == firstMonth && firstMonth != '2026-02') {
+              continue;
+            }
 
             double monthNet = agentHistory[agent]![mKey] ?? 0.0;
 
-            // ✅ EXACT MATCH: Deduct debt BEFORE checking promotion
             double effectiveForPromotion = monthNet - accumulatedDue;
 
             accumulatedDue += (currentTarget - monthNet);
-            if (accumulatedDue < 0) accumulatedDue = 0;
+            if (accumulatedDue < 0) {
+              accumulatedDue = 0;
+            }
 
             if (accumulatedDue <= 0 && !isSM) {
               if (calculatedRank == 'JSA' && effectiveForPromotion >= 150000) {
@@ -414,13 +451,22 @@ class SalesManagerController extends GetxController {
         }
 
         double amount = currentPeriodSales[agent] ?? 0.0;
+
+        if (amount <= 0) {
+          continue;
+        }
+
         double targetAmount = currentTarget * multiplier;
         double progress = targetAmount > 0 ? (amount / targetAmount) : 0.0;
 
         String greeting = "";
-        if (progress >= 1.0) greeting = "Target Smashed! 🏆";
-        else if (progress >= 0.8) greeting = "Almost there! 🔥";
-        else greeting = "Keep Pushing 📉";
+        if (progress >= 1.0) {
+          greeting = "Target Smashed! 🏆";
+        } else if (progress >= 0.8) {
+          greeting = "Almost there! 🔥";
+        } else {
+          greeting = "Keep Pushing 📉";
+        }
 
         leaderboardList.add({
           'name': agent,
@@ -430,18 +476,17 @@ class SalesManagerController extends GetxController {
           'greeting': greeting,
           'count': currentPeriodCount[agent] ?? 0,
           'isSM': isSM,
-          'roleStr': calculatedRank, // Passes exact dynamic rank
+          'roleStr': calculatedRank,
         });
       }
 
       leaderboardList.sort((a, b) => b['amount'].compareTo(a['amount']));
-      topAgents.value = leaderboardList.take(10).toList();
+      topAgents.value = leaderboardList.toList();
 
     } catch (e) {
-      print("❌ STATS ERROR: $e");
+      debugPrint("❌ STATS ERROR: $e");
     }
-  }
-  Future<void> approveOrder(String orderId) async {
+  }  Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
   }
 
@@ -475,6 +520,7 @@ class SalesManagerController extends GetxController {
         'updatedAt': FieldValue.serverTimestamp(),
         'lastUpdatedBy': managerName.value,
         'stageHistory': FieldValue.arrayUnion([historyEvent]),
+        'isEdited': false,
       };
 
       if (effectiveRevenue != null) {
@@ -485,15 +531,25 @@ class SalesManagerController extends GetxController {
 
       if (associateId.isNotEmpty) {
         String emoji = "🔄";
-        if (newStatus == 'Approved') emoji = "✅";
-        if (newStatus == 'Rejected') emoji = "❌";
-        if (newStatus == 'Cutting' || newStatus == 'Stitching' || newStatus == 'Cutting Done') emoji = "✂️";
-        if (newStatus == 'Printing' || newStatus == 'Printed') emoji = "🖨️";
-        if (newStatus == 'Packed' || newStatus == 'Packing') emoji = "📦";
-        if (newStatus == 'Out SRC') emoji = "🏢";
-        if (newStatus == 'Shipping' || newStatus == 'Shipped') emoji = "🚚";
-        if (newStatus == 'Delivered') emoji = "🎉";
-        if (newStatus == 'Fab Purchased' || newStatus == 'Fab Ready') emoji = "🧵";
+        if (newStatus == 'Approved') {
+          emoji = "✅";
+        } else if (newStatus == 'Rejected') {
+          emoji = "❌";
+        } else if (newStatus == 'Cutting' || newStatus == 'Stitching' || newStatus == 'Cutting Done') {
+          emoji = "✂️";
+        } else if (newStatus == 'Printing' || newStatus == 'Printed') {
+          emoji = "🖨️";
+        } else if (newStatus == 'Packed' || newStatus == 'Packing') {
+          emoji = "📦";
+        } else if (newStatus == 'Out SRC') {
+          emoji = "🏢";
+        } else if (newStatus == 'Shipping' || newStatus == 'Shipped') {
+          emoji = "🚚";
+        } else if (newStatus == 'Delivered') {
+          emoji = "🎉";
+        } else if (newStatus == 'Fab Purchased' || newStatus == 'Fab Ready') {
+          emoji = "🧵";
+        }
 
         await _db.collection('notifications').add({
           'targetUserId': associateId,

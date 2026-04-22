@@ -48,7 +48,7 @@ class OrderModel {
   // Image Paths
   final String? imageUrl;
   final String? localImagePath;
-  final String? mockupUrl; // FOR CLOUDINARY MOCKUPS
+  final String? mockupUrl;
 
   // THE DYNAMIC MULTI-ITEM LIST
   final List<Map<String, dynamic>> products;
@@ -63,6 +63,10 @@ class OrderModel {
 
   // PAYMENT HISTORY LOG
   final List<dynamic> paymentHistory;
+
+  final bool mockupDone;
+  final String? mockupApprovedBy;
+  final DateTime? mockupDoneAt;
 
   // STAGE UPDATE HISTORY LOG
   final List<dynamic> stageHistory;
@@ -112,6 +116,9 @@ class OrderModel {
     this.neckType = 'Not Specified',
     this.productType = 'Not Specified',
     this.color = 'Not Specified',
+    this.mockupDone = false,
+    this.mockupApprovedBy,
+    this.mockupDoneAt,
   });
 
   Map<String, dynamic> toJson() {
@@ -257,6 +264,9 @@ class OrderModel {
       neckType: data['neckType'] ?? 'Not Specified',
       productType: data['productType'] ?? 'Not Specified',
       color: data['color'] ?? 'Not Specified',
+      mockupDone: data['mockupDone'] ?? false,
+      mockupApprovedBy: data['mockupApprovedBy'] ?? '',
+      mockupDoneAt: _parseTimestampNullable(data['mockupDoneAt']),
     );
   }
 

@@ -44,100 +44,8 @@ class AgentDetailScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // --- 2. EXECUTIVE PROFILE HEADER ---
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: TColors.primary.withValues(alpha:0.3), width: 1.5),
-              boxShadow: [
-                if (!isDark)
-                  BoxShadow(
-                    color: TColors.primary.withValues(alpha:0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // --- DYNAMIC GRADIENT AVATAR WITH GLOW ---
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [TColors.primary, TColors.primary.withValues(alpha: 0.6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: TColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
-                  ),
-                  child: Center(
-                    child: Text(
-                      _getInitials(agent['name'] ?? "??"),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 24,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 20),
-
-                // Agent Info & Stats
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        agent['name'] ?? "Unknown Agent",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: isDark ? Colors.white : Colors.black87,
-                          letterSpacing: -0.5,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Data Row
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: _buildMetricBox("REVENUE", agent['revenue'] ?? "₹0", isDark, isHighlight: true),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 3,
-                            child: _buildMetricBox("CLIENTS", "${agent['uniqueClientsCount'] ?? 0}", isDark),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 3,
-                            child: _buildMetricBox("ORDERS", "${agent['orders'] ?? 0}", isDark),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // --- 2. MODERN PROFILE HEADER CARD ---
+          _buildModernHeaderCard(agent, isDark),
 
           // --- 3. PREMIUM SEARCH BAR ---
           Container(
@@ -309,17 +217,196 @@ class AgentDetailScreen extends StatelessWidget {
     );
   }
 
-  // ===================== HELPERS =====================
+  // ===========================================================================
+  // ✅ MODERN HEADER CARD UI (Adapted from the Eligible Agents Screen)
+  // ===========================================================================
+  Widget _buildModernHeaderCard(Map<String, dynamic> agent, bool isDark) {
+    Color textColor = isDark ? Colors.white : Colors.black87;
+    Color subTextColor = isDark ? Colors.white60 : Colors.black54;
+    Color cardBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    Color innerBoxColor = isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF8F9FA);
 
-  String _getInitials(String name) {
-    if (name.isEmpty) return "??";
-    List<String> names = name.trim().split(" ");
-    if (names.length > 1) {
-      return (names[0][0] + names[names.length - 1][0]).toUpperCase();
-    }
-    return name.length >= 2 ? name.substring(0, 2).toUpperCase() : name[0].toUpperCase();
+    // --- Data Extraction ---
+    String name = agent['name'] ?? "Unknown";
+    String avatar = agent['avatar'] ?? "??";
+    String cid = agent['id'] ?? "N/A";
+
+    // Safely extract values using fallbacks in case it was routed from a screen with slightly different keys
+    String totalRev = agent['totalRev'] ?? agent['grossRevenue'] ?? "₹0";
+    String extraRevenue = agent['extraRevenue'] ?? "₹0";
+    String eeEligibleMonths = agent['eeEligibleMonths'] ?? "0";
+    String totalEE = agent['totalEE'] ?? agent['extraEarning'] ?? "₹0";
+    String roleBreakdown = agent['roleBreakdown'] ?? "Active Associate";
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: cardBgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.2), width: 1.5),
+        boxShadow: [
+          if (!isDark)
+            BoxShadow(
+              color: Colors.green.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+
+          // --- 1. HEADER (Avatar, Name, CID) ---
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                      color: TColors.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(avatar, style: const TextStyle(fontWeight: FontWeight.w900, color: TColors.primary, fontSize: 16)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: textColor, letterSpacing: -0.3),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "CID: $cid",
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: subTextColor),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.workspace_premium_rounded, color: Colors.green, size: 20),
+                ),
+              ],
+            ),
+          ),
+
+          // --- 2. METRICS GRID (Soft Inner Containers) ---
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _buildModernMetricBox("TOTAL REVENUE", totalRev, innerBoxColor, textColor)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildModernMetricBox("EXTRA REVENUE", extraRevenue, innerBoxColor, Colors.green.shade600)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildModernMetricBox("ELIGIBLE MTHS", eeEligibleMonths, innerBoxColor, textColor)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildModernMetricBox("ROLE TIMELINE", roleBreakdown, innerBoxColor, TColors.primary, isSmallText: true)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // --- 3. FOOTER (Rich Green Reward Banner) ---
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 20.0),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.green.shade600, Colors.green.shade800],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20)
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Total Extra Earnings",
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white70, letterSpacing: 0.5),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      "Performance Bonus",
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white54),
+                    ),
+                  ],
+                ),
+                Text(
+                  totalEE,
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+                ),
+              ],
+            ),
+          ),
+
+        ],
+      ),
+    );
   }
 
+  // --- HELPER FOR SOFT METRIC BOXES ---
+  Widget _buildModernMetricBox(String title, String value, Color bgColor, Color valueColor, {bool isSmallText = false}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Colors.grey,
+                letterSpacing: 0.5
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isSmallText ? 13 : 16,
+              fontWeight: FontWeight.w900,
+              color: valueColor,
+              letterSpacing: -0.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== HELPERS =====================
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
@@ -331,37 +418,6 @@ class AgentDetailScreen extends StatelessWidget {
     } catch (e) {
       Get.snackbar("Error", "An unexpected error occurred: $e", snackPosition: SnackPosition.BOTTOM);
     }
-  }
-
-  Widget _buildMetricBox(String label, String value, bool isDark, {bool isHighlight = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        color: isHighlight ? TColors.primary.withValues(alpha:0.1) : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isHighlight ? TColors.primary.withValues(alpha:0.2) : (isDark ? Colors.white10 : Colors.grey.shade200)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: isHighlight ? TColors.primary.withValues(alpha:0.8) : Colors.grey.shade500, letterSpacing: 0.5),
-            ),
-          ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isHighlight ? TColors.primary : (isDark ? Colors.white : Colors.black87)),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Color _getStatusColor(String status) {

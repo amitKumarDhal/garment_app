@@ -117,7 +117,50 @@ class AdminAnalyticsScreen extends StatelessWidget {
               ),
             ),
 
-            // --- 2. REFRESHABLE CONTENT AREA ---
+            // ✅ 2. NEW: THE HORIZONTAL SUB-FILTER CHIPS (Only shows if not "All")
+            if (controller.selectedTab.value != 'All')
+              Container(
+                height: 38,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: controller.currentSubOptions.length,
+                  separatorBuilder: (context, index) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    String option = controller.currentSubOptions[index];
+                    bool isSelected = controller.selectedSubFilter.value == option;
+
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        controller.setSubFilter(option);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSelected ? TColors.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: isSelected ? TColors.primary : (isDark ? Colors.white10 : Colors.black12)),
+                        ),
+                        child: Text(
+                          option,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+            // --- 3. REFRESHABLE CONTENT AREA ---
             Expanded(
               child: RefreshIndicator(
                 color: TColors.primary,
@@ -125,26 +168,12 @@ class AdminAnalyticsScreen extends StatelessWidget {
                 onRefresh: () => controller.fetchAnalyticsData(showSpinner: false),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                  padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 40),
+                  padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.insights_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "OVERALL PERFORMANCE (${controller.selectedTimeframe.value.toUpperCase()})",
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black54, letterSpacing: 1.2),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
 
+                      // 📈 THE DYNAMIC PERFORMANCE CARD
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -157,43 +186,44 @@ class AdminAnalyticsScreen extends StatelessWidget {
                               BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 15, offset: const Offset(0, 8))
                           ],
                         ),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                  child: _buildCompactMetric(
-                                      "ORDERS",
-                                      controller.totalOrders.value.toString(),
-                                      Colors.blueAccent,
-                                      isDark
-                                  )
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.insights_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    controller.selectedTab.value == 'All'
+                                        ? "OVERALL PERFORMANCE (${controller.selectedTimeframe.value.toUpperCase()})"
+                                        : "${controller.selectedSubFilter.value.toUpperCase()} PERFORMANCE",
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black54, letterSpacing: 1.0),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            IntrinsicHeight(
+                              child: Row(
+                                children: [
+                                  Expanded(child: _buildCompactMetric("ORDERS", controller.totalOrders.value.toString(), Colors.blueAccent, isDark)),
+                                  VerticalDivider(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 24, thickness: 1.5),
+                                  Expanded(child: _buildCompactMetric("REVENUE", currency.format(controller.totalRevenue.value), Colors.green, isDark)),
+                                  VerticalDivider(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 24, thickness: 1.5),
+                                  Expanded(child: _buildCompactMetric("A.O.V.", currency.format(controller.averageOrderValue.value), Colors.purpleAccent, isDark)),
+                                ],
                               ),
-                              VerticalDivider(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 24, thickness: 1.5),
-                              Expanded(
-                                  child: _buildCompactMetric(
-                                      "REVENUE",
-                                      currency.format(controller.totalRevenue.value),
-                                      Colors.green,
-                                      isDark
-                                  )
-                              ),
-                              VerticalDivider(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 24, thickness: 1.5),
-                              Expanded(
-                                  child: _buildCompactMetric(
-                                      "A.O.V.",
-                                      currency.format(controller.averageOrderValue.value),
-                                      Colors.purpleAccent,
-                                      isDark
-                                  )
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
 
                       const SizedBox(height: 32),
 
-                      // 🌍 GEOGRAPHICAL DEMAND (VERTICAL LIST WITH BREAKDOWNS)
+                      // 🌍 GEOGRAPHICAL DEMAND
                       const Text(
                         "Geographical Demand",
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
@@ -241,8 +271,6 @@ class AdminAnalyticsScreen extends StatelessWidget {
                             final double revenue = region['revenue'] ?? 0.0;
                             final int units = region['units'] ?? 0;
                             final bool isTop = index == 0;
-
-                            // Check if there is a breakdown list for this state
                             final List<dynamic> breakdown = region['breakdown'] ?? [];
 
                             return Container(
@@ -258,7 +286,6 @@ class AdminAnalyticsScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // STATE HEADER ROW
                                   Row(
                                     children: [
                                       Container(
@@ -353,7 +380,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
                                     ],
                                   ),
 
-                                  // ✅ NEW: DYNAMIC BREAKDOWN SECTION
+                                  // ✅ DYNAMIC BREAKDOWN (Only shows if "All Categories" is selected)
                                   if (breakdown.isNotEmpty) ...[
                                     const SizedBox(height: 20),
                                     Container(
@@ -368,12 +395,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
                                         children: [
                                           Text(
                                             "${controller.selectedTab.value.toUpperCase()} BREAKDOWN",
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w900,
-                                              color: Colors.grey.shade500,
-                                              letterSpacing: 0.5,
-                                            ),
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey.shade500, letterSpacing: 0.5),
                                           ),
                                           const SizedBox(height: 10),
                                           ...breakdown.map((b) {
@@ -390,24 +412,15 @@ class AdminAnalyticsScreen extends StatelessWidget {
                                                   Expanded(
                                                     child: Text(
                                                       name,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w700,
-                                                        color: isDark ? Colors.white70 : Colors.black87,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : Colors.black87),
+                                                      maxLines: 1, overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                   Text(
                                                     isSortingByOrders ? "$bCount Ord" :
                                                     isSortingByUnits ? "${numberFormat.format(bUnits)} Pcs" :
                                                     currency.format(bRev),
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w900,
-                                                      color: TColors.primary,
-                                                    ),
+                                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: TColors.primary),
                                                   ),
                                                 ],
                                               ),
@@ -436,7 +449,6 @@ class AdminAnalyticsScreen extends StatelessWidget {
   }
 
   // --- HELPER WIDGETS ---
-
   Widget _buildSortToggle(String title, AdminAnalyticsController controller, bool isDark) {
     return Obx(() {
       bool isSelected = controller.selectedRegionSort.value == title;

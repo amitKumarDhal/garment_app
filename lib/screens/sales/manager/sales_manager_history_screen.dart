@@ -81,8 +81,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
           TextCellValue(order.productName),
           TextCellValue(order.marketingPersonName),
           TextCellValue(order.status.toUpperCase()),
-          // Hardcoded to 'N/A' to prevent the gstNumber getter compilation error
-          TextCellValue('N/A'),
+          TextCellValue('N/A'), // Hardcoded to prevent gst error if missing
           TextCellValue('${order.gstPercentage.toStringAsFixed(1)}%'),
           IntCellValue(order.quantity),
           DoubleCellValue(order.totalAmount),
@@ -115,6 +114,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure controller is registered
     final controller = Get.put(SalesManagerHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -145,7 +145,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             child: IconButton(
               icon: const Icon(Icons.download_rounded, color: TColors.primary, size: 28),
               tooltip: 'Export to Excel',
-              // ✅ Now dynamically passes BOTH the filtered orders and the current filter name!
               onPressed: () => _exportToExcel(controller.displayedOrders, controller.currentFilter.value),
             ),
           ),
@@ -274,16 +273,10 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             child: RefreshIndicator(
               color: TColors.primary,
               backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              // ✅ FIXED: Now calls the specific history controller's refresh method!
               onRefresh: () async {
                 HapticFeedback.lightImpact();
-                try {
-                  final mainController = Get.find<SalesManagerController>();
-                  mainController.fetchOrderHistory();
-                  mainController.fetchPendingOrders();
-                  await Future.delayed(const Duration(milliseconds: 800));
-                } catch (e) {
-                  await Future.delayed(const Duration(milliseconds: 500));
-                }
+                await controller.refreshData();
               },
               child: Obx(() {
                 if (controller.isLoading.value) {

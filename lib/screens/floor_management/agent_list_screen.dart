@@ -12,14 +12,11 @@ class AgentListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Finding the controller
     final controller = Get.put(MarketingController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
-
-      // ✅ 1. SLEEK TRANSPARENT APP BAR
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
         elevation: 0,
@@ -38,7 +35,7 @@ class AgentListScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // --- 2. PREMIUM SEARCH BAR ---
+          // --- SEARCH BAR ---
           Container(
             margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
             decoration: BoxDecoration(
@@ -71,17 +68,15 @@ class AgentListScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 3. AGENT LIST ---
+          // --- AGENT LIST ---
           Expanded(
             child: Obx(() {
-              // Show loader while Firestore aggregator is working
               if (controller.isLoading.value) {
                 return const Center(
                   child: CircularProgressIndicator(color: TColors.primary),
                 );
               }
 
-              // Empty State
               if (controller.filteredAgents.isEmpty) {
                 return Center(
                   child: Column(
@@ -111,7 +106,7 @@ class AgentListScreen extends StatelessWidget {
                 itemCount: controller.filteredAgents.length,
                 itemBuilder: (context, index) {
                   final agent = controller.filteredAgents[index];
-                  return _buildAgentCard(agent, isDark);
+                  return _buildModernAgentCard(agent, isDark);
                 },
               );
             }),
@@ -120,153 +115,219 @@ class AgentListScreen extends StatelessWidget {
       ),
     );
   }
+// ===========================================================================
+  // ✅ MODERN PREMIUM CARD DESIGN (WITH NET ACHIEVEMENT)
+  // ===========================================================================
+  Widget _buildModernAgentCard(Map<String, dynamic> agent, bool isDark) {
+    Color textColor = isDark ? Colors.white : Colors.black87;
+    Color subTextColor = isDark ? Colors.white70 : Colors.black54;
 
-  // --- PREMIUM AGENT PROFILE CARD ---
-  Widget _buildAgentCard(Map<String, dynamic> agent, bool isDark) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Get.to(() => AgentDetailScreen(agent: agent));
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+    // --- DATA EXTRACTION ---
+    String name = agent['name'] ?? "Unknown";
+    String avatar = agent['avatar'] ?? "??";
+    String id = agent['id'] ?? "N/A";
+
+    // ✅ Pull both Gross and Net
+    String grossRev = agent['grossRevenue']?.toString() ?? "₹0";
+    String netAch = agent['netAchievement']?.toString() ?? "₹0";
+
+    String monthsActive = (agent['monthsActive'] ?? "0").toString();
+    String totalTarget = (agent['totalTarget'] ?? "0").toString();
+    String clients = "${agent['uniqueClientsCount'] ?? 0}";
+    String orders = "${agent['orders'] ?? 0}";
+    String avgRev = agent['avgRevenue']?.toString() ?? "₹0";
+    String extraEarning = agent['extraEarning']?.toString() ?? "₹0";
+
+    List<dynamic> roleHistory = agent['roleHistory'] ?? [{'text': "Data pending..."}];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(24), // Premium rounded corners
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.03)),
+        boxShadow: [
+          if (!isDark)
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 15, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
-          boxShadow: [
-            if (!isDark)
-              BoxShadow(
-                color: Colors.black.withValues(alpha:0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // --- DYNAMIC GRADIENT AVATAR WITH GLOW ---
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [TColors.primary, TColors.primary.withValues(alpha: 0.6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: TColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-              ),
-              child: Center(
-                child: Text(
-                  agent['avatar'] ?? "??",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
+          splashColor: TColors.primary.withValues(alpha: 0.1),
+          highlightColor: TColors.primary.withValues(alpha: 0.05),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Get.to(() => AgentDetailScreen(agent: agent));
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
 
-            // --- DATA COLUMN ---
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    agent['name'] ?? "Unknown",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: isDark ? Colors.white : Colors.black87,
-                      letterSpacing: -0.3,
+                // --- 1. HEADER: AVATAR & INFO ---
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: TColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        avatar,
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: TColors.primary, fontSize: 18),
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor, letterSpacing: -0.3),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "ID: $id",
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: TColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white10 : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.arrow_forward_ios_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 14),
+                    ),
+                  ],
+                ),
 
-                  // --- HIGH-DENSITY STATS ROW ---
-                  Row(
+                const SizedBox(height: 16),
+
+                // --- 2. FINANCIAL SUMMARY (Soft Inner Container) ---
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+                  ),
+                  child: Row(
                     children: [
+                      // LEFT: Gross, Net, & Target
                       Expanded(
                         flex: 5,
-                        child: _buildMetricBox("REVENUE", agent['revenue'] ?? "₹0", isDark, isHighlight: true),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("GROSS SALES", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.grey.shade500, letterSpacing: 0.5)),
+                            Text(grossRev, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textColor)),
+                            const SizedBox(height: 8),
+
+                            Text("NET ACHIEVEMENT", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: TColors.primary, letterSpacing: 0.5)),
+                            Text(netAch, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: -0.5)),
+                            const SizedBox(height: 4),
+
+                            Text("Target: $totalTarget ($monthsActive mths)", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: subTextColor)),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 8),
+
+                      Container(width: 1, height: 70, color: isDark ? Colors.white10 : Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 12)),
+
+                      // RIGHT: Role History
                       Expanded(
-                        flex: 3,
-                        child: _buildMetricBox("CLIENTS", "${agent['uniqueClientsCount'] ?? 0}", isDark),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 3,
-                        child: _buildMetricBox("ORDERS", "${agent['orders'] ?? 0}", isDark),
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: roleHistory.map((historyItem) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Text(
+                                historyItem['text'] ?? "Unknown",
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: subTextColor),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, size: 20, color: Colors.grey.shade400),
-          ],
+                const SizedBox(height: 16),
+
+                // --- 3. BOTTOM METRICS CHIPS ---
+                Row(
+                  children: [
+                    Expanded(child: _buildMetricChip("Clients", clients, isDark)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildMetricChip("Orders", orders, isDark)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildMetricChip("AOV", avgRev, isDark)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildMetricChip("Bonus", extraEarning, isDark, isHighlight: true)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // --- MODERN METRIC BOX ---
-  Widget _buildMetricBox(String label, String value, bool isDark, {bool isHighlight = false}) {
+  // --- HELPER FOR MODERN METRIC CHIPS ---
+  Widget _buildMetricChip(String title, String value, bool isDark, {bool isHighlight = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
         color: isHighlight
-            ? TColors.primary.withValues(alpha:0.1)
-            : (isDark ? Colors.white.withValues(alpha:0.05) : Colors.grey.shade100),
-        borderRadius: BorderRadius.circular(8),
+            ? Colors.green.withValues(alpha: 0.1) // Green tint for Bonus
+            : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isHighlight
-              ? TColors.primary.withValues(alpha:0.2)
+              ? Colors.green.withValues(alpha: 0.3)
               : (isDark ? Colors.white10 : Colors.grey.shade200),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              label,
+              title,
               style: TextStyle(
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: FontWeight.w800,
-                color: isHighlight ? TColors.primary.withValues(alpha:0.8) : Colors.grey.shade500,
+                color: isHighlight ? Colors.green.shade700 : Colors.grey.shade500,
                 letterSpacing: 0.5,
               ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               value,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
-                color: isHighlight ? TColors.primary : (isDark ? Colors.white : Colors.black87),
+                color: isHighlight ? Colors.green : (isDark ? Colors.white : Colors.black87),
               ),
             ),
           ),

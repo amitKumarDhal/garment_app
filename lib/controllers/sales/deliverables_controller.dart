@@ -5,7 +5,8 @@ import '../../data/models/order_model.dart';
 import 'sales_manager_controller.dart';
 
 class DeliverablesController extends GetxController {
-  final SalesManagerController smController = Get.find<SalesManagerController>();
+  // ✅ THE FIX: Changed Get.find to Get.put so it creates it if it doesn't exist!
+  final SalesManagerController smController = Get.put(SalesManagerController());
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // Currently selected date on the timeline
@@ -124,7 +125,6 @@ class DeliverablesController extends GetxController {
       {'name': 'Stitched', 'icon': Icons.checkroom_outlined, 'color': Colors.brown},
       {'name': 'Packing', 'icon': Icons.inventory_2_outlined, 'color': Colors.purple},
       {'name': 'Packed', 'icon': Icons.all_inbox_rounded, 'color': Colors.deepPurple},
-      // ✅ ADDED: Out SRC stage
       {'name': 'Out SRC', 'icon': Icons.business_rounded, 'color': Colors.indigoAccent},
       {'name': 'Shipping', 'icon': Icons.local_shipping_outlined, 'color': Colors.teal},
       {'name': 'Shipped', 'icon': Icons.local_shipping_outlined, 'color': Colors.teal},

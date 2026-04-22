@@ -7,133 +7,116 @@ import '../../data/models/order_model.dart';
 class SalesManagerHistoryController extends GetxController {
   final _db = FirebaseFirestore.instance;
 
-  StreamSubscription<QuerySnapshot>? _listener;
+  // ✅ UI State
+  var isLoading = false.obs;
+  var isRefreshing = false.obs;
 
-  var isLoading = true.obs;
-
-  // ✅ All orders from DB (Source of Truth)
-  var allOrders = <OrderModel>[].obs;
-  // ✅ Filtered orders shown in the list
+  // ✅ Data Storage
+  var allOrders = <OrderModel>[];
   var displayedOrders = <OrderModel>[].obs;
 
+  // ✅ Filter State
   var currentFilter = "All NDO".obs;
   var searchQuery = "".obs;
 
   // =========================================================================
-  // ✅ DYNAMIC SUMMARY GETTERS (Updates automatically based on selection)
+  // ✅ METRICS (Calculated locally to save server costs)
   // =========================================================================
-
-  /// 1. Get total number of orders currently visible in the list
   int get filteredOrdersCount => displayedOrders.length;
 
-  /// 2. Get total revenue sum for currently visible orders
   double get filteredTotalRevenue =>
       displayedOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
 
-  /// 3. Get Average Order Value (AOV) for visible orders
-  double get filteredAov {
-    if (displayedOrders.isEmpty) return 0.0;
-    return filteredTotalRevenue / filteredOrdersCount;
-  }
-
-  // =========================================================================
+  double get filteredAov => (displayedOrders.isEmpty)
+      ? 0.0
+      : (filteredTotalRevenue / filteredOrdersCount);
 
   @override
   void onInit() {
     super.onInit();
-    // ✅ Always start with "All NDO" (Next Day Orders / Active floor items)
-    currentFilter.value = "All NDO";
-    fetchAllOrders();
+    fetchHistoryData();
   }
 
-  @override
-  void onClose() {
-    _listener?.cancel();
-    super.onClose();
-  }
+  /// ✅ ONE-TIME FETCH: The most important optimization for quota issues
+  Future<void> fetchHistoryData({bool quiet = false}) async {
+    try {
+      if (!quiet) isLoading.value = true;
 
-  /// Listens to real-time changes in Firestore
-  void fetchAllOrders() {
-    isLoading.value = true;
+      // Using a Get() call with a limit is the #1 way to prevent "Resource Exhausted"
+      final snapshot = await _db
+          .collection('orders')
+          .orderBy('orderDate', descending: true)
+          .limit(150) // Reduced slightly to keep initial load snappy
+          .get(const GetOptions(source: Source.serverAndCache));
 
-    _listener = _db
-        .collection('orders')
-        .orderBy('orderDate', descending: true)
-        .limit(200) // Adjusted limit for larger catalogs
-        .snapshots()
-        .listen((snapshot) {
-
-      allOrders.value = snapshot.docs
+      allOrders = snapshot.docs
           .map((doc) => OrderModel.fromSnapshot(doc))
           .toList();
 
       applyFilter();
+    } catch (e) {
+      debugPrint("❌ Master Ledger Fetch error: $e");
+      Get.snackbar(
+        "Ledger Error",
+        "Check your internet connection.",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent.withOpacity(0.1),
+        colorText: Colors.red,
+      );
+    } finally {
       isLoading.value = false;
-    }, onError: (e) {
-      debugPrint("❌ Master Ledger Stream error: $e");
-      isLoading.value = false;
-    });
+      isRefreshing.value = false;
+    }
   }
 
-  /// Sets the status filter (e.g., 'Approved', 'Out SRC')
+  /// ✅ PULL TO REFRESH
+  Future<void> refreshData() async {
+    isRefreshing.value = true;
+    await fetchHistoryData(quiet: true);
+  }
+
   void filterByStatus(String status) {
     currentFilter.value = status;
     applyFilter();
   }
 
-  /// Updates search query and recalculates the list
   void searchOrders(String query) {
     searchQuery.value = query;
     applyFilter();
   }
 
-  /// Core logic to filter data and calculate metrics
   void applyFilter() {
-    List<OrderModel> temp = allOrders.toList();
+    // Start with a clean copy of the master list
+    List<OrderModel> temp = List.from(allOrders);
 
-    // --- 1. STATUS FILTER LOGIC ---
+    // --- 1. STATUS FILTER ---
     if (currentFilter.value == "Trash") {
       temp = temp.where((o) => o.isDeleted == true).toList();
     } else if (currentFilter.value == "All") {
       temp = temp.where((o) => o.isDeleted != true).toList();
     } else if (currentFilter.value == "All NDO") {
-      // Terminal statuses to exclude from "Active Pipeline"
-      List<String> terminalStatuses = [
-        'shipped',
-        'delivered',
-        'completed',
-        'rejected',
-        'cancelled',
-        'deleted'
-      ];
-
+      // Logic for active pipeline (Next Day Orders)
+      const terminalStatuses = ['shipped', 'delivered', 'completed', 'rejected', 'cancelled'];
       temp = temp.where((o) {
-        String status = o.status.toLowerCase().trim();
-        return !o.isDeleted && !terminalStatuses.contains(status);
+        return !o.isDeleted && !terminalStatuses.contains(o.status.toLowerCase().trim());
       }).toList();
     } else {
-      // Specific status logic (e.g., 'Out SRC', 'Packing')
-      temp = temp.where((o) {
-        return o.status.toLowerCase().trim() ==
-            currentFilter.value.toLowerCase().trim() &&
-            o.isDeleted != true;
-      }).toList();
+      temp = temp.where((o) =>
+      o.status.toLowerCase().trim() == currentFilter.value.toLowerCase().trim() && !o.isDeleted
+      ).toList();
     }
 
-    // --- 2. SEARCH FILTER LOGIC ---
+    // --- 2. SEARCH LOGIC ---
     if (searchQuery.value.isNotEmpty) {
-      String q = searchQuery.value.toLowerCase().trim();
-
+      final q = searchQuery.value.toLowerCase().trim();
       temp = temp.where((o) {
-        // Search in ID, Agent Name, and Client Name
-        bool matchBasic = o.clientName.toLowerCase().contains(q) ||
+        final matchBasic = o.clientName.toLowerCase().contains(q) ||
             o.marketingPersonName.toLowerCase().contains(q) ||
             (o.manualOrderNo?.toLowerCase().contains(q) ?? false);
 
-        // Search inside the products nested map
-        bool matchProducts = o.products.any((prod) {
-          String pName = (prod['productName'] ?? '').toString().toLowerCase();
-          String pCode = (prod['productCode'] ?? '').toString().toLowerCase();
+        final matchProducts = o.products.any((prod) {
+          final pName = (prod['productName'] ?? '').toString().toLowerCase();
+          final pCode = (prod['productCode'] ?? '').toString().toLowerCase();
           return pName.contains(q) || pCode.contains(q);
         });
 
@@ -141,7 +124,6 @@ class SalesManagerHistoryController extends GetxController {
       }).toList();
     }
 
-    // Updating this observable triggers the Obx in the UI
     displayedOrders.assignAll(temp);
   }
 }

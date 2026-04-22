@@ -16,9 +16,14 @@ class UnitSupervisorController extends GetxController {
 
   StreamSubscription? _ordersSubscription;
   StreamSubscription? _inventorySubscription;
+  StreamSubscription? _mockupSubscription;
 
   // ✅ OBSERVABLE INVENTORY MAP (Key: "fabric_color", Value: total quantity)
   final RxMap<String, double> inventoryStock = <String, double>{}.obs;
+
+  // ✅ OBSERVABLE MOCKUP LISTS
+  var pendingMockupOrders = <OrderModel>[].obs;
+  var doneMockupOrders = <OrderModel>[].obs;
 
   final List<String> factoryStages = [
     'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
@@ -36,17 +41,100 @@ class UnitSupervisorController extends GetxController {
     super.onInit();
     fetchSupervisorProfile();
     fetchActiveOrders();
-    listenToInventoryLogs(); // ✅ Start listening to stock
+    listenToInventoryLogs();
+    listenToMockupOrders();
   }
 
   @override
   void onClose() {
     _ordersSubscription?.cancel();
     _inventorySubscription?.cancel();
+    _mockupSubscription?.cancel(); // ✅ Clean up memory
     super.onClose();
   }
 
   // ===========================================================================
+  // ✅ MOCKUP LOGIC: FETCH & SPLIT MOCKUP ORDERS
+  // ===========================================================================
+  void listenToMockupOrders() {
+    _mockupSubscription = _db.collection('orders')
+    // Focus on early production stages for mockups
+        .where('status', whereIn: ['Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done'])
+        .snapshots()
+        .listen((snapshot) {
+
+      pendingMockupOrders.clear();
+      doneMockupOrders.clear();
+
+      for (var doc in snapshot.docs) {
+        // Safe mapping using your specific OrderModel parser
+        OrderModel order = OrderModel.fromSnapshot(doc);
+
+        bool isMockupDone = doc.data().containsKey('mockupDone') ? doc.data()['mockupDone'] : false;
+
+        if (isMockupDone) {
+          doneMockupOrders.add(order);
+        } else {
+          pendingMockupOrders.add(order);
+        }
+      }
+    }, onError: (e) => debugPrint("Error fetching mockups: $e"));
+  }
+
+
+  // ✅ MOCKUP LOGIC: MARK MOCKUP AS DONE
+// ===========================================================================
+  // ✅ MARK MOCKUP AS DONE (Full Update with Timestamp & User Attribution)
+  // ===========================================================================
+  Future<void> markMockupDone(dynamic order) async {
+    try {
+      // 1. Safety Check: Ensure we have a name to record
+      String approverName = supervisorName.value.trim().isEmpty
+          ? "Unit Supervisor"
+          : supervisorName.value;
+
+      // 2. Show Loading Overlay
+      Get.dialog(
+          const Center(child: CircularProgressIndicator(color: TColors.primary)),
+          barrierDismissible: false
+      );
+
+      // 3. Update Firestore
+      await _db.collection('orders').doc(order.id).update({
+        'mockupDone': true,
+        'mockupApprovedBy': approverName,          // ✅ Records exactly who clicked "Done"
+        'mockupDoneAt': FieldValue.serverTimestamp(), // ✅ Records exactly when it happened
+        'lastUpdatedBy': approverName,             // ✅ General audit fallback
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 4. Close Loading Dialog
+      Get.back();
+
+      // 5. Success Feedback
+      Get.snackbar(
+        "Mockup Approved",
+        "Design set to DONE by $approverName",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        icon: const Icon(Icons.verified_user_rounded, color: Colors.white),
+        duration: const Duration(seconds: 2),
+      );
+
+    } catch (e) {
+      // Close loading dialog on error
+      if (Get.isDialogOpen!) Get.back();
+
+      debugPrint("❌ Mockup Update Error: $e");
+      Get.snackbar(
+          "Update Failed",
+          "Could not save approval: $e",
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white
+      );
+    }
+  }  // ===========================================================================
   // ✅ UPDATED FABRIC YIELD CALCULATOR
   // ===========================================================================
   /// Returns a formatted string like "28.5 KG" or "Not Specified"
