@@ -17,12 +17,37 @@ import '../../controllers/sales/sales_history_controller.dart';
 import '../../data/models/order_model.dart';
 import '../floor_management/marketing_upload_screen.dart';
 
-class SalesOrderHistoryScreen extends StatelessWidget {
+class SalesOrderHistoryScreen extends StatefulWidget {
   const SalesOrderHistoryScreen({super.key});
 
   @override
+  State<SalesOrderHistoryScreen> createState() => _SalesOrderHistoryScreenState();
+}
+
+class _SalesOrderHistoryScreenState extends State<SalesOrderHistoryScreen> {
+  late final SalesHistoryController controller;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(SalesHistoryController());
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        controller.fetchNextPage();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SalesHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -103,48 +128,85 @@ class SalesOrderHistoryScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 2. ORDERS LIST ---
+          // --- 2. ORDERS LIST WITH PAGINATION ---
           Expanded(
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
+            child: RefreshIndicator(
+              color: TColors.primary,
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              onRefresh: () async {
+                HapticFeedback.lightImpact();
+                await controller.refreshData();
+              },
+              child: Obx(() {
+                if (controller.isLoading.value && controller.displayedOrders.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (controller.displayedOrders.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                if (controller.displayedOrders.isEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05), shape: BoxShape.circle),
-                        child: Icon(Icons.receipt_long_rounded, size: 48, color: isDark ? Colors.white54 : Colors.grey),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05), shape: BoxShape.circle),
+                              child: Icon(Icons.receipt_long_rounded, size: 48, color: isDark ? Colors.white54 : Colors.grey),
+                            ),
+                            const SizedBox(height: 16),
+                            Text("No orders found.", style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      Text("No orders found.", style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade600, fontWeight: FontWeight.w600)),
                     ],
-                  ),
-                );
-              }
+                  );
+                }
 
-              return ListView.separated(
-                padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 120),
-                physics: const BouncingScrollPhysics(),
-                itemCount: controller.displayedOrders.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final order = controller.displayedOrders[index];
-                  return _buildHistoryCard(context, order, isDark);
-                },
-              );
-            }),
+                return ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 120),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: controller.displayedOrders.length + 1,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+
+                    if (index == controller.displayedOrders.length) {
+                      return Obx(() {
+                        if (controller.isLoadingMore.value) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (!controller.hasMoreData.value && controller.displayedOrders.isNotEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Center(
+                              child: Text(
+                                  "End of Results",
+                                  style: TextStyle(color: isDark ? Colors.white30 : Colors.black26, fontWeight: FontWeight.bold)
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      });
+                    }
+
+                    final order = controller.displayedOrders[index];
+                    return _buildHistoryCard(context, order, isDark);
+                  },
+                );
+              }),
+            ),
           ),
         ],
       ),
     );
   }
-
-  // --- UI Helpers ---
 
   Widget _buildFilterChip(SalesHistoryController controller, String label, bool isDark) {
     return Obx(() {
@@ -360,6 +422,35 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
+  // ✅ NEW: Full Payment Confirmation Dialog
+  void _confirmFullPayment(BuildContext context, OrderModel order) {
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+    Get.defaultDialog(
+      title: "Confirm Payment",
+      titleStyle: const TextStyle(fontWeight: FontWeight.w900),
+      content: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 10),
+        child: Text(
+          "Request approval for a full payment of ${currency.format(order.balanceDue)}?",
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14),
+        ),
+      ),
+      confirm: ElevatedButton(
+        onPressed: () {
+          Get.back(); // Close the dialog
+          Navigator.pop(context); // Close the bottom sheet to show the snackbar properly
+          HapticFeedback.heavyImpact();
+          Get.find<SalesHistoryController>().recordPayment(order, order.balanceDue);
+        },
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(120, 45)),
+        child: const Text("Confirm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+      cancel: OutlinedButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+    );
+  }
+
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo) {
     Get.to(
           () => Scaffold(
@@ -461,7 +552,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
                       decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                       child: const Text("Deleted", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                     )
-                  // ✅ FIX: "Pending Deletion" now has a clickable Undo icon!
                   else if (order.isDeleteRequested)
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -623,44 +713,74 @@ class SalesOrderHistoryScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
+              // ✅ PAYMENT BUTTONS WRAPPED IN STREAM BUILDER
               if (order.balanceDue > 0 && !isDeleted) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showPaymentDialog(context, order, Get.find<SalesHistoryController>());
-                        },
-                        icon: const Icon(Icons.edit_note_rounded, size: 18),
-                        label: const Text("Update Due"),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 1,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          HapticFeedback.heavyImpact();
-                          Get.find<SalesHistoryController>().recordPayment(order, order.balanceDue);
-                        },
-                        icon: const Icon(Icons.done_all_rounded, size: 18, color: Colors.white),
-                        label: const Text("FULLY PAID", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ],
+                StreamBuilder<bool>(
+                    stream: Get.find<SalesHistoryController>().hasPendingPayment(order.id),
+                    builder: (context, snapshot) {
+                      bool isPending = snapshot.data ?? false;
+
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: OutlinedButton.icon(
+                                  onPressed: isPending ? null : () {
+                                    Navigator.pop(context);
+                                    _showPaymentDialog(context, order, Get.find<SalesHistoryController>());
+                                  },
+                                  icon: const Icon(Icons.edit_note_rounded, size: 18),
+                                  label: const Text("Update Due"),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    foregroundColor: isPending ? Colors.grey : TColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 1,
+                                child: ElevatedButton.icon(
+                                  onPressed: isPending ? null : () {
+                                    HapticFeedback.mediumImpact();
+                                    _confirmFullPayment(context, order);
+                                  },
+                                  icon: Icon(
+                                      isPending ? Icons.hourglass_empty_rounded : Icons.done_all_rounded,
+                                      size: 18,
+                                      color: Colors.white
+                                  ),
+                                  label: Text(
+                                      isPending ? "PENDING" : "FULLY PAID",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    disabledBackgroundColor: Colors.grey.shade400,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Informational Text if Pending
+                          if (isPending)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12.0),
+                              child: Text(
+                                "A payment request is waiting for Manager approval.",
+                                style: TextStyle(color: Colors.orange.shade700, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
+                      );
+                    }
                 ),
                 const SizedBox(height: 24),
               ],
@@ -773,7 +893,6 @@ class SalesOrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: Undo Popup Helper
   void _confirmCancelDelete(BuildContext context, OrderModel order) {
     Get.defaultDialog(
       title: "Cancel Deletion?",

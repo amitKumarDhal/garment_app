@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Needed for the StreamBuilder
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../data/models/order_model.dart';
@@ -16,18 +17,29 @@ import '../../notifications/notification_screen.dart';
 import '../../../controllers/notifications/notification_controller.dart';
 import '../../profile/profile_screen.dart';
 
-
-class SalesManagerHome extends StatelessWidget {
+// ✅ OPTIMIZATION: Converted to StatefulWidget to stop 'Get.put' memory leaks in build()
+class SalesManagerHome extends StatefulWidget {
   const SalesManagerHome({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(SalesManagerController());
+  State<SalesManagerHome> createState() => _SalesManagerHomeState();
+}
 
+class _SalesManagerHomeState extends State<SalesManagerHome> {
+  late final SalesManagerController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Safe: Only runs exactly once when the screen loads
+    controller = Get.put(SalesManagerController());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.fetchAllData();
     });
+  }
 
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -136,7 +148,6 @@ class SalesManagerHome extends StatelessWidget {
                       )
                   ),
                   const SizedBox(width: 8),
-                  // ✅ SAFE WRAPPER: Prevents overflow on small screens if date is too long
                   Expanded(
                     child: Obx(() => Wrap(
                       alignment: WrapAlignment.end,
@@ -144,7 +155,6 @@ class SalesManagerHome extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        // Dropdown Trigger
                         GestureDetector(
                           onTap: () => _showTimeframeSelector(context, controller, isDark),
                           child: Container(
@@ -170,7 +180,6 @@ class SalesManagerHome extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // Show specific month picker ONLY if 'Monthly' is selected
                         if (controller.selectedTimeframe.value == 'Monthly')
                           GestureDetector(
                             onTap: () => _pickMonth(context, controller),
@@ -329,7 +338,7 @@ class SalesManagerHome extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF00796B), Color(0xFF009688)], // Teal gradient
+                      colors: [Color(0xFF00796B), Color(0xFF009688)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -480,7 +489,6 @@ class SalesManagerHome extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 )),
                                 const SizedBox(height: 2),
-                                // ✅ OVERFLOW FIX: Wrapped dynamic text in Expanded
                                 Row(
                                   children: [
                                     Text("Units Sold ", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 11, fontWeight: FontWeight.w600)),
@@ -614,26 +622,122 @@ class SalesManagerHome extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Obx(() {
-                if (controller.pendingOrders.isEmpty) {
-                  return _buildEmptyState(isDark, "No pending orders", Icons.check_circle_outline);
-                }
-                return SizedBox(
-                  height: 130,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: controller.pendingOrders.take(5).length,
-                    itemBuilder: (context, index) {
-                      return _buildHorizontalPendingOrderCard(context, controller.pendingOrders[index], isDark);
-                    },
-                  ),
-                );
-              }),
+
+              // ✅ ENHANCED: Combined Pending Actions (Payments & Orders)
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('payment_requests')
+                    .where('status', isEqualTo: 'pending')
+                    .snapshots(),
+                builder: (context, paymentSnap) {
+                  return Obx(() {
+                    final pendingOrders = controller.pendingOrders.toList();
+                    final paymentDocs = paymentSnap.data?.docs ?? [];
+
+                    if (pendingOrders.isEmpty && paymentDocs.isEmpty) {
+                      return _buildEmptyState(isDark, "All caught up! No pending actions.", Icons.check_circle_outline);
+                    }
+
+                    return SizedBox(
+                      height: 130,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          // 1. Show Pending Payment Requests First
+                          ...paymentDocs.map((doc) => _buildHorizontalPaymentCard(context, doc, isDark)),
+                          // 2. Show Pending Orders Next (Limit to 5)
+                          ...pendingOrders.take(5).map((order) => _buildHorizontalPendingOrderCard(context, order, isDark)),
+                        ],
+                      ),
+                    );
+                  });
+                },
+              ),
               const SizedBox(height: 32),
 
               _buildTopAssociatesLeaderboard(context, isDark, controller),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ NEW: Horizontal Payment Request Card
+  Widget _buildHorizontalPaymentCard(BuildContext context, QueryDocumentSnapshot doc, bool isDark) {
+    final data = doc.data() as Map<String, dynamic>;
+    final amount = data['amount'] ?? 0.0;
+    final agent = data['agentName'] ?? 'Associate';
+    final orderNo = data['manualOrderNo'] ?? 'Unknown';
+
+    return Container(
+      width: 280,
+      margin: const EdgeInsets.only(right: 12, bottom: 4),
+      decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.04), blurRadius: 8, offset: const Offset(0, 4))],
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.5), width: 1.5)
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            HapticFeedback.lightImpact();
+            Get.dialog(const Center(child: CircularProgressIndicator(color: TColors.primary)), barrierDismissible: false);
+            try {
+              final orderDoc = await FirebaseFirestore.instance.collection('orders').doc(data['orderId']).get();
+              Get.back(); // close loading
+              if (orderDoc.exists) {
+                Get.to(() => OrderApprovalScreen(order: OrderModel.fromSnapshot(orderDoc)));
+              } else {
+                Get.snackbar("Error", "Order not found.", backgroundColor: Colors.redAccent.withValues(alpha:0.1), colorText: Colors.red);
+              }
+            } catch(e) {
+              Get.back();
+              Get.snackbar("Error", "Failed to load order.", backgroundColor: Colors.redAccent.withValues(alpha:0.1), colorText: Colors.red);
+            }
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Payment Request", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orange.shade700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 4),
+                          Text("Order #$orderNo • By $agent", style: TextStyle(fontSize: 12, color: Colors.grey[500]), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.orange.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.currency_rupee_rounded, color: Colors.orange, size: 14)),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Approve Amount", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                        Text("₹${amount.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
+                      ],
+                    ),
+                    Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.orange.withValues(alpha:0.1), shape: BoxShape.circle), child: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.orange)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -727,186 +831,216 @@ class SalesManagerHome extends StatelessWidget {
               );
             }
 
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 100),
-              itemCount: controller.topAgents.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final agent = controller.topAgents[index];
-                int rankNum = index + 1;
+            int totalAgents = controller.topAgents.length;
+            int displayCount = controller.visibleLeaderboardCount.value;
+            if (displayCount > totalAgents) displayCount = totalAgents;
 
-                // ✅ ADDED NULL SAFETY
-                final String name = agent['name'] ?? 'Unknown';
+            final displayedAgents = controller.topAgents.sublist(0, displayCount);
 
-                // ✅ FIX: Extract raw amount and format it to show the full exact total safely
-                final double rawAmount = (agent['amount'] as num?)?.toDouble() ?? 0.0;
-                final String formattedAmt = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(rawAmount);
+            return Column(
+              children: [
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: displayedAgents.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final agent = displayedAgents[index];
+                    int rankNum = index + 1;
 
-                final double progress = (agent['progress'] as num?)?.toDouble() ?? 0.0;
-                final int ordersCount = agent['count'] ?? 0;
+                    final String name = agent['name'] ?? 'Unknown';
+                    final double rawAmount = (agent['amount'] as num?)?.toDouble() ?? 0.0;
+                    final String formattedAmt = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(rawAmount);
 
-                // ✅ CRITICAL FIX: Looks for 'roleStr' first to get the dynamic calculated rank!
-                final String rankBadge = agent['roleStr'] ?? agent['rank'] ?? 'JSA';
-                final Color badgeColor = _getRankColor(rankBadge);
+                    final double progress = (agent['progress'] as num?)?.toDouble() ?? 0.0;
+                    final int ordersCount = agent['count'] ?? 0;
 
-                final double displayProgress = progress.clamp(0.0, 1.0);
-                String percentText = "${(progress * 100).toInt()}%";
+                    final String rankBadge = agent['roleStr'] ?? agent['rank'] ?? 'JSA';
+                    final Color badgeColor = _getRankColor(rankBadge);
 
-                List<Color> rankGradient;
-                Color rankBorderColor;
-                Color rankTextColor;
+                    final double displayProgress = progress.clamp(0.0, 1.0);
+                    String percentText = "${(progress * 100).toInt()}%";
 
-                if (rankNum == 1) {
-                  rankGradient = [const Color(0xFFFFD700), const Color(0xFFF57F17)];
-                  rankBorderColor = const Color(0xFFFFD700).withValues(alpha: 0.5);
-                  rankTextColor = Colors.white;
-                } else if (rankNum == 2) {
-                  rankGradient = [const Color(0xFFB0BEC5), const Color(0xFF78909C)];
-                  rankBorderColor = const Color(0xFFB0BEC5).withValues(alpha: 0.5);
-                  rankTextColor = Colors.white;
-                } else if (rankNum == 3) {
-                  rankGradient = [const Color(0xFFD4A373), const Color(0xFF8D6E63)];
-                  rankBorderColor = const Color(0xFFD4A373).withValues(alpha: 0.5);
-                  rankTextColor = Colors.white;
-                } else {
-                  rankGradient = isDark ? [const Color(0xFF3A3A3C), const Color(0xFF2C2C2E)] : [const Color(0xFFE5E5EA), const Color(0xFFD1D1D6)];
-                  rankBorderColor = isDark ? Colors.white10 : Colors.black12;
-                  rankTextColor = isDark ? Colors.white : Colors.black87;
-                }
+                    List<Color> rankGradient;
+                    Color rankBorderColor;
+                    Color rankTextColor;
 
-                Color progressColor = progress >= 0.8 ? Colors.green : progress >= 0.5 ? Colors.amber : Colors.redAccent;
+                    if (rankNum == 1) {
+                      rankGradient = [const Color(0xFFFFD700), const Color(0xFFF57F17)];
+                      rankBorderColor = const Color(0xFFFFD700).withValues(alpha: 0.5);
+                      rankTextColor = Colors.white;
+                    } else if (rankNum == 2) {
+                      rankGradient = [const Color(0xFFB0BEC5), const Color(0xFF78909C)];
+                      rankBorderColor = const Color(0xFFB0BEC5).withValues(alpha: 0.5);
+                      rankTextColor = Colors.white;
+                    } else if (rankNum == 3) {
+                      rankGradient = [const Color(0xFFD4A373), const Color(0xFF8D6E63)];
+                      rankBorderColor = const Color(0xFFD4A373).withValues(alpha: 0.5);
+                      rankTextColor = Colors.white;
+                    } else {
+                      rankGradient = isDark ? [const Color(0xFF3A3A3C), const Color(0xFF2C2C2E)] : [const Color(0xFFE5E5EA), const Color(0xFFD1D1D6)];
+                      rankBorderColor = isDark ? Colors.white10 : Colors.black12;
+                      rankTextColor = isDark ? Colors.white : Colors.black87;
+                    }
 
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: rankBorderColor, width: rankNum <= 3 ? 1.5 : 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 54, height: 54,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: rankGradient),
-                              boxShadow: [
-                                if (rankNum <= 3) BoxShadow(color: rankGradient.last.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                "#$rankNum",
-                                style: TextStyle(color: rankTextColor, fontSize: 18, fontWeight: FontWeight.w900),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
+                    Color progressColor = progress >= 0.8 ? Colors.green : progress >= 0.5 ? Colors.amber : Colors.redAccent;
 
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        name,
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: badgeColor.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
-                                      ),
-                                      child: Text(
-                                        rankBadge,
-                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: badgeColor),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      formattedAmt,
-                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87),
-                                    ),
-                                    Text(
-                                      "  •  $ordersCount Orders",
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: progressColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: progressColor.withValues(alpha: 0.3)),
-                            ),
-                            child: Text(
-                              percentText,
-                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: progressColor),
-                            ),
-                          ),
-                        ],
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: rankBorderColor, width: rankNum <= 3 ? 1.5 : 1),
                       ),
-                      const SizedBox(height: 16),
-
-                      Stack(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            height: 6,
-                            width: double.infinity,
-                            decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade200, borderRadius: BorderRadius.circular(10)),
-                          ),
-                          LayoutBuilder(
-                              builder: (context, constraints) {
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 1000),
-                                  curve: Curves.easeOutCubic,
-                                  height: 6,
-                                  width: constraints.maxWidth * displayProgress,
-                                  decoration: BoxDecoration(
-                                      color: progressColor,
-                                      borderRadius: BorderRadius.circular(10),
-                                      boxShadow: [
-                                        BoxShadow(color: progressColor.withValues(alpha: 0.4), blurRadius: 4)
-                                      ]
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 54, height: 54,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: rankGradient),
+                                  boxShadow: [
+                                    if (rankNum <= 3) BoxShadow(color: rankGradient.last.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    "#$rankNum",
+                                    style: TextStyle(color: rankTextColor, fontSize: 18, fontWeight: FontWeight.w900),
                                   ),
-                                );
-                              }
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            name,
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: badgeColor.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Text(
+                                            rankBadge,
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: badgeColor),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          formattedAmt,
+                                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87),
+                                        ),
+                                        Text(
+                                          "  •  $ordersCount Orders",
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: progressColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: progressColor.withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  percentText,
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: progressColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          Stack(
+                            children: [
+                              Container(
+                                height: 6,
+                                width: double.infinity,
+                                decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade200, borderRadius: BorderRadius.circular(10)),
+                              ),
+                              LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return AnimatedContainer(
+                                      duration: const Duration(milliseconds: 1000),
+                                      curve: Curves.easeOutCubic,
+                                      height: 6,
+                                      width: constraints.maxWidth * displayProgress,
+                                      decoration: BoxDecoration(
+                                          color: progressColor,
+                                          borderRadius: BorderRadius.circular(10),
+                                          boxShadow: [
+                                            BoxShadow(color: progressColor.withValues(alpha: 0.4), blurRadius: 4)
+                                          ]
+                                      ),
+                                    );
+                                  }
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+
+                if (displayCount < totalAgents)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16, bottom: 40),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          controller.visibleLeaderboardCount.value += 10;
+                        },
+                        style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                        ),
+                        child: Text(
+                            "Show More Agents (${totalAgents - displayCount} left)",
+                            style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)
+                        ),
+                      ),
+                    ),
+                  )
+              ],
             );
           }),
         ],
       ),
     );
-  }  Color _getRankColor(String rank) {
+  }
+
+  Color _getRankColor(String rank) {
     switch (rank.toUpperCase()) {
       case "SM": return Colors.blueAccent;
       case "SC": return Colors.teal;
@@ -1131,7 +1265,6 @@ class SalesManagerHome extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top Icon Circle
           Container(
             width: 32,
             height: 32,
@@ -1139,7 +1272,6 @@ class SalesManagerHome extends StatelessWidget {
             child: Icon(icon, color: Colors.black, size: 16),
           ),
           const SizedBox(height: 16),
-          // Main Value
           Text(
             value,
             style: const TextStyle(

@@ -2,6 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../controllers/production/stock_in_out_controller.dart';
@@ -286,13 +287,11 @@ class StockInOutScreen extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 decoration: BoxDecoration(
-                  // Highlight Regular colors slightly
                   color: isReg ? Colors.blue.withValues(alpha: 0.05) : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    // The Color Dot
                     Container(
                       width: 16, height: 16,
                       decoration: BoxDecoration(
@@ -302,7 +301,6 @@ class StockInOutScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Color Name
                     Expanded(
                       child: Text(
                         colorMap['name'],
@@ -314,7 +312,6 @@ class StockInOutScreen extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // Regular Badge
                     if (isReg)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -335,7 +332,7 @@ class StockInOutScreen extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED: Premium Recent Activity Feed UI
+  // ✅ UPDATED: Paginated Recent Activity Feed UI
   Widget _buildRecentActivity(StockInOutController controller, bool isDark) {
     return Obx(() {
       if (controller.recentHistory.isEmpty) {
@@ -353,169 +350,199 @@ class StockInOutScreen extends StatelessWidget {
         );
       }
 
-      return ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: controller.recentHistory.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          var log = controller.recentHistory[index];
-          bool isIn = log['type'] == 'IN';
-          Color actionColor = isIn ? Colors.green : Colors.redAccent;
-          Color bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+      // ✅ UI PAGINATION LOGIC
+      int totalLogs = controller.recentHistory.length;
+      int displayCount = controller.visibleLogCount.value;
+      if (displayCount > totalLogs) displayCount = totalLogs;
 
-          String product = log['product'] ?? '';
-          String colorName = log['color'] ?? '';
-          String style = log['style'] != null && log['style'] != 'N/A' ? " (${log['style']})" : "";
-          double qty = (log['qty'] as num?)?.toDouble() ?? 0.0;
-          String unit = log['unit'] ?? '';
-          String supervisor = log['supervisorName'] ?? 'Unknown';
-          String vendor = log['vendorName'] ?? '';
+      final displayedLogs = controller.recentHistory.sublist(0, displayCount);
 
-          DateTime date = DateTime.now();
-          if (log['timestamp'] != null) {
-            date = (log['timestamp'] as Timestamp).toDate();
-          } else if (log['date'] != null) {
-            date = (log['date'] as Timestamp).toDate();
-          }
-          String dateStr = DateFormat('dd MMM, hh:mm a').format(date);
+      return Column(
+        children: [
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(), // Scroll is handled by the parent view
+            itemCount: displayedLogs.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              var log = displayedLogs[index];
+              bool isIn = log['type'] == 'IN';
+              Color actionColor = isIn ? Colors.green : Colors.redAccent;
+              Color bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
-          return Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-              boxShadow: [
-                if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
-              ],
-            ),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Left Accent Line
-                  Container(width: 5, color: actionColor),
+              String product = log['product'] ?? '';
+              String colorName = log['color'] ?? '';
+              String style = log['style'] != null && log['style'] != 'N/A' ? " (${log['style']})" : "";
+              double qty = (log['qty'] as num?)?.toDouble() ?? 0.0;
+              String unit = log['unit'] ?? '';
+              String supervisor = log['supervisorName'] ?? 'Unknown';
+              String vendor = log['vendorName'] ?? '';
 
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          // Action Icon Box
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: actionColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              isIn ? Icons.add_to_photos_rounded : Icons.outbox_rounded,
-                              color: actionColor,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
+              DateTime date = DateTime.now();
+              if (log['timestamp'] != null) {
+                date = (log['timestamp'] as Timestamp).toDate();
+              } else if (log['date'] != null) {
+                date = (log['date'] as Timestamp).toDate();
+              }
+              String dateStr = DateFormat('dd MMM, hh:mm a').format(date);
 
-                          // Middle Info Area
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "$colorName $product$style",
-                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.white54 : Colors.black54),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        supervisor,
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black54),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(Icons.access_time_filled_rounded, size: 12, color: isDark ? Colors.white38 : Colors.black38),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      dateStr,
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : Colors.black38),
-                                    ),
-                                  ],
-                                ),
-                                if (isIn && vendor.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.local_shipping_rounded, size: 12, color: Colors.blueAccent),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          vendor,
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.blueAccent),
-                                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ]
-                              ],
-                            ),
-                          ),
-
-                          // Right Quantities & Badge Area
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+              return Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                  boxShadow: [
+                    if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(width: 5, color: actionColor),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: actionColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Text(
-                                  isIn ? "STOCK IN" : "STOCK OUT",
-                                  style: TextStyle(color: actionColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                child: Icon(
+                                  isIn ? Icons.add_to_photos_rounded : Icons.outbox_rounded,
+                                  color: actionColor,
+                                  size: 24,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
+                              const SizedBox(width: 16),
+
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      "$colorName $product$style",
+                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.white54 : Colors.black54),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            supervisor,
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black54),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.access_time_filled_rounded, size: 12, color: isDark ? Colors.white38 : Colors.black38),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          dateStr,
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : Colors.black38),
+                                        ),
+                                      ],
+                                    ),
+                                    if (isIn && vendor.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.local_shipping_rounded, size: 12, color: Colors.blueAccent),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              vendor,
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.blueAccent),
+                                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ]
+                                  ],
+                                ),
+                              ),
+
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(
-                                    "${isIn ? '+' : '-'}${qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)}",
-                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: actionColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      isIn ? "STOCK IN" : "STOCK OUT",
+                                      style: TextStyle(color: actionColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    unit,
-                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: isDark ? Colors.white54 : Colors.black54),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        "${isIn ? '+' : '-'}${qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)}",
+                                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : Colors.black87, letterSpacing: -0.5),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        unit,
+                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: isDark ? Colors.white54 : Colors.black54),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
+              );
+            },
+          ),
+
+          // ✅ THE "SHOW MORE" BUTTON
+          if (displayCount < totalLogs)
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    controller.visibleLogCount.value += 10; // Load next 10
+                  },
+                  style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                  ),
+                  child: Text(
+                      "Show More Activity (${totalLogs - displayCount} left)",
+                      style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)
+                  ),
+                ),
               ),
             ),
-          );
-        },
+        ],
       );
     });
   }

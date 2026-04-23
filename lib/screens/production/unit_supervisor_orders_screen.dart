@@ -15,8 +15,42 @@ import '../../controllers/production/unit_supervisor_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../data/models/order_model.dart';
 
-class UnitSupervisorOrdersScreen extends StatelessWidget {
+// ✅ 1. Converted to StatefulWidget for Scroll Tracking
+class UnitSupervisorOrdersScreen extends StatefulWidget {
   const UnitSupervisorOrdersScreen({super.key});
+
+  @override
+  State<UnitSupervisorOrdersScreen> createState() => _UnitSupervisorOrdersScreenState();
+}
+
+class _UnitSupervisorOrdersScreenState extends State<UnitSupervisorOrdersScreen> {
+  late final UnitSupervisorController controller;
+
+  // ✅ 2. Added UI Pagination Variables
+  final ScrollController _scrollController = ScrollController();
+  final RxInt visibleCount = 15.obs; // Start by showing 15 items
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(UnitSupervisorController());
+
+    // ✅ 3. Listen to scrolling to inject more items smoothly
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        // Prevent adding more if we already show everything
+        if (visibleCount.value < controller.activeOrders.length) {
+          visibleCount.value += 15;
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   // --- GRADIENT HELPERS ---
   LinearGradient _buildSolidGradient(Color color) {
@@ -40,7 +74,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(UnitSupervisorController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = TColors.getAdaptiveTextColor(context);
 
@@ -71,7 +104,10 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 ],
               ),
               child: TextField(
-                onChanged: (value) => controller.updateSearchQuery(value),
+                onChanged: (value) {
+                  visibleCount.value = 15; // ✅ Reset pagination on new search
+                  controller.updateSearchQuery(value);
+                },
                 style: TextStyle(color: textColor, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: "Search by Order ID, Client, or Product...",
@@ -122,7 +158,10 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                       clipBehavior: Clip.none,
                       children: [
                         GestureDetector(
-                          onTap: () => controller.setFilterStage(stage),
+                          onTap: () {
+                            visibleCount.value = 15; // ✅ Reset pagination when switching tabs
+                            controller.setFilterStage(stage);
+                          },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             curve: Curves.easeInOut,
@@ -177,7 +216,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 3. FILTERED ORDER LIST ---
+          // --- 3. FILTERED & PAGINATED ORDER LIST ---
           Expanded(
             child: Obx(() {
               List<OrderModel> ordersToDisplay = controller.filteredOrders;
@@ -199,10 +238,31 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                 }
               }
 
+              // Apply Sorting
+              var sortedOrders = List<OrderModel>.from(ordersToDisplay);
+              if (controller.selectedFilterStage.value == 'All') {
+                sortedOrders.sort((a, b) {
+                  String valA = a.manualOrderNo ?? a.id ?? "";
+                  String valB = b.manualOrderNo ?? b.id ?? "";
+                  return valB.compareTo(valA);
+                });
+              } else {
+                sortedOrders.sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
+              }
+
+              // ✅ PAGINATION SLICING
+              int totalOrders = sortedOrders.length;
+              int currentDisplayLimit = visibleCount.value;
+              if (currentDisplayLimit > totalOrders) {
+                currentDisplayLimit = totalOrders;
+              }
+              final slicedOrders = sortedOrders.sublist(0, currentDisplayLimit);
+
               return RefreshIndicator(
                 color: TColors.primary,
                 backgroundColor: isDark ? TColors.darkCard : Colors.white,
                 onRefresh: () async {
+                  visibleCount.value = 15; // ✅ Reset pagination on pull to refresh
                   await controller.fetchActiveOrders();
                 },
                 child: ordersToDisplay.isEmpty
@@ -223,24 +283,22 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                   ),
                 )
                     : ListView.builder(
+                  controller: _scrollController, // ✅ Attach scroll listener here
                   physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                   padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-                  itemCount: ordersToDisplay.length,
+                  itemCount: currentDisplayLimit < totalOrders ? currentDisplayLimit + 1 : currentDisplayLimit,
                   itemBuilder: (context, index) {
-                    var sortedOrders = List<OrderModel>.from(ordersToDisplay);
 
-                    if (controller.selectedFilterStage.value == 'All') {
-                      sortedOrders.sort((a, b) {
-                        String valA = a.manualOrderNo ?? a.id ?? "";
-                        String valB = b.manualOrderNo ?? b.id ?? "";
-                        return valB.compareTo(valA);
-                      });
-                    } else {
-                      sortedOrders.sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
+                    // Show a tiny loading spinner at the bottom if more items are ready to load
+                    if (index == currentDisplayLimit) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20.0),
+                        child: Center(child: CircularProgressIndicator(color: TColors.primary)),
+                      );
                     }
 
                     DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-                    var order = sortedOrders[index];
+                    var order = slicedOrders[index];
                     Color statusColor = _getStatusColor(order.status);
                     DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
                     int daysLeft = deadline.difference(today).inDays;
@@ -419,9 +477,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
     );
   }
 
-  // ===========================================================================
-  // ✅ ENHANCED MATERIAL REQUIREMENT CARD (Calculated Requirement + Live Stock)
-  // ===========================================================================
   Widget _buildMaterialRequirementCard(OrderModel order, bool isDark, Color textColor, UnitSupervisorController controller) {
     Map<String, Map<String, dynamic>> materials = {};
 
@@ -460,7 +515,6 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
 
     if (materials.isEmpty && estimatedKg == "Not Specified") return const SizedBox.shrink();
 
-    // ✅ THE FIX: We removed the outer Obx() here so it doesn't crash when materials is empty!
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(16),
@@ -502,9 +556,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
             const SizedBox(height: 12),
           ],
 
-          // Live Stock list
           ...materials.values.map((mat) {
-            // ✅ THE FIX: We only wrap the specific list item in Obx() so it safely accesses the observable!
             return Obx(() {
               double inStock = controller.inventoryStock[mat['lookupKey']] ?? 0.0;
               String displayStock = mat['unit'] == 'pcs' ? inStock.toInt().toString() : inStock.toStringAsFixed(1);
@@ -627,7 +679,7 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                             child: (order.mockupUrl != null && order.mockupUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
                               imageUrl: order.mockupUrl!,
-                              fit: BoxFit.contain, // Ensures NO ZOOM OR CROP
+                              fit: BoxFit.contain,
                               placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
                               errorWidget: (context, url, error) => Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -656,10 +708,8 @@ class UnitSupervisorOrdersScreen extends StatelessWidget {
                         ),
                       const SizedBox(height: 24),
 
-                      // ✅ MATERIAL CARD (Now totally Crash-Free!)
                       _buildMaterialRequirementCard(order, isDark, textColor, controller),
 
-                      // ✅ DETAILED PRODUCT LIST
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(

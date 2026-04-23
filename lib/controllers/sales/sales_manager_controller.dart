@@ -1,9 +1,10 @@
+import 'dart:async'; // ✅ Added for StreamSubscription
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ Added for HapticFeedback
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // ✅ Added for DateFormat and NumberFormat
+import 'package:intl/intl.dart';
 import '../../data/models/order_model.dart';
 
 class SalesManagerController extends GetxController {
@@ -11,6 +12,13 @@ class SalesManagerController extends GetxController {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // ✅ Stream Subscriptions (Crucial for stopping background read leaks)
+  StreamSubscription? _pendingSub;
+  StreamSubscription? _approvedSub;
+  StreamSubscription? _activeSub;
+  StreamSubscription? _completedSub;
+  StreamSubscription? _deletionSub;
 
   final List<String> productionStages = [
     'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
@@ -25,6 +33,7 @@ class SalesManagerController extends GetxController {
   var deletionRequests = <OrderModel>[].obs;
   var totalShippingCollected = 0.0.obs;
   var totalGstCollected = 0.0.obs;
+  var visibleLeaderboardCount = 5.obs;
 
   int get urgentDeliverablesCount {
     List<String> safeStatuses = [
@@ -68,6 +77,17 @@ class SalesManagerController extends GetxController {
   void onInit() {
     super.onInit();
     fetchAllData();
+  }
+
+  // ✅ Cancel streams when controller is destroyed to save reads
+  @override
+  void onClose() {
+    _pendingSub?.cancel();
+    _approvedSub?.cancel();
+    _activeSub?.cancel();
+    _completedSub?.cancel();
+    _deletionSub?.cancel();
+    super.onClose();
   }
 
   void fetchAllData() async {
@@ -153,12 +173,12 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchPendingOrders() {
-    if (_auth.currentUser == null) {
-      return;
-    }
+    if (_auth.currentUser == null) return;
     try {
-      _db.collection('orders')
+      _pendingSub?.cancel();
+      _pendingSub = _db.collection('orders')
           .where('status', whereIn: ['Placed', 'Pending', 'placed', 'pending'])
+          .limit(50) // ✅ OPTIMIZED: Hard cap to save reads
           .snapshots()
           .listen((snapshot) {
 
@@ -184,34 +204,34 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchApprovedOrders() {
-    if (_auth.currentUser == null) {
-      return;
-    }
+    if (_auth.currentUser == null) return;
     try {
-      _db.collection('orders')
+      _approvedSub?.cancel();
+      _approvedSub = _db.collection('orders')
           .where('status', isEqualTo: 'Approved')
           .orderBy('orderDate', descending: true)
+          .limit(50) // ✅ OPTIMIZED: Hard cap
           .snapshots()
           .listen((snapshot) {
         approvedOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       });
     } catch (e) {
-      debugPrint("Error fetching approved orders: $e"); // ✅ Changed to debugPrint
+      debugPrint("Error fetching approved orders: $e");
     }
   }
 
   void fetchOrderHistory() {
-    if (_auth.currentUser == null) {
-      return;
-    }
+    if (_auth.currentUser == null) return;
 
-    _db.collection('orders')
+    _activeSub?.cancel();
+    _activeSub = _db.collection('orders')
         .where('status', whereIn: [
       'Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done',
       'Printing', 'Printed', 'Stitching', 'Stitched', 'Packing', 'Packed',
       'Out SRC', 'Shipping'
     ])
         .orderBy('orderDate', descending: true)
+        .limit(100) // ✅ OPTIMIZED: Hard cap for active pipeline
         .snapshots()
         .listen((snapshot) {
       activeOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
@@ -219,7 +239,8 @@ class SalesManagerController extends GetxController {
       debugPrint("Error in Active Orders Stream: $e");
     });
 
-    _db.collection('orders')
+    _completedSub?.cancel();
+    _completedSub = _db.collection('orders')
         .where('status', whereIn: ['Shipped', 'Delivered', 'Rejected'])
         .orderBy('orderDate', descending: true)
         .limit(50)
@@ -230,18 +251,18 @@ class SalesManagerController extends GetxController {
   }
 
   void fetchDeletionRequests() {
-    if (_auth.currentUser == null) {
-      return;
-    }
+    if (_auth.currentUser == null) return;
     try {
-      _db.collection('orders')
+      _deletionSub?.cancel();
+      _deletionSub = _db.collection('orders')
           .where('isDeleteRequested', isEqualTo: true)
+          .limit(30) // ✅ OPTIMIZED: Hard cap
           .snapshots()
           .listen((snapshot) {
         deletionRequests.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
       });
     } catch (e) {
-      debugPrint("Error fetching deletion requests: $e"); // ✅ Changed to debugPrint
+      debugPrint("Error fetching deletion requests: $e");
     }
   }
 
@@ -249,7 +270,7 @@ class SalesManagerController extends GetxController {
     final user = _auth.currentUser;
     if (user != null) {
       try {
-        final doc = await _db.collection('users').doc(user.uid).get();
+        final doc = await _db.collection('users').doc(user.uid).get(const GetOptions(source: Source.serverAndCache));
         if (doc.exists) {
           String fullName = doc.data()?['FullName'] ?? '';
           if (fullName.isNotEmpty) {
@@ -257,7 +278,7 @@ class SalesManagerController extends GetxController {
           }
         }
       } catch (e) {
-        debugPrint("Error fetching manager profile: $e"); // ✅ Handled empty catch
+        debugPrint("Error fetching manager profile: $e");
       }
     }
   }
@@ -288,7 +309,8 @@ class SalesManagerController extends GetxController {
 
       String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
 
-      final usersSnap = await _db.collection('users').get();
+      // ✅ OPTIMIZED: Uses cache to prevent redownloading user list every time
+      final usersSnap = await _db.collection('users').get(const GetOptions(source: Source.serverAndCache));
       Map<String, String> roleMap = {};
 
       Set<String> allSalesAgents = {};
@@ -317,9 +339,10 @@ class SalesManagerController extends GetxController {
         }
       }
 
+      // ✅ OPTIMIZED: Uses serverAndCache so historical data math doesn't burn new reads
       final snapshot = await _db.collection('orders')
           .where('orderDate', isLessThanOrEqualTo: end)
-          .get();
+          .get(const GetOptions(source: Source.serverAndCache));
 
       List<String> validStatuses = [
         'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
@@ -486,7 +509,9 @@ class SalesManagerController extends GetxController {
     } catch (e) {
       debugPrint("❌ STATS ERROR: $e");
     }
-  }  Future<void> approveOrder(String orderId) async {
+  }
+
+  Future<void> approveOrder(String orderId) async {
     await _updateStatus(orderId, 'Approved', Colors.green);
   }
 

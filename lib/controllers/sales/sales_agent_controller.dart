@@ -13,6 +13,7 @@ class SalesAgentController extends GetxController {
   final _db = FirebaseFirestore.instance;
 
   // --- UI State Observables ---
+  var visibleLeaderboardCount = 5.obs; // ✅ ADDED: Controls UI Pagination for the Leaderboard
   final leaderboardData = <Map<String, dynamic>>[].obs;
   final isLoading = true.obs;
   final agentName = "".obs;
@@ -115,7 +116,10 @@ class SalesAgentController extends GetxController {
 
   Future<void> loadDashboardData() async {
     if (_auth.currentUser == null) return;
+
+    visibleLeaderboardCount.value = 5; // ✅ RESET: Shrink leaderboard back to 5 on refresh
     isLoading.value = true;
+
     await fetchAgentIdentity();
     await Future.wait([fetchAgentStats(), fetchLeaderboard()]);
     isLoading.value = false;
@@ -329,13 +333,8 @@ class SalesAgentController extends GetxController {
   // =====================================================================
   // ✅ TEAM LEADERBOARD WITH DYNAMIC RANKS
   // =====================================================================
-// =====================================================================
-  // ✅ TEAM LEADERBOARD WITH DYNAMIC RANKS (Synced with Manager Logic)
-  // =====================================================================
   Future<void> fetchLeaderboard() async {
     try {
-      isLoading.value = true;
-
       final rangeData = _getDateRange();
       DateTime start = rangeData['start'];
       DateTime end = rangeData['end'];
@@ -345,18 +344,15 @@ class SalesAgentController extends GetxController {
       final usersSnap = await _db.collection('users').get();
       Map<String, String> userRoleMap = {};
 
-      // ✅ Master list to hold ALL sales agents
       Set<String> allSalesAgents = {};
 
       for (var doc in usersSnap.docs) {
         final d = doc.data();
 
-        // ✅ Case-sensitivity and trimming fix
         String n = (d['FullName'] ?? d['Name'] ?? d['name'] ?? '').toString().trim();
         String rawRole = (d['Role'] ?? d['role'] ?? '').toString().toUpperCase();
 
         if (n.isNotEmpty) {
-          // ✅ Ensuring Manager & Admin are explicitly grabbed
           if (rawRole.contains('SALES') || rawRole.contains('AGENT') || rawRole.contains('MARKETING') || rawRole.contains('ASSOCIATE') || rawRole.contains('MANAGER') || rawRole.contains('ADMIN') || ['SM', 'SSA', 'SC', 'JSA'].contains(rawRole)) {
             allSalesAgents.add(n);
             userRoleMap[n] = _parseRoleAcronym(rawRole);
@@ -364,7 +360,6 @@ class SalesAgentController extends GetxController {
         }
       }
 
-      // ✅ THE FIX: Removed 'pending' and 'placed'. Only approved orders count now!
       List<String> revenueStatuses = [
         'approved', 'fab purchased', 'fab ready', 'cutting', 'cutting done',
         'printing', 'printed', 'stitching', 'stitched', 'packing', 'packed',
@@ -412,7 +407,6 @@ class SalesAgentController extends GetxController {
 
       List<Map<String, dynamic>> tempList = [];
 
-      // ✅ Loop through ALL known sales agents (Not just currentPeriodSales.keys)
       for (String agent in allSalesAgents) {
         String dbRole = userRoleMap[agent] ?? 'JSA';
         bool isSM = dbRole == 'SM';
@@ -451,7 +445,6 @@ class SalesAgentController extends GetxController {
 
         double amount = currentPeriodSales[agent] ?? 0.0;
 
-        // ✅ TRUE COMPETITOR RULE: Hide 0-sales agents (Including the Manager)
         if (amount <= 0) {
           continue;
         }
@@ -480,23 +473,20 @@ class SalesAgentController extends GetxController {
 
       tempList.sort((a, b) => b['amount'].compareTo(a['amount']));
 
-      // ✅ Displays everyone, no limits!
       leaderboardData.value = tempList.toList();
 
     } catch (e) {
       debugPrint("Error fetching leaderboard: $e");
-    } finally {
-      isLoading.value = false;
     }
   }
+
   // =====================================================================
-  // ✅ FIX: ENHANCED QUICK UPDATE ORDER (MATH & APPROVAL FIXES)
+  // ✅ ENHANCED QUICK UPDATE ORDER
   // =====================================================================
   Future<void> updateOrder(OrderModel originalOrder, int newQty, double newPrice, String newDetails) async {
     try {
       isLoading.value = true;
 
-      // 1. Recalculate Totals
       double subTotal = newQty * newPrice;
       double gstAmount = (subTotal * originalOrder.gstPercentage) / 100;
       double newTotal = subTotal + gstAmount + originalOrder.shippingCharge;
@@ -508,28 +498,25 @@ class SalesAgentController extends GetxController {
         'balanceDue': newBalance,
         'productDetails': newDetails,
         'updatedAt': FieldValue.serverTimestamp(),
-        'status': 'Pending',            // ✅ Force manager to re-approve
-        'isEdited': true,               // ✅ Flag it for the manager's UI
-        'effectiveRevenue': newTotal,   // ✅ Reset Margin so Manager inputs it again!
+        'status': 'Pending',
+        'isEdited': true,
+        'effectiveRevenue': newTotal,
       };
 
-      // 2. Fix inner product array Math
       if (originalOrder.products.isNotEmpty) {
         List<dynamic> updatedProducts = List.from(originalOrder.products);
         if (updatedProducts[0] is Map) {
           Map<String, dynamic> firstProduct = Map<String, dynamic>.from(updatedProducts[0]);
           firstProduct['price'] = newPrice;
-          firstProduct['qty'] = newQty;                    // ✅ Now QTY updates correctly!
-          firstProduct['total'] = subTotal + gstAmount;    // ✅ Now Item Total updates correctly!
+          firstProduct['qty'] = newQty;
+          firstProduct['total'] = subTotal + gstAmount;
           updatedProducts[0] = firstProduct;
         }
         updateData['products'] = updatedProducts;
       }
 
-      // 3. Update DB
       await _db.collection('orders').doc(originalOrder.id).update(updateData);
 
-      // 4. Alert Manager
       try {
         final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
         for (var managerDoc in managerSnapshot.docs) {

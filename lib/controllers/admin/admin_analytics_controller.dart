@@ -65,7 +65,14 @@ class AdminAnalyticsController extends GetxController {
   Future<void> fetchAnalyticsData({bool showSpinner = true}) async {
     try {
       if (showSpinner) isLoading.value = true;
-      final snapshot = await _db.collection('orders').get();
+
+      // =======================================================================
+      // ✅ OPTIMIZED: Added serverAndCache.
+      // Since this controller downloads the ENTIRE database to allow for instant
+      // offline tab-switching, this single line saves thousands of reads by
+      // utilizing local phone memory for historical orders.
+      // =======================================================================
+      final snapshot = await _db.collection('orders').get(const GetOptions(source: Source.serverAndCache));
 
       List<OrderModel> validOrders = [];
       for (var doc in snapshot.docs) {

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../data/models/order_model.dart';
 
@@ -10,18 +11,24 @@ class SalesHistoryController extends GetxController {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
+  // --- UI State ---
   var isLoading = true.obs;
+  String currentAgentName = "";
 
-  // Master list of all history (used for resetting search)
+  // --- Pagination State ---
+  var isLoadingMore = false.obs;
+  var hasMoreData = true.obs;
+  DocumentSnapshot? lastDocument; // 👈 The cursor
+  final int documentLimit = 25;   // 👈 How many orders to fetch per swipe
+
+  // Master list of all history (used for local filtering to save quota)
   var allHistoryOrders = <OrderModel>[];
 
   // The list actually shown on the screen
   var displayedOrders = <OrderModel>[].obs;
 
-  // Filter state: "All", "Pending", "Approved", "Trash", etc.
+  // Filter state
   var currentFilter = "All".obs;
-
-  // Store search query so it persists when switching tabs
   var currentSearchQuery = "".obs;
 
   @override
@@ -30,46 +37,115 @@ class SalesHistoryController extends GetxController {
     fetchHistory();
   }
 
-  // --- 1. Fetch ONLY Logged-in Agent's Orders ---
-  void fetchHistory() async {
-    try {
-      isLoading.value = true;
-      final user = _auth.currentUser;
+  // --- Helper: Cache the Agent Name ---
+  Future<void> _ensureAgentName() async {
+    if (currentAgentName.isNotEmpty) return;
 
-      if (user != null) {
-        String myName = user.displayName ?? "Unknown";
-        final userDoc = await _db.collection('id_requests').doc(user.uid).get();
+    final user = _auth.currentUser;
+    if (user != null) {
+      currentAgentName = user.displayName ?? "Unknown";
+      try {
+        final userDoc = await _db.collection('id_requests').doc(user.uid).get(const GetOptions(source: Source.serverAndCache));
         if (userDoc.exists) {
-          myName = userDoc.data()?['name'] ?? myName;
+          currentAgentName = userDoc.data()?['name'] ?? currentAgentName;
         }
-
-        final snapshot = await _db
-            .collection('orders')
-            .where('marketingPersonName', isEqualTo: myName)
-            .orderBy('orderDate', descending: true)
-            .limit(100)
-            .get();
-
-        final orders = snapshot.docs
-            .map((doc) => OrderModel.fromSnapshot(doc))
-            .toList();
-
-        allHistoryOrders = orders;
-        applyFilter();
+      } catch (e) {
+        debugPrint("Error fetching agent name: $e");
       }
+    }
+  }
+
+  // =========================================================================
+  // ✅ DATA FETCHING (PAGINATED)
+  // =========================================================================
+
+  /// 1️⃣ INITIAL FETCH: Grabs the first batch of orders
+  Future<void> fetchHistory({bool quiet = false}) async {
+    try {
+      if (!quiet) isLoading.value = true;
+      hasMoreData.value = true; // Reset flag
+
+      await _ensureAgentName();
+      if (currentAgentName.isEmpty) return;
+
+      final snapshot = await _db
+          .collection('orders')
+          .where('marketingPersonName', isEqualTo: currentAgentName)
+          .orderBy('orderDate', descending: true)
+          .limit(documentLimit)
+          .get(const GetOptions(source: Source.serverAndCache));
+
+      if (snapshot.docs.isNotEmpty) {
+        allHistoryOrders = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+        lastDocument = snapshot.docs.last; // Save cursor
+
+        if (snapshot.docs.length < documentLimit) {
+          hasMoreData.value = false; // Database is empty beyond this point
+        }
+      } else {
+        allHistoryOrders = [];
+        hasMoreData.value = false;
+      }
+
+      applyFilter();
+
     } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Could not load history: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
-      );
+      Get.snackbar("Error", "Could not load history: $e",
+          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
-  // --- 2. REQUEST Deletion Method ---
+  /// 2️⃣ FETCH NEXT PAGE: Triggered when user scrolls to the bottom
+  Future<void> fetchNextPage() async {
+    if (isLoadingMore.value || !hasMoreData.value || lastDocument == null) return;
+
+    try {
+      isLoadingMore.value = true;
+      HapticFeedback.selectionClick();
+
+      await _ensureAgentName();
+
+      final snapshot = await _db
+          .collection('orders')
+          .where('marketingPersonName', isEqualTo: currentAgentName)
+          .orderBy('orderDate', descending: true)
+          .startAfterDocument(lastDocument!) // 👈 Start where we left off
+          .limit(documentLimit)
+          .get(const GetOptions(source: Source.serverAndCache));
+
+      if (snapshot.docs.isNotEmpty) {
+        final newOrders = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+        allHistoryOrders.addAll(newOrders);
+        lastDocument = snapshot.docs.last; // Update cursor
+
+        if (snapshot.docs.length < documentLimit) {
+          hasMoreData.value = false; // Reached the end
+        }
+
+        applyFilter();
+      } else {
+        hasMoreData.value = false;
+      }
+    } catch (e) {
+      debugPrint("❌ Pagination Error: $e");
+    } finally {
+      isLoadingMore.value = false;
+    }
+  }
+
+  /// ✅ PULL TO REFRESH: Resets cursor and list
+  Future<void> refreshData() async {
+    lastDocument = null; // Clear the cursor
+    await fetchHistory(quiet: true);
+  }
+
+  // =========================================================================
+  // ✅ DELETION REQUESTS
+  // =========================================================================
+
   Future<void> requestDeleteOrder(OrderModel order) async {
     final lockedStatuses = ['shipping', 'shipped', 'delivered'];
     if (lockedStatuses.contains(order.status.toLowerCase())) {
@@ -85,8 +161,6 @@ class SalesHistoryController extends GetxController {
 
     try {
       isLoading.value = true;
-
-      // ✅ Safe ID check
       if (order.id == null) return;
 
       await _db.collection('orders').doc(order.id).update({
@@ -94,7 +168,7 @@ class SalesHistoryController extends GetxController {
         'deleteRequestedAt': FieldValue.serverTimestamp(),
       });
 
-      fetchHistory();
+      await refreshData(); // Update UI
 
       final managerSnapshot = await _db.collection('users').where('Role', isEqualTo: 'Sales Manager').get();
 
@@ -118,21 +192,15 @@ class SalesHistoryController extends GetxController {
         duration: const Duration(seconds: 4),
       );
     } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Could not send delete request: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
-      );
+      Get.snackbar("Error", "Could not send delete request: $e",
+          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
-  // --- 2B. CANCEL Deletion Request Method ---
-  // ✅ FIX: Changed String to String? and added a null check
   Future<void> cancelDeleteRequest(String? orderId) async {
-    if (orderId == null) return; // Safety check
+    if (orderId == null) return;
 
     try {
       isLoading.value = true;
@@ -142,7 +210,7 @@ class SalesHistoryController extends GetxController {
         'deleteRequestedAt': FieldValue.delete(),
       });
 
-      fetchHistory();
+      await refreshData(); // Update UI
 
       Get.snackbar(
         "Request Cancelled",
@@ -152,34 +220,31 @@ class SalesHistoryController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Could not cancel request: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-        colorText: Colors.red,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar("Error", "Could not cancel request: $e",
+          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red, snackPosition: SnackPosition.BOTTOM);
     } finally {
       isLoading.value = false;
     }
   }
 
-  // --- 3. Filter by Chip ---
+  // =========================================================================
+  // ✅ FILTERING & SEARCHING (Local to save reads)
+  // =========================================================================
+
   void filterByStatus(String status) {
     currentFilter.value = status;
     applyFilter();
   }
 
-  // --- 4. Search Bar Logic ---
   void searchOrders(String query) {
     currentSearchQuery.value = query;
     applyFilter();
   }
 
-  // --- 5. Main Filter Engine ---
   void applyFilter() {
     List<OrderModel> temp = allHistoryOrders;
 
+    // 1. Status Filter
     if (currentFilter.value == "Trash") {
       temp = temp.where((o) => o.toJson()['isDeleted'] == true).toList();
     } else if (currentFilter.value == "All") {
@@ -193,6 +258,7 @@ class SalesHistoryController extends GetxController {
           .toList();
     }
 
+    // 2. Search Query Filter
     if (currentSearchQuery.value.isNotEmpty) {
       String lowerQuery = currentSearchQuery.value.toLowerCase();
       temp = temp.where((o) {
@@ -213,9 +279,11 @@ class SalesHistoryController extends GetxController {
     displayedOrders.assignAll(temp);
   }
 
-  // ✅ 6. SECURE PAYMENT LOGIC (Requires Manager Approval)
-  Future<void> recordPayment(OrderModel order, double amount) async {
+  // =========================================================================
+  // ✅ PAYMENTS
+  // =========================================================================
 
+  Future<void> recordPayment(OrderModel order, double amount) async {
     if (amount > order.balanceDue) {
       Get.snackbar(
         "Invalid Payment Amount",
@@ -230,16 +298,14 @@ class SalesHistoryController extends GetxController {
 
     try {
       isLoading.value = true;
-
-      final user = _auth.currentUser;
-      String agentName = user?.displayName ?? 'Sales Associate';
-      String agentUid = user?.uid ?? '';
+      await _ensureAgentName();
+      String agentUid = _auth.currentUser?.uid ?? '';
 
       await _db.collection('payment_requests').add({
         'orderId': order.id,
         'manualOrderNo': order.manualOrderNo ?? 'Unknown',
         'clientName': order.clientName,
-        'agentName': agentName,
+        'agentName': currentAgentName,
         'agentUid': agentUid,
         'amount': amount,
         'status': 'pending',
@@ -254,7 +320,7 @@ class SalesHistoryController extends GetxController {
         await _db.collection('notifications').add({
           'targetUserId': managerDoc.id,
           'title': 'Payment Approval Required 💰',
-          'message': '$agentName collected ₹$amount for Order ${order.manualOrderNo}.',
+          'message': '$currentAgentName collected ₹$amount for Order ${order.manualOrderNo}.',
           'orderId': order.id,
           'timestamp': FieldValue.serverTimestamp(),
           'isRead': false,
@@ -271,21 +337,15 @@ class SalesHistoryController extends GetxController {
       );
 
     } catch (e) {
-      Get.snackbar(
-          "Error",
-          "Failed to submit payment request: $e",
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-          colorText: Colors.red
-      );
+      Get.snackbar("Error", "Failed to submit payment request: $e",
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
-  // ✅ 7. CHECK PENDING PAYMENT STATUS
-  // ✅ FIX: Changed String to String? and added a null check
   Stream<bool> hasPendingPayment(String? orderId) {
-    if (orderId == null) return Stream.value(false); // Safety check
+    if (orderId == null) return Stream.value(false);
 
     return _db.collection('payment_requests')
         .where('orderId', isEqualTo: orderId)

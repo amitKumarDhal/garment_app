@@ -13,15 +13,14 @@ class UnitSupervisorController extends GetxController {
   var activeOrders = <OrderModel>[].obs;
   var supervisorName = 'Supervisor'.obs;
   var isLoading = true.obs;
+  var visibleOrdersCount = 10.obs;
 
   StreamSubscription? _ordersSubscription;
   StreamSubscription? _inventorySubscription;
   StreamSubscription? _mockupSubscription;
 
-  // ✅ OBSERVABLE INVENTORY MAP (Key: "fabric_color", Value: total quantity)
   final RxMap<String, double> inventoryStock = <String, double>{}.obs;
 
-  // ✅ OBSERVABLE MOCKUP LISTS
   var pendingMockupOrders = <OrderModel>[].obs;
   var doneMockupOrders = <OrderModel>[].obs;
 
@@ -49,17 +48,18 @@ class UnitSupervisorController extends GetxController {
   void onClose() {
     _ordersSubscription?.cancel();
     _inventorySubscription?.cancel();
-    _mockupSubscription?.cancel(); // ✅ Clean up memory
+    _mockupSubscription?.cancel();
     super.onClose();
   }
 
   // ===========================================================================
-  // ✅ MOCKUP LOGIC: FETCH & SPLIT MOCKUP ORDERS
+  // ✅ MOCKUP LOGIC
   // ===========================================================================
   void listenToMockupOrders() {
+    _mockupSubscription?.cancel();
     _mockupSubscription = _db.collection('orders')
-    // Focus on early production stages for mockups
         .where('status', whereIn: ['Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done'])
+        .limit(50) // ✅ OPTIMIZED: Hard cap prevents quota burn
         .snapshots()
         .listen((snapshot) {
 
@@ -67,9 +67,7 @@ class UnitSupervisorController extends GetxController {
       doneMockupOrders.clear();
 
       for (var doc in snapshot.docs) {
-        // Safe mapping using your specific OrderModel parser
         OrderModel order = OrderModel.fromSnapshot(doc);
-
         bool isMockupDone = doc.data().containsKey('mockupDone') ? doc.data()['mockupDone'] : false;
 
         if (isMockupDone) {
@@ -81,100 +79,60 @@ class UnitSupervisorController extends GetxController {
     }, onError: (e) => debugPrint("Error fetching mockups: $e"));
   }
 
-
-  // ✅ MOCKUP LOGIC: MARK MOCKUP AS DONE
-// ===========================================================================
-  // ✅ MARK MOCKUP AS DONE (Full Update with Timestamp & User Attribution)
-  // ===========================================================================
   Future<void> markMockupDone(dynamic order) async {
     try {
-      // 1. Safety Check: Ensure we have a name to record
-      String approverName = supervisorName.value.trim().isEmpty
-          ? "Unit Supervisor"
-          : supervisorName.value;
+      String approverName = supervisorName.value.trim().isEmpty ? "Unit Supervisor" : supervisorName.value;
 
-      // 2. Show Loading Overlay
-      Get.dialog(
-          const Center(child: CircularProgressIndicator(color: TColors.primary)),
-          barrierDismissible: false
-      );
+      Get.dialog(const Center(child: CircularProgressIndicator(color: TColors.primary)), barrierDismissible: false);
 
-      // 3. Update Firestore
       await _db.collection('orders').doc(order.id).update({
         'mockupDone': true,
-        'mockupApprovedBy': approverName,          // ✅ Records exactly who clicked "Done"
-        'mockupDoneAt': FieldValue.serverTimestamp(), // ✅ Records exactly when it happened
-        'lastUpdatedBy': approverName,             // ✅ General audit fallback
+        'mockupApprovedBy': approverName,
+        'mockupDoneAt': FieldValue.serverTimestamp(),
+        'lastUpdatedBy': approverName,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 4. Close Loading Dialog
       Get.back();
-
-      // 5. Success Feedback
       Get.snackbar(
-        "Mockup Approved",
-        "Design set to DONE by $approverName",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        icon: const Icon(Icons.verified_user_rounded, color: Colors.white),
-        duration: const Duration(seconds: 2),
+        "Mockup Approved", "Design set to DONE by $approverName",
+        backgroundColor: Colors.green, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM,
       );
-
     } catch (e) {
-      // Close loading dialog on error
       if (Get.isDialogOpen!) Get.back();
-
-      debugPrint("❌ Mockup Update Error: $e");
-      Get.snackbar(
-          "Update Failed",
-          "Could not save approval: $e",
-          backgroundColor: Colors.redAccent,
-          colorText: Colors.white
-      );
+      Get.snackbar("Update Failed", "Could not save approval: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
     }
-  }  // ===========================================================================
-  // ✅ UPDATED FABRIC YIELD CALCULATOR
+  }
+
   // ===========================================================================
-  /// Returns a formatted string like "28.5 KG" or "Not Specified"
+  // ✅ FABRIC YIELD CALCULATOR
+  // ===========================================================================
   String getFabricRequiredText(int totalPieces, String fabricOrProductName) {
     String normalized = fabricOrProductName.toLowerCase().trim();
     double yieldPerKg = 0.0;
 
-    // Matching exact fabric types from your dropdown
-    if (normalized.contains('pc matty')) {
-      yieldPerKg = 3.2;
-    } else if (normalized.contains('spun') || normalized.contains('spun matty')) {
-      yieldPerKg = 3.5;
-    } else if (normalized.contains('nokia')) {
-      yieldPerKg = 6.0;
-    } else if (normalized.contains('dotknit') || normalized.contains('dot')) {
-      yieldPerKg = 4.0;
-    } else if (normalized.contains('matty')) {
-      // General fallback if they just type "matty"
-      yieldPerKg = 3.5;
-    }
+    if (normalized.contains('pc matty')) yieldPerKg = 3.2;
+    else if (normalized.contains('spun') || normalized.contains('spun matty')) yieldPerKg = 3.5;
+    else if (normalized.contains('nokia')) yieldPerKg = 6.0;
+    else if (normalized.contains('dotknit') || normalized.contains('dot')) yieldPerKg = 4.0;
+    else if (normalized.contains('matty')) yieldPerKg = 3.5;
 
-    // If the string doesn't contain a known fabric name
-    if (yieldPerKg == 0.0) {
-      return "Not Specified";
-    }
+    if (yieldPerKg == 0.0) return "Not Specified";
 
-    // Calculate absolute KG needed
     double kgRequired = totalPieces / yieldPerKg;
-
-    // Add a standard 2% cutting/waste buffer, round up to 1 decimal point
     double finalRequirement = kgRequired * 1.02;
 
     return "${finalRequirement.toStringAsFixed(1)} KG";
   }
 
   // ===========================================================================
-  // ✅ REAL-TIME INVENTORY LOG AGGREGATOR
+  // ✅ REAL-TIME INVENTORY
   // ===========================================================================
   void listenToInventoryLogs() {
-    _inventorySubscription = _db.collection('inventory_logs').snapshots().listen((snapshot) {
+    _inventorySubscription?.cancel();
+    _inventorySubscription = _db.collection('inventory_logs')
+        .limit(300) // ✅ OPTIMIZED: Prevents downloading thousands of old logs
+        .snapshots().listen((snapshot) {
       Map<String, double> calculatedStock = {};
 
       for (var doc in snapshot.docs) {
@@ -184,33 +142,26 @@ class UnitSupervisorController extends GetxController {
         String type = (data['type'] ?? 'IN').toString().toUpperCase();
         double qty = double.tryParse(data['qty']?.toString() ?? '0') ?? 0.0;
 
-        // Leave the fabric name EXACTLY as it comes from the dropdown
-        // (e.g., "pc matty (240 gsm)") so it matches the Sales Order string perfectly.
         String baseFabric = rawProduct;
-
-        // Standardize collars just in case they are typed differently
-        if (rawProduct.contains('collar')) {
-          baseFabric = "collar";
-        }
+        if (rawProduct.contains('collar')) baseFabric = "collar";
 
         String key = "${baseFabric}_$rawColor";
 
-        if (type == 'IN') {
-          calculatedStock[key] = (calculatedStock[key] ?? 0.0) + qty;
-        } else if (type == 'OUT') {
-          calculatedStock[key] = (calculatedStock[key] ?? 0.0) - qty;
-        }
+        if (type == 'IN') calculatedStock[key] = (calculatedStock[key] ?? 0.0) + qty;
+        else if (type == 'OUT') calculatedStock[key] = (calculatedStock[key] ?? 0.0) - qty;
       }
-
       inventoryStock.value = calculatedStock;
     }, onError: (e) => debugPrint("Error fetching inventory logs: $e"));
   }
 
+  // ===========================================================================
+  // ✅ DATA FETCHING
+  // ===========================================================================
   Future<void> fetchSupervisorProfile() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        final doc = await _db.collection('users').doc(user.uid).get();
+        final doc = await _db.collection('users').doc(user.uid).get(const GetOptions(source: Source.serverAndCache));
         if (doc.exists) {
           String fullName = doc.data()?['FullName'] ?? doc.data()?['name'] ?? 'Supervisor';
           supervisorName.value = fullName.trim().split(' ').first;
@@ -230,16 +181,25 @@ class UnitSupervisorController extends GetxController {
 
     _ordersSubscription = _db.collection('orders')
         .where('status', whereIn: factoryStages)
-        .orderBy('deliveryDate', descending: false)
+    // ❌ REMOVED: .orderBy('deliveryDate') to prevent Firebase Index Crash
+        .limit(100) // ✅ OPTIMIZED: Hard cap on active items
         .snapshots()
         .listen((snapshot) {
 
       final validDocs = snapshot.docs.where((doc) => doc.data()['isDeleted'] != true);
-      activeOrders.value = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+      // Convert to list of OrderModels
+      List<OrderModel> ordersList = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+
+      // ✅ LOCAL SORT: Sorts by delivery date perfectly without needing Firebase Indexes!
+      ordersList.sort((a, b) => a.deliveryDate.compareTo(b.deliveryDate));
+
+      activeOrders.value = ordersList;
       isLoading.value = false;
 
       if (!completer.isCompleted) completer.complete();
     }, onError: (e) {
+      debugPrint("Fetch Orders Error: $e");
       isLoading.value = false;
       if (!completer.isCompleted) completer.complete();
     });
@@ -247,6 +207,9 @@ class UnitSupervisorController extends GetxController {
     return completer.future;
   }
 
+  // ===========================================================================
+  // ✅ UPDATES & FILTERS
+  // ===========================================================================
   Future<void> updateProductionStage(String orderId, String currentStatus, String newStatus, {String remark = ""}) async {
     try {
       final historyEvent = {
@@ -316,9 +279,7 @@ class UnitSupervisorController extends GetxController {
       },
     );
 
-    if (newDateRange != null) {
-      selectedDateRange.value = newDateRange;
-    }
+    if (newDateRange != null) selectedDateRange.value = newDateRange;
   }
 
   List<OrderModel> get filteredOrders {

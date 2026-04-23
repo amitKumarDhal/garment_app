@@ -22,6 +22,7 @@ class StockInOutController extends GetxController {
   var selectedProduct = ''.obs;
   var selectedColor = ''.obs;
   var selectedCollarStyle = 'Solid color'.obs;
+  var visibleLogCount = 5.obs;
 
   var recentHistory = <Map<String, dynamic>>[].obs;
   var currentBalance = 0.0.obs;

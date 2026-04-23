@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 
 import '../../controllers/production/unit_supervisor_controller.dart';
 import '../../utils/constants/colors.dart';
@@ -138,7 +139,10 @@ class UnitSupervisorHome extends StatelessWidget {
         return RefreshIndicator(
           color: TColors.primary,
           backgroundColor: isDark ? TColors.darkCard : Colors.white,
-          onRefresh: () async => controller.fetchActiveOrders(),
+          onRefresh: () async {
+            controller.visibleOrdersCount.value = 10; // Reset UI pagination on pull
+            await controller.fetchActiveOrders();
+          },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 100),
@@ -238,102 +242,130 @@ class UnitSupervisorHome extends StatelessWidget {
                             child: Center(child: Text("Floor is clear!", style: TextStyle(color: TColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600))),
                           )
                         else
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 350),
-                            child: Scrollbar(
-                              child: ListView.separated(
-                                padding: EdgeInsets.zero,
-                                physics: const BouncingScrollPhysics(),
-                                shrinkWrap: true,
-                                itemCount: floorOrders.length,
-                                separatorBuilder: (context, index) => Divider(color: isDark ? Colors.white10 : TColors.error.withValues(alpha: 0.05), height: 1, indent: 16, endIndent: 16),
-                                itemBuilder: (context, index) {
-                                  var order = floorOrders[index];
-                                  DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
-                                  int daysLeft = deadline.difference(today).inDays;
+                          Obx(() {
+                            // ✅ UI PAGINATION LOGIC
+                            int totalOrders = floorOrders.length;
+                            int displayCount = controller.visibleOrdersCount.value;
+                            if (displayCount > totalOrders) displayCount = totalOrders;
 
-                                  bool isOverdue = daysLeft < 0;
-                                  bool isDueToday = daysLeft == 0;
-                                  bool isPacked = order.status.toLowerCase() == 'packed';
-                                  bool isOutSrc = order.status.toLowerCase() == 'out src';
+                            final displayedOrders = floorOrders.sublist(0, displayCount);
 
-                                  Color alertColor = isPacked ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber)));
+                            return ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 400),
+                              child: Scrollbar(
+                                child: ListView.separated(
+                                  padding: EdgeInsets.zero,
+                                  physics: const BouncingScrollPhysics(),
+                                  shrinkWrap: true,
+                                  itemCount: displayCount < totalOrders ? displayCount + 1 : displayCount,
+                                  separatorBuilder: (context, index) => Divider(color: isDark ? Colors.white10 : TColors.error.withValues(alpha: 0.05), height: 1, indent: 16, endIndent: 16),
+                                  itemBuilder: (context, index) {
 
-                                  String fabricRequired = controller.getFabricRequiredText(order.quantity, order.productName);
+                                    // ✅ "SHOW MORE" BUTTON AT THE BOTTOM OF THE LIST
+                                    if (index == displayCount) {
+                                      return Padding(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            HapticFeedback.lightImpact();
+                                            controller.visibleOrdersCount.value += 10;
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                              side: BorderSide(color: TColors.error.withValues(alpha: 0.3)),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                                          ),
+                                          child: Text("Show More Orders (${totalOrders - displayCount} left)", style: const TextStyle(color: TColors.error, fontWeight: FontWeight.bold)),
+                                        ),
+                                      );
+                                    }
 
-                                  return GestureDetector(
-                                    onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                      child: Row(
-                                        children: [
-                                          Container(width: 3, height: 32, decoration: BoxDecoration(color: alertColor, borderRadius: BorderRadius.circular(2))),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                RichText(
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  text: TextSpan(
-                                                    style: const TextStyle(fontFamily: 'Urbanist'),
-                                                    children: [
-                                                      TextSpan(text: "${order.manualOrderNo ?? order.id?.substring(0,5)} ", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: textColor)),
-                                                      TextSpan(text: "• ${order.clientName}", style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: TColors.textSecondary)),
-                                                    ],
+                                    var order = displayedOrders[index];
+                                    DateTime deadline = DateTime(order.deliveryDate.year, order.deliveryDate.month, order.deliveryDate.day);
+                                    int daysLeft = deadline.difference(today).inDays;
+
+                                    bool isOverdue = daysLeft < 0;
+                                    bool isDueToday = daysLeft == 0;
+                                    bool isPacked = order.status.toLowerCase() == 'packed';
+                                    bool isOutSrc = order.status.toLowerCase() == 'out src';
+
+                                    Color alertColor = isPacked ? TColors.success : (isOutSrc ? Colors.indigoAccent : (isOverdue ? TColors.error : (isDueToday ? TColors.warning : Colors.amber)));
+
+                                    String fabricRequired = controller.getFabricRequiredText(order.quantity, order.productName);
+
+                                    return GestureDetector(
+                                      onTap: () => _showUpdateStageDialog(context, order, controller, isDark, textColor),
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        child: Row(
+                                          children: [
+                                            Container(width: 3, height: 32, decoration: BoxDecoration(color: alertColor, borderRadius: BorderRadius.circular(2))),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  RichText(
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    text: TextSpan(
+                                                      style: const TextStyle(fontFamily: 'Urbanist'),
+                                                      children: [
+                                                        TextSpan(text: "${order.manualOrderNo ?? order.id?.substring(0,5)} ", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: textColor)),
+                                                        TextSpan(text: "• ${order.clientName}", style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: TColors.textSecondary)),
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
-                                                const SizedBox(height: 6),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.inventory_2_outlined, size: 12, color: TColors.textSecondary),
-                                                    const SizedBox(width: 4),
-                                                    Expanded(child: Text("${order.quantity} Units stuck in ${order.status.toUpperCase()}", style: const TextStyle(fontSize: 11, color: TColors.textSecondary, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                                                  ],
-                                                ),
-                                                if (fabricRequired != "Not Specified") ...[
-                                                  const SizedBox(height: 4),
+                                                  const SizedBox(height: 6),
                                                   Row(
                                                     children: [
-                                                      const Icon(Icons.calculate_rounded, size: 12, color: Colors.blueAccent),
+                                                      const Icon(Icons.inventory_2_outlined, size: 12, color: TColors.textSecondary),
                                                       const SizedBox(width: 4),
-                                                      Expanded(child: Text("Needs $fabricRequired", style: const TextStyle(fontSize: 11, color: Colors.blueAccent, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                                      Expanded(child: Text("${order.quantity} Units stuck in ${order.status.toUpperCase()}", style: const TextStyle(fontSize: 11, color: TColors.textSecondary, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
                                                     ],
                                                   ),
-                                                ]
-                                              ],
+                                                  if (fabricRequired != "Not Specified") ...[
+                                                    const SizedBox(height: 4),
+                                                    Row(
+                                                      children: [
+                                                        const Icon(Icons.calculate_rounded, size: 12, color: Colors.blueAccent),
+                                                        const SizedBox(width: 4),
+                                                        Expanded(child: Text("Needs $fabricRequired", style: const TextStyle(fontSize: 11, color: Colors.blueAccent, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                                      ],
+                                                    ),
+                                                  ]
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Builder(
-                                              builder: (context) {
-                                                String text = isPacked
-                                                    ? "READY: ${daysLeft < 0 ? '${daysLeft.abs()} LATE' : (daysLeft == 0 ? 'TODAY' : 'IN $daysLeft DAYS')}"
-                                                    : (isOverdue ? "${daysLeft.abs()} DAYS LATE" : (isDueToday ? "DUE TODAY" : "In $daysLeft days"));
+                                            const SizedBox(width: 8),
+                                            Builder(
+                                                builder: (context) {
+                                                  String text = isPacked
+                                                      ? "READY: ${daysLeft < 0 ? '${daysLeft.abs()} LATE' : (daysLeft == 0 ? 'TODAY' : 'IN $daysLeft DAYS')}"
+                                                      : (isOverdue ? "${daysLeft.abs()} DAYS LATE" : (isDueToday ? "DUE TODAY" : "In $daysLeft days"));
 
-                                                if (isOverdue || isDueToday || isPacked) {
-                                                  return Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                                    decoration: BoxDecoration(color: alertColor.withValues(alpha: 0.05), border: Border.all(color: alertColor.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(6)),
-                                                    child: Text(text.toUpperCase(), style: TextStyle(color: alertColor, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                                                  );
-                                                } else {
-                                                  return Text(text, style: TextStyle(color: alertColor, fontSize: 10, fontWeight: FontWeight.w800));
+                                                  if (isOverdue || isDueToday || isPacked) {
+                                                    return Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                      decoration: BoxDecoration(color: alertColor.withValues(alpha: 0.05), border: Border.all(color: alertColor.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(6)),
+                                                      child: Text(text.toUpperCase(), style: TextStyle(color: alertColor, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                                                    );
+                                                  } else {
+                                                    return Text(text, style: TextStyle(color: alertColor, fontSize: 10, fontWeight: FontWeight.w800));
+                                                  }
                                                 }
-                                              }
-                                          ),
-                                          const SizedBox(width: 4),
-                                          const Icon(Icons.chevron_right_rounded, color: TColors.textSecondary, size: 18),
-                                        ],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            const Icon(Icons.chevron_right_rounded, color: TColors.textSecondary, size: 18),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          }),
                         Divider(color: isDark ? Colors.white10 : TColors.error.withValues(alpha: 0.1), height: 1),
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
@@ -345,6 +377,7 @@ class UnitSupervisorHome extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 24),
+                // ✅ Passes FULL floorOrders list so the schedule timeline is 100% accurate
                 _buildDatewiseDeliverables(floorOrders, isDark, textColor, controller, today, context),
                 const SizedBox(height: 40),
               ],
@@ -880,7 +913,6 @@ class UnitSupervisorHome extends StatelessWidget {
 
                       _buildMaterialRequirementCard(order, isDark, textColor, controller),
 
-                      // ✅ THE FIX IS HERE: DETAILED PRODUCT LIST INSTEAD OF SUMMARY
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(

@@ -87,7 +87,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     );
   }
 
-  // ✅ DOWNLOAD AND SAVE TO GALLERY LOGIC
   Future<void> _downloadAndSaveImage(String url, String orderNo) async {
     try {
       Get.snackbar("Downloading...", "Saving mockup to your gallery.",
@@ -115,7 +114,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     Color statusColor = _getStatusColor(displayStatus);
 
-    // DYNAMIC CALCULATIONS FOR RECEIPT
     double calculatedSubtotal = 0;
     double calculatedTax = 0;
 
@@ -140,7 +138,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black87, size: 20),
           onPressed: () => Get.back(),
         ),
-        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         title: Row(
           children: [
             Text(
@@ -193,22 +190,12 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         imageUrl: currentOrder.mockupUrl!,
                         fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
-                        errorWidget: (context, url, error) => Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.broken_image_rounded, color: TColors.error.withValues(alpha: 0.5), size: 40),
-                            const SizedBox(height: 8),
-                            const Text("Image Error", style: TextStyle(color: TColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                        errorWidget: (context, url, error) => const Icon(Icons.broken_image_rounded, size: 40),
                       ),
                     ),
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(top: 8.0, bottom: 28.0),
-                  child: Center(child: Text("Tap image to view full screen & download", style: TextStyle(fontSize: 10, color: TColors.textSecondary, fontStyle: FontStyle.italic))),
-                ),
+                const SizedBox(height: 28),
               ],
 
               // --- 1. KEY INFO CARD ---
@@ -221,19 +208,13 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                 _buildDetailRow(Icons.phone_outlined, "Phone", currentOrder.clientPhone ?? "N/A", isDark),
                 _buildDivider(isDark),
                 _buildDetailRow(Icons.location_on_outlined, "Address", currentOrder.clientAddress ?? "N/A", isDark),
-
-                if ((currentOrder.state != null && currentOrder.state!.isNotEmpty) || (currentOrder.pincode != null && currentOrder.pincode!.isNotEmpty)) ...[
-                  _buildDivider(isDark),
-                  _buildDetailRow(Icons.map_outlined, "State & PIN", "${currentOrder.state ?? 'N/A'} - ${currentOrder.pincode ?? 'N/A'}", isDark),
-                ],
-
                 _buildDivider(isDark),
                 _buildDetailRow(Icons.calendar_month_rounded, "Deadline", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate), isDark, color: Colors.redAccent),
               ]),
               const SizedBox(height: 28),
 
               // --- 2. DYNAMIC ITEM LIST ---
-              _buildSectionTitle("Itemized Products (${currentOrder.products.length})", Icons.inventory_2_outlined, isDark),
+              _buildSectionTitle("Itemized Products", Icons.inventory_2_outlined, isDark),
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -245,16 +226,12 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   int iQty = int.tryParse(item['qty']?.toString() ?? '0') ?? 0;
                   double iTotal = double.tryParse(item['total']?.toString() ?? '0') ?? (iPrice * iQty);
 
-                  String neck = item['neckType'] ?? 'Not Specified';
-                  String type = item['productType'] ?? 'Not Specified';
-
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
-                      boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,28 +244,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                           ],
                         ),
                         const SizedBox(height: 8),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                          child: Text(
-                              "Type: $type  |  Neck: $neck",
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: TColors.primary)
-                          ),
-                        ),
-
-                        Row(
-                          children: [
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.grey.withValues(alpha:0.1), borderRadius: BorderRadius.circular(4)), child: Text(item['productCode'] ?? "NO SKU", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey.shade600))),
-                            const SizedBox(width: 8),
-                            Text("${item['qty']} Units × ${currency.format(iPrice)}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
-                          ],
-                        ),
-                        if (item['sizeDescription'] != null && item['sizeDescription'].toString().isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text("Sizes: ${item['sizeDescription']}", style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
-                        ]
+                        Text("${item['qty']} Units × ${currency.format(iPrice)}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
                       ],
                     ),
                   );
@@ -296,114 +252,34 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
               ),
               const SizedBox(height: 28),
 
-              // --- 3. FINANCIAL BREAKDOWN WITH PAYMENT HISTORY ---
+              // --- 3. FINANCIAL BREAKDOWN ---
               _buildSectionTitle("Financial Ledger", Icons.receipt_long_rounded, isDark),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.green.withValues(alpha:isDark ? 0.3 : 0.5), width: 1.5),
-                  boxShadow: [if (!isDark) BoxShadow(color: Colors.green.withValues(alpha:0.05), blurRadius: 15, offset: const Offset(0, 5))],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              _buildCard(isDark, [
+                _buildFinanceRow("Items Subtotal", currency.format(calculatedSubtotal), isDark),
+                const SizedBox(height: 8),
+                _buildFinanceRow("Total Tax (GST)", "+ ${currency.format(calculatedTax)}", isDark),
+                const SizedBox(height: 8),
+                _buildFinanceRow("Shipping Charge", "+ ${currency.format(currentOrder.shippingCharge)}", isDark),
+                const SizedBox(height: 16),
+                _buildDashedDivider(isDark),
+                const SizedBox(height: 16),
+                _buildFinanceRow("Grand Total", currency.format(currentOrder.totalAmount), isDark, isBold: true, fontSize: 16),
+                const SizedBox(height: 16),
+                _buildFinanceRow("Advance Paid", "- ${currency.format(currentOrder.advanceAmount)}", isDark, color: Colors.redAccent),
+                const SizedBox(height: 16),
+                _buildDashedDivider(isDark),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildFinanceRow("Items Subtotal", currency.format(calculatedSubtotal), isDark),
-                    const SizedBox(height: 8),
-                    _buildFinanceRow("Total Tax (GST)", "+ ${currency.format(calculatedTax)}", isDark),
-                    const SizedBox(height: 8),
-                    _buildFinanceRow("Shipping Charge", "+ ${currency.format(currentOrder.shippingCharge)}", isDark),
-                    const SizedBox(height: 16),
-                    _buildDashedDivider(isDark),
-                    const SizedBox(height: 16),
-                    _buildFinanceRow("Grand Total", currency.format(currentOrder.totalAmount), isDark, isBold: true, fontSize: 16),
-                    const SizedBox(height: 12),
-
-                    if (currentOrder.paymentHistory.isNotEmpty) ...[
-                      const Text("Payment Record:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-                      const SizedBox(height: 8),
-                      ...currentOrder.paymentHistory.map((payment) {
-
-                        double amount = 0.0;
-                        if (payment['amount'] != null) {
-                          amount = double.tryParse(payment['amount'].toString()) ?? 0.0;
-                        }
-
-                        String dateStr = "Unknown Date";
-                        if (payment['date'] != null) {
-                          DateTime dt = (payment['date'] as Timestamp).toDate();
-                          dateStr = DateFormat('dd MMM, hh:mm a').format(dt);
-                        }
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 6.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                  "Paid on $dateStr",
-                                  style: TextStyle(fontSize: 12, color: Colors.redAccent.withValues(alpha: 0.8), fontStyle: FontStyle.italic)
-                              ),
-                              Text(
-                                  "- ${currency.format(amount)}",
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.redAccent)
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ] else if (currentOrder.advanceAmount > 0) ...[
-                      _buildFinanceRow("Advance Paid", "- ${currency.format(currentOrder.advanceAmount)}", isDark, color: Colors.redAccent),
-                    ],
-
-                    const SizedBox(height: 16),
-                    _buildDashedDivider(isDark),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text("REMAINING AMOUNT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.grey, letterSpacing: 0.5)),
-                        Text(currency.format(currentOrder.balanceDue), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: currentOrder.balanceDue <= 0 ? Colors.green : Colors.redAccent)),
-                      ],
-                    ),
-
-                    if (currentOrder.balanceDue <= 0) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.withValues(alpha: 0.3), width: 1.5),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.verified_rounded, color: Colors.green, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              "FULL PAYMENT SUCCESSFUL",
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    ]
+                    const Text("BALANCE DUE", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.grey)),
+                    Text(currency.format(currentOrder.balanceDue), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: currentOrder.balanceDue <= 0 ? Colors.green : Colors.redAccent)),
                   ],
                 ),
-              ),
+              ]),
               const SizedBox(height: 32),
 
-              // --- 4. SMART ACTION AREA (Production Status) ---
+              // --- 4. SMART ACTION AREA (History Removed) ---
               if (displayStatus == 'Placed' || displayStatus == 'Pending') ...[
                 Row(
                   children: [
@@ -415,24 +291,10 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         }),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(color: Colors.redAccent.withValues(alpha:0.5), width: 1.5),
+                          side: const BorderSide(color: Colors.redAccent, width: 1.5),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: const Text("REJECT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      height: 52,
-                      width: 52,
-                      decoration: BoxDecoration(
-                          color: isDark ? Colors.white10 : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: isDark ? Colors.transparent : Colors.grey.shade300)
-                      ),
-                      child: IconButton(
-                        icon: Icon(Icons.history_rounded, color: isDark ? Colors.white : Colors.black87, size: 22),
-                        onPressed: () => _showHistoryDialog(context, currentOrder, isDark),
+                        child: const Text("REJECT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -444,11 +306,10 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         }),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
-                          elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: const Text("APPROVE ORDER", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                        child: const Text("APPROVE ORDER", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                       ),
                     ),
                   ],
@@ -460,126 +321,54 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.05)),
-                    boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                    border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: controller.productionStages.contains(displayStatus) ? displayStatus : null,
-                              icon: const Icon(Icons.swap_vert_rounded, color: Colors.grey),
-                              decoration: InputDecoration(
-                                labelText: "Current Stage",
-                                labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600),
-                                filled: true,
-                                fillColor: isDark ? Colors.black.withValues(alpha:0.2) : Colors.grey.shade50,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05))),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TColors.primary, width: 1.5)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              ),
-                              style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87, fontSize: 15),
-                              items: controller.productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
-
-                              onChanged: (newValue) {
-                                if (newValue != null && newValue.toLowerCase() != displayStatus.toLowerCase()) {
-                                  HapticFeedback.lightImpact();
-                                  _confirmAction("Move to $newValue", Colors.blue, () async {
-                                    setState(() => displayStatus = newValue);
-                                    await controller.updateOrderStatus(currentOrder.id!, newValue);
-                                  });
-                                } else if (newValue != null && newValue.toLowerCase() == displayStatus.toLowerCase()) {
-                                  Get.snackbar(
-                                    "Notice",
-                                    "The order is already marked as $newValue.",
-                                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                                    colorText: Colors.blue,
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            height: 52,
-                            width: 52,
-                            decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: isDark ? Colors.transparent : Colors.grey.shade300)
-                            ),
-                            child: IconButton(
-                              icon: Icon(Icons.history_rounded, color: isDark ? Colors.white : Colors.black87, size: 22),
-                              onPressed: () => _showHistoryDialog(context, currentOrder, isDark),
-                            ),
-                          ),
-                        ],
+                      DropdownButtonFormField<String>(
+                        value: controller.productionStages.contains(displayStatus) ? displayStatus : null,
+                        decoration: InputDecoration(
+                          labelText: "Move to Stage",
+                          filled: true,
+                          fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        items: controller.productionStages.map((stage) => DropdownMenuItem(value: stage, child: Text(stage))).toList(),
+                        onChanged: (newValue) {
+                          if (newValue != null && newValue != displayStatus) {
+                            _confirmAction("Move to $newValue", Colors.blue, () async {
+                              setState(() => displayStatus = newValue);
+                              await controller.updateOrderStatus(currentOrder.id!, newValue);
+                            });
+                          }
+                        },
                       ),
                       const SizedBox(height: 12),
-
-                      // ✅ ADDED OUT SRC AND OTHER LOCKED STATUSES HERE TO PREVENT SALES MANAGER FROM EDITING IT IF THEY SHOULDN'T.
-                      // Wait, Sales Manager SHOULD be able to edit. The prompt instructions were to add Out SRC to the "locked from sales agent" list.
-                      // Let's make sure the Sales Manager "Edit Order" button (if they have one) or Cancel button handles it correctly.
-                      // Actually, Sales Manager CAN cancel orders.
-
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _confirmAction("Cancel & Reject", Colors.redAccent, () async {
-                            if (displayStatus != "Rejected") {
-                              await controller.rejectOrder(currentOrder.id!);
-                              setState(() => displayStatus = "Rejected");
-                            }
+                        child: OutlinedButton(
+                          onPressed: () => _confirmAction("Reject", Colors.redAccent, () async {
+                            await controller.rejectOrder(currentOrder.id!);
+                            setState(() => displayStatus = "Rejected");
                           }),
-                          icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 16),
-                          label: const Text("CANCEL ORDER", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.5)),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: BorderSide(color: Colors.redAccent.withValues(alpha:0.3)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
+                          child: const Text("CANCEL & REJECT ORDER", style: TextStyle(color: Colors.redAccent)),
                         ),
                       ),
-
                     ],
                   ),
                 ),
               ] else ...[
-                Column(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
-                      child: Center(
-                        child: Text("Order is ${displayStatus.toUpperCase()}.", style: TextStyle(color: isDark ? Colors.redAccent : Colors.red, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showHistoryDialog(context, currentOrder, isDark),
-                        icon: const Icon(Icons.history_rounded, size: 18),
-                        label: const Text("VIEW ORDER HISTORY", style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: BorderSide(color: Colors.grey.shade400),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                        ),
-                      ),
-                    )
-                  ],
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
+                  child: Center(
+                    child: Text("Order is ${displayStatus.toUpperCase()}.", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800)),
+                  ),
                 ),
               ],
 
               const SizedBox(height: 24),
-
               EffectiveRevenueSection(order: currentOrder),
 
               if (displayStatus != 'Rejected')
@@ -587,14 +376,12 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      HapticFeedback.lightImpact();
                       await PdfInvoiceService.generateAndPrintInvoice(currentOrder);
                     },
-                    icon: Icon(Icons.print_rounded, color: isDark ? Colors.white70 : Colors.black54, size: 20),
-                    label: Text("PRINT INVOICE", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    icon: const Icon(Icons.print_rounded),
+                    label: const Text("PRINT INVOICE", style: TextStyle(fontWeight: FontWeight.w800)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 1.5),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                   ),
@@ -615,7 +402,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
       padding: const EdgeInsets.only(left: 4, bottom: 12),
       child: Row(
         children: [
-          Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: TColors.primary.withValues(alpha:0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icon, size: 16, color: TColors.primary)),
+          Icon(icon, size: 16, color: TColors.primary),
           const SizedBox(width: 10),
           Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
         ],
@@ -629,8 +416,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
-        boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha:0.03), blurRadius: 15, offset: const Offset(0, 5))],
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
       ),
       child: Column(children: children),
     );
@@ -640,17 +426,23 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start, // Ensures icon stays at the top if text wraps
         children: [
           Icon(icon, size: 18, color: Colors.grey.shade500),
           const SizedBox(width: 12),
-          Expanded(flex: 2, child: Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w500))),
+          // Wrapped in Expanded to prevent overflow
+          Expanded(
+              flex: 2,
+              child: Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
+          ),
+          const SizedBox(width: 8),
+          // Wrapped in Expanded to allow long addresses/names to wrap to the next line
           Expanded(
             flex: 3,
             child: Text(
               value,
-              textAlign: TextAlign.end,
-              style: TextStyle(fontWeight: isBold ? FontWeight.w800 : FontWeight.w600, fontSize: 14, color: color ?? (isDark ? Colors.white : Colors.black87)),
+              textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: isBold ? FontWeight.w800 : FontWeight.w600, color: color ?? (isDark ? Colors.white : Colors.black87)),
             ),
           ),
         ],
@@ -660,151 +452,57 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
 
   Widget _buildFinanceRow(String label, String value, bool isDark, {bool isBold = false, double fontSize = 13, Color? color}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: fontSize, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
+        // Wrapped in Expanded to prevent overflow if the label is long
+        Expanded(
+            child: Text(label, style: TextStyle(fontSize: fontSize, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600))
+        ),
+        const SizedBox(width: 8),
         Text(value, style: TextStyle(fontSize: fontSize, fontWeight: isBold ? FontWeight.w900 : FontWeight.w600, color: color ?? (isDark ? Colors.white : Colors.black87))),
       ],
     );
   }
 
   Widget _buildDivider(bool isDark) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05), thickness: 1));
+    return Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.05));
   }
 
   Widget _buildDashedDivider(bool isDark) {
     return Row(children: List.generate(40, (index) => Expanded(child: Container(color: index % 2 == 0 ? Colors.transparent : (isDark ? Colors.grey.shade800 : Colors.grey.shade300), height: 1.5))));
   }
 
-  void _confirmAction(String action, Color color, VoidCallback onConfirm) {
+  // ✅ IMPROVED: Loading logic to prevent multi-popups
+  void _confirmAction(String action, Color color, Future<void> Function() onConfirm) {
     Get.defaultDialog(
       title: "$action Order",
       titleStyle: TextStyle(fontWeight: FontWeight.w900, color: color),
-      middleText: "Are you sure you want to $action this order?\n\nIf rejected, the revenue will be deducted automatically.",
-      middleTextStyle: const TextStyle(fontSize: 14),
+      middleText: "Are you sure you want to $action this order?",
+      barrierDismissible: false,
       confirm: ElevatedButton(
-        onPressed: () {
-          onConfirm();
-          Get.back();
+        onPressed: () async {
+          Get.back(); // Close dialog
+
+          // Show loader
+          Get.dialog(
+            const Center(child: CircularProgressIndicator(color: TColors.primary)),
+            barrierDismissible: false,
+          );
+
+          await onConfirm();
+
+          if (Get.isDialogOpen ?? false) Get.back(); // Close loader
         },
-        style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-        ),
+        style: ElevatedButton.styleFrom(backgroundColor: color),
         child: const Text("Confirm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       cancel: OutlinedButton(
         onPressed: () => Get.back(),
-        style: OutlinedButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-        ),
         child: const Text("Cancel"),
       ),
     );
   }
 
-  void _showHistoryDialog(BuildContext context, OrderModel order, bool isDark) {
-    showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        builder: (context) {
-          List<dynamic> history = List.from(order.stageHistory.reversed);
-
-          return FractionallySizedBox(
-            heightFactor: 0.6,
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Stage History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Text(order.manualOrderNo ?? "Unknown ID", style: const TextStyle(color: TColors.primary, fontWeight: FontWeight.w900, fontSize: 12)),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (history.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Text("No updates have been made yet.", style: TextStyle(color: Colors.grey.shade500)),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: history.length,
-                        itemBuilder: (context, index) {
-                          var event = history[index];
-                          DateTime time = DateTime.now();
-                          if (event['timestamp'] != null) {
-                            time = (event['timestamp'] as Timestamp).toDate();
-                          }
-                          String stage = event['stage'] ?? 'Unknown Stage';
-                          String updater = event['updatedBy'] ?? 'System';
-                          Color color = _getStatusColor(stage);
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Column(
-                                  children: [
-                                    Container(
-                                      width: 14, height: 14,
-                                      decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.3), width: 3)),
-                                    ),
-                                    if (index != history.length - 1)
-                                      Container(width: 2, height: 40, color: isDark ? Colors.white10 : Colors.grey.shade200)
-                                  ],
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(stage, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.person_rounded, size: 12, color: Colors.grey.shade500),
-                                          const SizedBox(width: 4),
-                                          Text("Updated by $updater", style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-                                        ],
-                                      )
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                    DateFormat('dd MMM\nhh:mm a').format(time),
-                                    textAlign: TextAlign.right,
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, height: 1.3)
-                                )
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                ],
-              ),
-            ),
-          );
-        }
-    );
-  }
-
-  // ✅ ADDED OUT SRC COLOR MAP TO MANAGER APP
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
@@ -818,7 +516,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
       case 'stitched': return Colors.brown;
       case 'packing': return Colors.purple;
       case 'packed': return Colors.deepPurple;
-      case 'out src': return Colors.indigoAccent; // ✅ NEW
+      case 'out src': return Colors.indigoAccent;
       case 'shipping':
       case 'shipped': return Colors.teal;
       case 'delivered': return Colors.green;

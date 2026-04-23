@@ -301,7 +301,6 @@ class SalesDashboard extends StatelessWidget {
     final originalRole = controller.dbBaseRole;
     final currentRole = controller.userRole.value;
 
-    // If the dynamic calculated role is different from the base role in the DB, a promotion happened!
     if (originalRole != currentRole) {
       return Container(
         margin: const EdgeInsets.only(top: 16),
@@ -487,7 +486,6 @@ class SalesDashboard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // --- TOP ROW: Progress Ring + Gross Sales ---
             Row(
               children: [
                 SizedBox(
@@ -551,7 +549,6 @@ class SalesDashboard extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // --- EYE-CATCHY DUES CARD ---
             if (!controller.isSalesManager.value) ...[
               Container(
                 width: double.infinity,
@@ -619,7 +616,6 @@ class SalesDashboard extends StatelessWidget {
               const SizedBox(height: 12),
             ],
 
-            // --- NET ACHIEVEMENT PILL ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -668,7 +664,6 @@ class SalesDashboard extends StatelessWidget {
               ),
             ),
 
-            // --- SIMPLIFIED BONUS ROW ---
             if (!controller.isSalesManager.value && isMonthly) ...[
               const SizedBox(height: 12),
               Container(
@@ -763,206 +758,239 @@ class SalesDashboard extends StatelessWidget {
         );
       }
 
+      // ✅ UI PAGINATION LOGIC
+      int totalAgents = controller.leaderboardData.length;
+      int displayCount = controller.visibleLeaderboardCount.value;
+      if (displayCount > totalAgents) displayCount = totalAgents;
+
+      final displayedAgents = controller.leaderboardData.sublist(0, displayCount);
+
       return Column(
-        children: controller.leaderboardData.asMap().entries.map((entry) {
-          int index = entry.key;
-          var agent = entry.value;
-          int rank = index + 1;
+        children: [
+          ...displayedAgents.asMap().entries.map((entry) {
+            int index = entry.key;
+            var agent = entry.value;
+            int rank = index + 1; // Rank is based on index (1-based)
 
-          double rawAmount = (agent['amount'] as num).toDouble();
-          int totalOrders = agent['count'] ?? 0;
+            double rawAmount = (agent['amount'] as num).toDouble();
+            int totalOrders = agent['count'] ?? 0;
 
-          String exactAmountDisplay = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0,).format(rawAmount);
+            String exactAmountDisplay = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0,).format(rawAmount);
 
-          double progress = agent['progress'] ?? 0.0;
-          String roleStr = agent['roleStr'] ?? 'JSA';
+            double progress = agent['progress'] ?? 0.0;
+            String roleStr = agent['roleStr'] ?? 'JSA';
 
-          List<Color> rankGradient;
-          Color rankBorder;
-          Color textColor;
+            List<Color> rankGradient;
+            Color rankBorder;
+            Color textColor;
 
-          if (rank == 1) {
-            rankGradient = [const Color(0xFFFFD700), const Color(0xFFFFA000)];
-            rankBorder = const Color(0xFFFFD700);
-            textColor = Colors.white;
-          } else if (rank == 2) {
-            rankGradient = [const Color(0xFFB0BEC5), const Color(0xFF607D8B)];
-            rankBorder = const Color(0xFFCFD8DC);
-            textColor = Colors.white;
-          } else if (rank == 3) {
-            rankGradient = [const Color(0xFFCA8E5B), const Color(0xFF8D6E63)];
-            rankBorder = const Color(0xFFBCAAA4);
-            textColor = Colors.white;
-          } else {
-            rankGradient = isDark
-                ? [const Color(0xFF3A3A3C), const Color(0xFF2C2C2E)]
-                : [const Color(0xFFE5E5EA), const Color(0xFFD1D1D6)];
-            rankBorder = Colors.transparent;
-            textColor = isDark ? Colors.white : Colors.black87;
-          }
+            if (rank == 1) {
+              rankGradient = [const Color(0xFFFFD700), const Color(0xFFFFA000)];
+              rankBorder = const Color(0xFFFFD700);
+              textColor = Colors.white;
+            } else if (rank == 2) {
+              rankGradient = [const Color(0xFFB0BEC5), const Color(0xFF607D8B)];
+              rankBorder = const Color(0xFFCFD8DC);
+              textColor = Colors.white;
+            } else if (rank == 3) {
+              rankGradient = [const Color(0xFFCA8E5B), const Color(0xFF8D6E63)];
+              rankBorder = const Color(0xFFBCAAA4);
+              textColor = Colors.white;
+            } else {
+              rankGradient = isDark
+                  ? [const Color(0xFF3A3A3C), const Color(0xFF2C2C2E)]
+                  : [const Color(0xFFE5E5EA), const Color(0xFFD1D1D6)];
+              rankBorder = Colors.transparent;
+              textColor = isDark ? Colors.white : Colors.black87;
+            }
 
-          Color nameColor = isDark ? Colors.white : Colors.black87;
-          Color progressColor = progress >= 1.0 ? Colors.purpleAccent : progress >= 0.8 ? Colors.green : progress >= 0.5 ? Colors.amber : Colors.redAccent;
+            Color nameColor = isDark ? Colors.white : Colors.black87;
+            Color progressColor = progress >= 1.0 ? Colors.purpleAccent : progress >= 0.8 ? Colors.green : progress >= 0.5 ? Colors.amber : Colors.redAccent;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: rank <= 3
-                  ? Border.all(color: rankBorder.withValues(alpha:0.5), width: 1.5)
-                  : Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
-              boxShadow: [
-                if (!isDark)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha:0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: rankGradient,
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: rank <= 3
+                    ? Border.all(color: rankBorder.withValues(alpha:0.5), width: 1.5)
+                    : Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)),
+                boxShadow: [
+                  if (!isDark)
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha:0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: rankGradient.last.withValues(alpha:0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: rankGradient,
                       ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      "#$rank",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: textColor,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha:0.25),
-                            offset: const Offset(0, 1),
-                            blurRadius: 2,
-                          ),
-                        ],
-                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: rankGradient.last.withValues(alpha:0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    agent['name'] ?? 'Unknown',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: nameColor,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blueAccent.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.2)),
-                                  ),
-                                  child: Text(roleStr, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
-                                ),
-                              ],
+                    child: Center(
+                      child: Text(
+                        "#$rank",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: textColor,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha:0.25),
+                              offset: const Offset(0, 1),
+                              blurRadius: 2,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: progressColor.withValues(alpha:0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: progressColor.withValues(alpha:0.2)),
-                            ),
-                            child: Text(
-                              "${(progress * 100).toStringAsFixed(0)}%",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 12,
-                                color: progressColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            exactAmountDisplay,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              color: nameColor,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 1),
-                            child: Text(
-                              "•  $totalOrders Orders",
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: progress.clamp(0.0, 1.0),
-                          minHeight: 6,
-                          backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
-                          valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      agent['name'] ?? 'Unknown',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: nameColor,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueAccent.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.2)),
+                                    ),
+                                    child: Text(roleStr, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: progressColor.withValues(alpha:0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: progressColor.withValues(alpha:0.2)),
+                              ),
+                              child: Text(
+                                "${(progress * 100).toStringAsFixed(0)}%",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  color: progressColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              exactAmountDisplay,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: nameColor,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 1),
+                              child: Text(
+                                "•  $totalOrders Orders",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: progress.clamp(0.0, 1.0),
+                            minHeight: 6,
+                            backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // ✅ THE "SHOW MORE" BUTTON
+          if (displayCount < totalAgents)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 20),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    controller.visibleLeaderboardCount.value += 10; // Load next 10
+                  },
+                  style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                  ),
+                  child: Text(
+                      "Show More Agents (${totalAgents - displayCount} left)",
+                      style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)
                   ),
                 ),
-              ],
-            ),
-          );
-        }).toList(),
+              ),
+            )
+        ],
       );
     });
   }

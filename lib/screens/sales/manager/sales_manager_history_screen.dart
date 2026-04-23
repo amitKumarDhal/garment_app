@@ -18,11 +18,40 @@ import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 import 'sales_manager_order_details.dart';
 
-class SalesManagerHistoryScreen extends StatelessWidget {
+// ✅ 1. Converted to StatefulWidget to manage Scroll Controller
+class SalesManagerHistoryScreen extends StatefulWidget {
   const SalesManagerHistoryScreen({super.key});
 
+  @override
+  State<SalesManagerHistoryScreen> createState() => _SalesManagerHistoryScreenState();
+}
+
+class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
+  late final SalesManagerHistoryController controller;
+  final ScrollController _scrollController = ScrollController(); // ✅ 2. Added ScrollController
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(SalesManagerHistoryController());
+
+    // ✅ 3. Attach listener to detect when user scrolls to the bottom
+    _scrollController.addListener(() {
+      // If we are within 200 pixels of the bottom, tell the controller to fetch more!
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        controller.fetchNextPage(); // This method needs to exist in your controller
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose(); // ✅ Clean up memory
+    super.dispose();
+  }
+
   // ===========================================================================
-  // ✅ ENHANCED EXCEL EXPORT LOGIC (Month & Filter Specific)
+  // ✅ EXCEL EXPORT LOGIC
   // ===========================================================================
   Future<void> _exportToExcel(List<OrderModel> orders, String filterStatus) async {
     if (orders.isEmpty) {
@@ -35,13 +64,11 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       Get.snackbar("Exporting...", "Generating Excel file, please wait.",
           backgroundColor: Colors.blue.withValues(alpha: 0.1), colorText: Colors.blue);
 
-      // 1. Fetch the exact timeframe/month the manager is looking at
       final mainController = Get.find<SalesManagerController>();
       String timeLabel = mainController.selectedTimeframe.value == 'Monthly'
           ? DateFormat('MMMM yyyy').format(mainController.selectedMonth.value)
           : mainController.selectedTimeframe.value;
 
-      // Safe strings for the file name (removes spaces)
       String safeTimeLabel = timeLabel.replaceAll(' ', '_');
       String safeFilter = filterStatus.replaceAll(' ', '');
 
@@ -49,14 +76,12 @@ class SalesManagerHistoryScreen extends StatelessWidget {
       Sheet sheetObject = excel['Orders Ledger'];
       excel.setDefaultSheet('Orders Ledger');
 
-      // 2. Add an Informational Header to the Excel Sheet
       sheetObject.appendRow([TextCellValue('Sales Manager Master Ledger')]);
       sheetObject.appendRow([TextCellValue('Timeframe:'), TextCellValue(timeLabel)]);
       sheetObject.appendRow([TextCellValue('Status Filter:'), TextCellValue(filterStatus)]);
       sheetObject.appendRow([TextCellValue('Total Orders in Sheet:'), IntCellValue(orders.length)]);
-      sheetObject.appendRow([]); // Blank row for spacing
+      sheetObject.appendRow([]);
 
-      // 3. Create Column Headers
       sheetObject.appendRow([
         TextCellValue('Order No'),
         TextCellValue('Order Date'),
@@ -71,7 +96,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
         TextCellValue('Total Amount (₹)'),
       ]);
 
-      // 4. Add Data Rows
       for (var order in orders) {
         sheetObject.appendRow([
           TextCellValue(order.manualOrderNo ?? order.id ?? 'N/A'),
@@ -81,14 +105,13 @@ class SalesManagerHistoryScreen extends StatelessWidget {
           TextCellValue(order.productName),
           TextCellValue(order.marketingPersonName),
           TextCellValue(order.status.toUpperCase()),
-          TextCellValue('N/A'), // Hardcoded to prevent gst error if missing
+          TextCellValue('N/A'),
           TextCellValue('${order.gstPercentage.toStringAsFixed(1)}%'),
           IntCellValue(order.quantity),
           DoubleCellValue(order.totalAmount),
         ]);
       }
 
-      // 5. Save File to Temporary Directory with dynamic name
       var fileBytes = excel.save();
       if (fileBytes != null) {
         final directory = await getTemporaryDirectory();
@@ -98,7 +121,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
           ..createSync(recursive: true)
           ..writeAsBytesSync(fileBytes);
 
-        // 6. Trigger Native Share/Save Menu
         // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(filePath)],
@@ -114,8 +136,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure controller is registered
-    final controller = Get.put(SalesManagerHistoryController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -236,7 +256,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
                         Row(
                           children: [
                             const Icon(Icons.analytics_rounded, size: 16, color: TColors.primary),
@@ -248,8 +267,6 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
-
-                        // Metrics
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -268,21 +285,22 @@ class SalesManagerHistoryScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 3. ORDERS LIST WITH REFRESH INDICATOR ---
+          // --- 3. ORDERS LIST WITH PAGINATION ---
           Expanded(
             child: RefreshIndicator(
               color: TColors.primary,
               backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              // ✅ FIXED: Now calls the specific history controller's refresh method!
               onRefresh: () async {
                 HapticFeedback.lightImpact();
-                await controller.refreshData();
+                await controller.refreshData(); // Should reset the list and fetch first 20
               },
               child: Obx(() {
-                if (controller.isLoading.value) {
+                // Initial Loading State
+                if (controller.isLoading.value && controller.displayedOrders.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
+                // Empty State
                 if (controller.displayedOrders.isEmpty) {
                   return ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -306,12 +324,39 @@ class SalesManagerHistoryScreen extends StatelessWidget {
                   );
                 }
 
+                // Data State
                 return ListView.separated(
+                  controller: _scrollController, // ✅ 4. Attach the scroll controller
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 40, top: 0),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: controller.displayedOrders.length,
+                  itemCount: controller.displayedOrders.length + 1, // ✅ 5. Add 1 for the bottom loading spinner
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
+
+                    // ✅ 6. Handle the extra index at the bottom for Pagination
+                    if (index == controller.displayedOrders.length) {
+                      return Obx(() {
+                        if (controller.isLoadingMore.value) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (!controller.hasMoreData.value && controller.displayedOrders.isNotEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Center(
+                              child: Text(
+                                  "End of Results",
+                                  style: TextStyle(color: isDark ? Colors.white30 : Colors.black26, fontWeight: FontWeight.bold)
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink(); // Empty space if nothing is happening
+                      });
+                    }
+
                     final order = controller.displayedOrders[index];
                     return GestureDetector(
                       onTap: () {
@@ -330,7 +375,7 @@ class SalesManagerHistoryScreen extends StatelessWidget {
     );
   }
 
-  // --- UI Helpers ---
+  // --- UI Helpers (Unchanged) ---
 
   Widget _buildMetricTile(String label, String value, Color color, bool isDark) {
     return Expanded(
