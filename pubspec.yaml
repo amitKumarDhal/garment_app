@@ -88,6 +88,7 @@ flutter:
   assets:
     - assets/logos/Yoobbel-onblack-cup.png
     - assets/images/Yoobbel.png
+    - assets/logos/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

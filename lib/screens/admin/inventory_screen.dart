@@ -237,7 +237,7 @@ class InventoryScreen extends StatelessWidget {
         padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         itemCount: list.length,
-        separatorBuilder: (_, __) => Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), height: 1),
+        separatorBuilder: (_, _) => Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), height: 1),
         itemBuilder: (context, index) {
           final log = list[index];
 

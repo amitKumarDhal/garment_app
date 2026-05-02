@@ -73,16 +73,28 @@ class MockupListScreen extends StatelessWidget {
       );
     }
 
+    // =========================================================================
+    // ✅ SORTING LOGIC: Nearest Deadlines at the top!
+    // =========================================================================
+    final sortedOrders = List<dynamic>.from(orders);
+    sortedOrders.sort((a, b) {
+      // Fallback to year 2099 if deadline is missing so it goes to the bottom
+      DateTime dateA = a.deliveryDate ?? DateTime(2099);
+      DateTime dateB = b.deliveryDate ?? DateTime(2099);
+
+      return dateA.compareTo(dateB); // Ascending order
+    });
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
       physics: const BouncingScrollPhysics(),
-      itemCount: orders.length,
+      itemCount: sortedOrders.length, // ✅ Use the sorted list
       itemBuilder: (context, index) {
-        final order = orders[index];
+        final order = sortedOrders[index]; // ✅ Use the sorted list
         return OrderCardForMockup(
           order: order,
           isDark: isDark,
-          isDone: isDoneList, // ✅ Tells the card if it's in the Done tab
+          isDone: isDoneList,
           onCardTap: () => Get.to(() => MockupDesignScreen(order: order, isMockupDone: isDoneList)),
         );
       },

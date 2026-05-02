@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../controllers/admin/admin_profile_controller.dart';
-import '../../utils/constants/colors.dart'; // Ensure this points to your TColors
+import '../../utils/constants/colors.dart';
 
 class AdminProfileScreen extends StatelessWidget {
   const AdminProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Inject the controller
+    // Inject the controller (Note: If you use Bindings in your routes, you can change this to Get.find())
     final controller = Get.put(AdminProfileController());
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -22,7 +22,10 @@ class AdminProfileScreen extends StatelessWidget {
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black87, size: 20),
-          onPressed: () => Get.back(),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Get.back();
+          },
         ),
         title: Text(
           "Admin Profile",
@@ -78,6 +81,7 @@ class AdminProfileScreen extends StatelessWidget {
                 icon: Icons.manage_accounts_rounded,
                 isDark: isDark,
                 onTap: () {
+                  HapticFeedback.lightImpact(); // ✅ Added Haptics
                   // Get.to(() => const ManageUsersScreen());
                   Get.snackbar("Coming Soon", "User management will be available here.");
                 }
@@ -87,6 +91,7 @@ class AdminProfileScreen extends StatelessWidget {
                 icon: Icons.pin_rounded,
                 isDark: isDark,
                 onTap: () {
+                  HapticFeedback.lightImpact(); // ✅ Added Haptics
                   // Get.to(() => const CounterSettingsScreen());
                   Get.snackbar("Coming Soon", "Counter settings will be available here.");
                 }
@@ -96,6 +101,7 @@ class AdminProfileScreen extends StatelessWidget {
                 icon: Icons.settings_rounded,
                 isDark: isDark,
                 onTap: () {
+                  HapticFeedback.lightImpact(); // ✅ Added Haptics
                   Get.snackbar("Coming Soon", "System settings will be available here.");
                 }
             ),
@@ -106,7 +112,10 @@ class AdminProfileScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: controller.confirmLogout,
+                onPressed: () {
+                  HapticFeedback.mediumImpact(); // ✅ Added Haptics
+                  controller.confirmLogout();
+                },
                 icon: const Icon(Icons.logout_rounded, color: Colors.white),
                 label: const Text("Secure Logout", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
@@ -137,15 +146,22 @@ class AdminProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03)),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(icon, color: TColors.primary, size: 20),
+      // ✅ Wrap ListTile in Material and ClipRRect to keep the tap ripple effect inside the rounded corners
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Material(
+          color: Colors.transparent,
+          child: ListTile(
+            onTap: onTap,
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: TColors.primary, size: 20),
+            ),
+            title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: isDark ? Colors.white38 : Colors.black38),
+          ),
         ),
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: isDark ? Colors.white38 : Colors.black38),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../utils/constants/colors.dart';
 import '../../controllers/floor_management/marketing_controller.dart';
+import '../admin/associate_analytics_screen.dart';
 import 'agent_detail_screen.dart';
 
 class AgentListScreen extends StatelessWidget {
@@ -116,7 +117,7 @@ class AgentListScreen extends StatelessWidget {
     );
   }
 // ===========================================================================
-  // ✅ MODERN PREMIUM CARD DESIGN (WITH NET ACHIEVEMENT)
+  // ✅ MODERN PREMIUM CARD DESIGN (WITH ANALYTICS BUTTON)
   // ===========================================================================
   Widget _buildModernAgentCard(Map<String, dynamic> agent, bool isDark) {
     Color textColor = isDark ? Colors.white : Colors.black87;
@@ -127,7 +128,6 @@ class AgentListScreen extends StatelessWidget {
     String avatar = agent['avatar'] ?? "??";
     String id = agent['id'] ?? "N/A";
 
-    // ✅ Pull both Gross and Net
     String grossRev = agent['grossRevenue']?.toString() ?? "₹0";
     String netAch = agent['netAchievement']?.toString() ?? "₹0";
 
@@ -144,7 +144,7 @@ class AgentListScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24), // Premium rounded corners
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.03)),
         boxShadow: [
           if (!isDark)
@@ -172,43 +172,25 @@ class AgentListScreen extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: TColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
+                      width: 46, height: 46,
+                      decoration: BoxDecoration(color: TColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
                       alignment: Alignment.center,
-                      child: Text(
-                        avatar,
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: TColors.primary, fontSize: 18),
-                      ),
+                      child: Text(avatar, style: const TextStyle(fontWeight: FontWeight.w900, color: TColors.primary, fontSize: 18)),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            name,
-                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor, letterSpacing: -0.3),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          Text(name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor, letterSpacing: -0.3), maxLines: 1, overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
-                          Text(
-                            "ID: $id",
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: TColors.primary),
-                          ),
+                          Text("ID: $id", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: TColors.primary)),
                         ],
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white10 : Colors.grey.shade100,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade100, shape: BoxShape.circle),
                       child: Icon(Icons.arrow_forward_ios_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 14),
                     ),
                   ],
@@ -216,7 +198,7 @@ class AgentListScreen extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // --- 2. FINANCIAL SUMMARY (Soft Inner Container) ---
+                // --- 2. FINANCIAL SUMMARY ---
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -226,7 +208,6 @@ class AgentListScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      // LEFT: Gross, Net, & Target
                       Expanded(
                         flex: 5,
                         child: Column(
@@ -235,19 +216,14 @@ class AgentListScreen extends StatelessWidget {
                             Text("GROSS SALES", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.grey.shade500, letterSpacing: 0.5)),
                             Text(grossRev, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textColor)),
                             const SizedBox(height: 8),
-
                             Text("NET ACHIEVEMENT", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: TColors.primary, letterSpacing: 0.5)),
                             Text(netAch, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: -0.5)),
                             const SizedBox(height: 4),
-
                             Text("Target: $totalTarget ($monthsActive mths)", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: subTextColor)),
                           ],
                         ),
                       ),
-
                       Container(width: 1, height: 70, color: isDark ? Colors.white10 : Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 12)),
-
-                      // RIGHT: Role History
                       Expanded(
                         flex: 4,
                         child: Column(
@@ -256,10 +232,7 @@ class AgentListScreen extends StatelessWidget {
                           children: roleHistory.map((historyItem) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Text(
-                                historyItem['text'] ?? "Unknown",
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: subTextColor),
-                              ),
+                              child: Text(historyItem['text'] ?? "Unknown", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: subTextColor)),
                             );
                           }).toList(),
                         ),
@@ -281,6 +254,28 @@ class AgentListScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(child: _buildMetricChip("Bonus", extraEarning, isDark, isHighlight: true)),
                   ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ✅ 4. NEW ANALYTICS BUTTON
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      // Navigate to your new screen, passing the agent data!
+                      Get.to(() => AssociateAnalyticsScreen(agent: agent));
+                    },
+                    icon: const Icon(Icons.insights_rounded, size: 18),
+                    label: const Text("Deep Product Analytics", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : Colors.black87,
+                      side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
                 ),
               ],
             ),

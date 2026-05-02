@@ -25,7 +25,7 @@ class AgentDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
 
-      // ✅ 1. SLEEK TRANSPARENT APP BAR
+      // ✅ 1. SLEEK TRANSPARENT APP BAR (Admin Menu Removed)
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -218,7 +218,7 @@ class AgentDetailScreen extends StatelessWidget {
   }
 
   // ===========================================================================
-  // ✅ MODERN HEADER CARD UI (Adapted from the Eligible Agents Screen)
+  // ✅ MODERN HEADER CARD UI (3-COLUMN METRIC ROW)
   // ===========================================================================
   Widget _buildModernHeaderCard(Map<String, dynamic> agent, bool isDark) {
     Color textColor = isDark ? Colors.white : Colors.black87;
@@ -230,13 +230,15 @@ class AgentDetailScreen extends StatelessWidget {
     String name = agent['name'] ?? "Unknown";
     String avatar = agent['avatar'] ?? "??";
     String cid = agent['id'] ?? "N/A";
+    String role = agent['roleBreakdown'] ?? agent['role'] ?? "Associate";
 
-    // Safely extract values using fallbacks in case it was routed from a screen with slightly different keys
-    String totalRev = agent['totalRev'] ?? agent['grossRevenue'] ?? "₹0";
-    String extraRevenue = agent['extraRevenue'] ?? "₹0";
-    String eeEligibleMonths = agent['eeEligibleMonths'] ?? "0";
-    String totalEE = agent['totalEE'] ?? agent['extraEarning'] ?? "₹0";
-    String roleBreakdown = agent['roleBreakdown'] ?? "Active Associate";
+    // Data Mapping
+    String totalAchievement = agent['grossRevenue']?.toString() ?? agent['totalRev']?.toString() ?? "₹0";
+    String netAchievement = agent['netAchievement']?.toString() ?? "₹0";
+    String eeEligibleMonths = agent['eeEligibleMonths']?.toString() ?? "0";
+
+    // Bottom Banner Bonus
+    String totalEE = agent['extraEarning']?.toString() ?? agent['totalEE']?.toString() ?? "₹0";
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -257,7 +259,7 @@ class AgentDetailScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
 
-          // --- 1. HEADER (Avatar, Name, CID) ---
+          // --- 1. HEADER (Avatar, Name, CID, Role Badge) ---
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
@@ -289,35 +291,26 @@ class AgentDetailScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                // Role Badge
                 Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), shape: BoxShape.circle),
-                  child: const Icon(Icons.workspace_premium_rounded, color: Colors.green, size: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Text(role.toUpperCase(), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 10)),
                 ),
               ],
             ),
           ),
 
-          // --- 2. METRICS GRID (Soft Inner Containers) ---
+          // --- 2. 3-COLUMN METRICS GRID ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildModernMetricBox("TOTAL REVENUE", totalRev, innerBoxColor, textColor)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildModernMetricBox("EXTRA REVENUE", extraRevenue, innerBoxColor, Colors.green.shade600)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _buildModernMetricBox("ELIGIBLE MTHS", eeEligibleMonths, innerBoxColor, textColor)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildModernMetricBox("ROLE TIMELINE", roleBreakdown, innerBoxColor, TColors.primary, isSmallText: true)),
-                  ],
-                ),
+                Expanded(child: _buildModernMetricBox("TOTAL ACHV", totalAchievement, innerBoxColor, textColor)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildModernMetricBox("NET ACHV", netAchievement, innerBoxColor, TColors.primary)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildModernMetricBox("ELIGIBLE MTHS", eeEligibleMonths, innerBoxColor, Colors.orange.shade600)),
               ],
             ),
           ),
@@ -370,9 +363,9 @@ class AgentDetailScreen extends StatelessWidget {
   }
 
   // --- HELPER FOR SOFT METRIC BOXES ---
-  Widget _buildModernMetricBox(String title, String value, Color bgColor, Color valueColor, {bool isSmallText = false}) {
+  Widget _buildModernMetricBox(String title, String value, Color bgColor, Color valueColor) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(14),
@@ -380,26 +373,32 @@ class AgentDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: Colors.grey,
-                letterSpacing: 0.5
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.grey,
+                  letterSpacing: 0.5
+              ),
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isSmallText ? 13 : 16,
-              fontWeight: FontWeight.w900,
-              color: valueColor,
-              letterSpacing: -0.3,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: valueColor,
+                letterSpacing: -0.3,
+              ),
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

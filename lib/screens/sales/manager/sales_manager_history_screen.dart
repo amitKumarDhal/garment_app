@@ -7,7 +7,6 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ✅ Hiding 'Border' fixes the naming collision between Flutter and the Excel package
 import 'package:excel/excel.dart' hide Border;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -18,7 +17,6 @@ import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
 import 'sales_manager_order_details.dart';
 
-// ✅ 1. Converted to StatefulWidget to manage Scroll Controller
 class SalesManagerHistoryScreen extends StatefulWidget {
   const SalesManagerHistoryScreen({super.key});
 
@@ -28,41 +26,37 @@ class SalesManagerHistoryScreen extends StatefulWidget {
 
 class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
   late final SalesManagerHistoryController controller;
-  final ScrollController _scrollController = ScrollController(); // ✅ 2. Added ScrollController
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     controller = Get.put(SalesManagerHistoryController());
 
-    // ✅ 3. Attach listener to detect when user scrolls to the bottom
+    // Auto-load more UI cards when scrolling near the bottom
     _scrollController.addListener(() {
-      // If we are within 200 pixels of the bottom, tell the controller to fetch more!
       if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-        controller.fetchNextPage(); // This method needs to exist in your controller
+        if (controller.canLoadMoreUI) {
+          controller.loadMoreUI();
+        }
       }
     });
   }
 
   @override
   void dispose() {
-    _scrollController.dispose(); // ✅ Clean up memory
+    _scrollController.dispose();
     super.dispose();
   }
 
-  // ===========================================================================
-  // ✅ EXCEL EXPORT LOGIC
-  // ===========================================================================
   Future<void> _exportToExcel(List<OrderModel> orders, String filterStatus) async {
     if (orders.isEmpty) {
-      Get.snackbar("Export Failed", "There are no orders to export.",
-          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
+      Get.snackbar("Export Failed", "There are no orders to export.", backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
       return;
     }
 
     try {
-      Get.snackbar("Exporting...", "Generating Excel file, please wait.",
-          backgroundColor: Colors.blue.withValues(alpha: 0.1), colorText: Colors.blue);
+      Get.snackbar("Exporting...", "Generating Excel file, please wait.", backgroundColor: Colors.blue.withValues(alpha: 0.1), colorText: Colors.blue);
 
       final mainController = Get.find<SalesManagerController>();
       String timeLabel = mainController.selectedTimeframe.value == 'Monthly'
@@ -129,8 +123,7 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
       }
     } catch (e) {
       debugPrint("Excel Export Error: $e");
-      Get.snackbar("Error", "Failed to generate Excel file: $e",
-          backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
+      Get.snackbar("Error", "Failed to generate Excel file: $e", backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
     }
   }
 
@@ -180,7 +173,6 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
             ),
             child: Column(
               children: [
-                // Search Bar
                 TextField(
                   onChanged: (val) => controller.searchOrders(val),
                   style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w600),
@@ -200,7 +192,6 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Scrollable Status Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
@@ -285,22 +276,20 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
             ),
           ),
 
-          // --- 3. ORDERS LIST WITH PAGINATION ---
+          // --- 3. ORDERS LIST WITH UI PAGINATION ---
           Expanded(
             child: RefreshIndicator(
               color: TColors.primary,
               backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               onRefresh: () async {
                 HapticFeedback.lightImpact();
-                await controller.refreshData(); // Should reset the list and fetch first 20
+                await controller.refreshData();
               },
               child: Obx(() {
-                // Initial Loading State
                 if (controller.isLoading.value && controller.displayedOrders.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // Empty State
                 if (controller.displayedOrders.isEmpty) {
                   return ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -324,40 +313,39 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
                   );
                 }
 
-                // Data State
+                // Get only the chunk of orders safe to draw on screen
+                final safeUIOrders = controller.renderableOrders;
+
                 return ListView.separated(
-                  controller: _scrollController, // ✅ 4. Attach the scroll controller
+                  controller: _scrollController,
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 40, top: 0),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: controller.displayedOrders.length + 1, // ✅ 5. Add 1 for the bottom loading spinner
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  itemCount: controller.canLoadMoreUI ? safeUIOrders.length + 1 : safeUIOrders.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
 
-                    // ✅ 6. Handle the extra index at the bottom for Pagination
-                    if (index == controller.displayedOrders.length) {
-                      return Obx(() {
-                        if (controller.isLoadingMore.value) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        if (!controller.hasMoreData.value && controller.displayedOrders.isNotEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                              child: Text(
-                                  "End of Results",
-                                  style: TextStyle(color: isDark ? Colors.white30 : Colors.black26, fontWeight: FontWeight.bold)
-                              ),
+                    if (index == safeUIOrders.length) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => controller.loadMoreUI(),
+                            style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
                             ),
-                          );
-                        }
-                        return const SizedBox.shrink(); // Empty space if nothing is happening
-                      });
+                            child: Text(
+                                "Show More (${controller.displayedOrders.length - safeUIOrders.length} left)",
+                                style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)
+                            ),
+                          ),
+                        ),
+                      );
                     }
 
-                    final order = controller.displayedOrders[index];
+                    final order = safeUIOrders[index];
                     return GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -375,7 +363,7 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
     );
   }
 
-  // --- UI Helpers (Unchanged) ---
+  // --- UI Helpers ---
 
   Widget _buildMetricTile(String label, String value, Color color, bool isDark) {
     return Expanded(
@@ -423,7 +411,7 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
       List<OrderModel> baseList = controller.allOrders;
 
       if (label == 'All') {
-        count = baseList.length;
+        count = baseList.where((o) => !o.isDeleted).length;
       } else if (label == 'All NDO') {
         count = baseList.where((o) {
           String s = o.status.toLowerCase();

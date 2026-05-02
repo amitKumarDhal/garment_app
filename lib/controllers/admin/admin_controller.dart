@@ -152,8 +152,8 @@ class AdminController extends GetxController {
 
     startDate.value = DateTime(startYear, 4, 1);
     endDate.value = DateTime(startYear + 1, 3, 31, 23, 59, 59);
-    timeframeLabel.value = "FY ${startYear}-${(startYear + 1).toString().substring(2)}";
-    _updatePeriodStream(); // ✅ FORCED REFRESH INSTANTLY
+    timeframeLabel.value = "FY $startYear-${(startYear + 1).toString().substring(2)}";
+    _updatePeriodStream();
     Get.back(); // Close bottom sheet
   }
 

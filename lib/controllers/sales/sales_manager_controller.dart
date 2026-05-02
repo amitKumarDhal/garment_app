@@ -1,4 +1,4 @@
-import 'dart:async'; // ✅ Added for StreamSubscription
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -13,7 +13,7 @@ class SalesManagerController extends GetxController {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ✅ Stream Subscriptions (Crucial for stopping background read leaks)
+  // Stream Subscriptions
   StreamSubscription? _pendingSub;
   StreamSubscription? _approvedSub;
   StreamSubscription? _activeSub;
@@ -79,7 +79,6 @@ class SalesManagerController extends GetxController {
     fetchAllData();
   }
 
-  // ✅ Cancel streams when controller is destroyed to save reads
   @override
   void onClose() {
     _pendingSub?.cancel();
@@ -178,7 +177,7 @@ class SalesManagerController extends GetxController {
       _pendingSub?.cancel();
       _pendingSub = _db.collection('orders')
           .where('status', whereIn: ['Placed', 'Pending', 'placed', 'pending'])
-          .limit(50) // ✅ OPTIMIZED: Hard cap to save reads
+          .limit(50)
           .snapshots()
           .listen((snapshot) {
 
@@ -210,7 +209,7 @@ class SalesManagerController extends GetxController {
       _approvedSub = _db.collection('orders')
           .where('status', isEqualTo: 'Approved')
           .orderBy('orderDate', descending: true)
-          .limit(50) // ✅ OPTIMIZED: Hard cap
+          .limit(50)
           .snapshots()
           .listen((snapshot) {
         approvedOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
@@ -231,7 +230,7 @@ class SalesManagerController extends GetxController {
       'Out SRC', 'Shipping'
     ])
         .orderBy('orderDate', descending: true)
-        .limit(100) // ✅ OPTIMIZED: Hard cap for active pipeline
+        .limit(100)
         .snapshots()
         .listen((snapshot) {
       activeOrders.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
@@ -256,7 +255,7 @@ class SalesManagerController extends GetxController {
       _deletionSub?.cancel();
       _deletionSub = _db.collection('orders')
           .where('isDeleteRequested', isEqualTo: true)
-          .limit(30) // ✅ OPTIMIZED: Hard cap
+          .limit(30)
           .snapshots()
           .listen((snapshot) {
         deletionRequests.value = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
@@ -309,7 +308,6 @@ class SalesManagerController extends GetxController {
 
       String targetMonthKey = DateFormat('yyyy-MM').format(selectedMonth.value);
 
-      // ✅ OPTIMIZED: Uses cache to prevent redownloading user list every time
       final usersSnap = await _db.collection('users').get(const GetOptions(source: Source.serverAndCache));
       Map<String, String> roleMap = {};
 
@@ -339,7 +337,6 @@ class SalesManagerController extends GetxController {
         }
       }
 
-      // ✅ OPTIMIZED: Uses serverAndCache so historical data math doesn't burn new reads
       final snapshot = await _db.collection('orders')
           .where('orderDate', isLessThanOrEqualTo: end)
           .get(const GetOptions(source: Source.serverAndCache));
@@ -589,13 +586,17 @@ class SalesManagerController extends GetxController {
         fetchMonthlyStats();
       }
 
-      Get.snackbar(
-        "Order $newStatus",
-        "Successfully updated status & notified associate.",
-        backgroundColor: color.withValues(alpha: 0.1),
-        colorText: color,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      // ✅ THE FIX: Wait slightly so the UI finishes popping the dialog BEFORE sliding down the Snackbar
+      Future.delayed(const Duration(milliseconds: 250), () {
+        Get.snackbar(
+          "Order $newStatus",
+          "Successfully updated status & notified associate.",
+          backgroundColor: color.withValues(alpha: 0.1),
+          colorText: color,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      });
+
     } catch (e) {
       Get.snackbar("Update Failed", e.toString());
     }
@@ -622,8 +623,11 @@ class SalesManagerController extends GetxController {
 
       fetchMonthlyStats();
 
-      Get.snackbar("Success", "Order moved to trash.",
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
+      // ✅ Apply the same fix here
+      Future.delayed(const Duration(milliseconds: 250), () {
+        Get.snackbar("Success", "Order moved to trash.",
+            backgroundColor: Colors.redAccent.withValues(alpha: 0.1), colorText: Colors.red);
+      });
     } catch (e) {
       Get.snackbar("Error", "Could not soft delete: $e");
     }
@@ -646,12 +650,15 @@ class SalesManagerController extends GetxController {
         });
       }
 
-      Get.snackbar(
-          "Denied",
-          "Deletion request denied. The order is active.",
-          backgroundColor: Colors.orange.withValues(alpha: 0.1),
-          colorText: Colors.orange
-      );
+      // ✅ Apply the same fix here
+      Future.delayed(const Duration(milliseconds: 250), () {
+        Get.snackbar(
+            "Denied",
+            "Deletion request denied. The order is active.",
+            backgroundColor: Colors.orange.withValues(alpha: 0.1),
+            colorText: Colors.orange
+        );
+      });
     } catch (e) {
       Get.snackbar("Error", "Could not deny request: $e");
     }

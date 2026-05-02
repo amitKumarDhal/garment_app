@@ -27,11 +27,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     // 2. Define the "Smaller to Bigger" scaling effect
-    // Starting at 0.0 (invisible) and growing to 1.0 (full massive size)
     _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        // easeOutBack gives it that premium "opening/expanding" snap at the end
         curve: Curves.easeOutBack,
       ),
     );
@@ -48,19 +46,22 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 1. Detect if the device/app is in Dark Mode
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white, // ✅ Always strictly white
+      // ✅ 2. Adapt the background color so the logo matches seamlessly
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       body: Center(
         child: ScaleTransition(
           scale: _scaleAnimation,
-          child: const Text(
-            "Y",
-            style: TextStyle(
-              fontSize: 220, // ✅ Massive "Y" dominating the center of the screen
-              fontWeight: FontWeight.w900,
-              color: Colors.red, // Use TColors.primary if you prefer your brand color
-              height: 1.0, // Keeps the text perfectly centered vertically
-            ),
+          child: Image.asset(
+            // ✅ 3. Swap the exact file path based on the theme
+            isDark
+                ? 'assets/logos/Yoobbel-onblack-cup.png'
+                : 'assets/logos/Yoobbel-onwhite-cup.png',
+            width: 250,
+            fit: BoxFit.contain,
           ),
         ),
       ),

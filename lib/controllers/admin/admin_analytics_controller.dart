@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../data/models/order_model.dart';
 
@@ -156,10 +155,10 @@ class AdminAnalyticsController extends GetxController {
       for (var order in allOrders) {
         try {
           DateTime? d = order.createdAt ?? order.orderDate;
-          if (d == null) continue;
           bool inTime = false;
-          if (selectedTimeframe.value == 'This Month') inTime = (d.year == now.year && d.month == now.month);
-          else if (selectedTimeframe.value == 'Last 3 Months') inTime = d.isAfter(DateTime(now.year, now.month - 3, now.day));
+          if (selectedTimeframe.value == 'This Month') {
+            inTime = (d.year == now.year && d.month == now.month);
+          } else if (selectedTimeframe.value == 'Last 3 Months') inTime = d.isAfter(DateTime(now.year, now.month - 3, now.day));
           else if (selectedTimeframe.value == 'Last 6 Months') inTime = d.isAfter(DateTime(now.year, now.month - 6, now.day));
           else if (selectedTimeframe.value == 'Last 12 Months') inTime = d.isAfter(DateTime(now.year - 1, now.month, now.day));
           else if (selectedTimeframe.value == 'This FY') {
@@ -291,12 +290,4 @@ class AdminAnalyticsController extends GetxController {
     }
   }
 
-  void _resetMetrics() {
-    totalOrders.value = 0;
-    totalRevenue.value = 0.0;
-    averageOrderValue.value = 0.0;
-    topState.value = "N/A";
-    topStateCount.value = 0;
-    regionalPerformance.clear();
-  }
 }

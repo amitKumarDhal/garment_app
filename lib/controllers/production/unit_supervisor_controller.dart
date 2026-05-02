@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
 
@@ -13,7 +14,9 @@ class UnitSupervisorController extends GetxController {
   var activeOrders = <OrderModel>[].obs;
   var supervisorName = 'Supervisor'.obs;
   var isLoading = true.obs;
+
   var visibleOrdersCount = 10.obs;
+  final RxInt visibleMockupDoneCount = 10.obs;
 
   StreamSubscription? _ordersSubscription;
   StreamSubscription? _inventorySubscription;
@@ -52,30 +55,57 @@ class UnitSupervisorController extends GetxController {
     super.onClose();
   }
 
+  void loadMoreMockupDone() {
+    HapticFeedback.lightImpact();
+    visibleMockupDoneCount.value += 10;
+  }
+
+  void loadMoreOrders() {
+    HapticFeedback.lightImpact();
+    visibleOrdersCount.value += 10;
+  }
+
   // ===========================================================================
-  // ✅ MOCKUP LOGIC
+  // ✅ FIXED: MOCKUP LOGIC WITH PROPER STATE UPDATES
   // ===========================================================================
   void listenToMockupOrders() {
     _mockupSubscription?.cancel();
     _mockupSubscription = _db.collection('orders')
         .where('status', whereIn: ['Approved', 'Fab Purchased', 'Fab Ready', 'Cutting', 'Cutting Done'])
-        .limit(50) // ✅ OPTIMIZED: Hard cap prevents quota burn
+        .limit(200)
         .snapshots()
         .listen((snapshot) {
 
-      pendingMockupOrders.clear();
-      doneMockupOrders.clear();
+      // 1. Create temporary lists
+      List<OrderModel> tempPending = [];
+      List<OrderModel> tempDone = [];
 
       for (var doc in snapshot.docs) {
         OrderModel order = OrderModel.fromSnapshot(doc);
-        bool isMockupDone = doc.data().containsKey('mockupDone') ? doc.data()['mockupDone'] : false;
+        final data = doc.data();
+
+        bool isMockupDone = false;
+        if (data.containsKey('mockupDone') && data['mockupDone'] != null) {
+          final dynamicValue = data['mockupDone'];
+          if (dynamicValue is bool) {
+            isMockupDone = dynamicValue;
+          } else if (dynamicValue.toString().toLowerCase() == 'true') {
+            isMockupDone = true;
+          }
+        }
 
         if (isMockupDone) {
-          doneMockupOrders.add(order);
+          tempDone.add(order);
         } else {
-          pendingMockupOrders.add(order);
+          tempPending.add(order);
         }
       }
+
+      // 2. Assign the temporary lists to the observables
+      // This forces GetX to trigger an update in the UI!
+      pendingMockupOrders.value = tempPending;
+      doneMockupOrders.value = tempDone;
+
     }, onError: (e) => debugPrint("Error fetching mockups: $e"));
   }
 
@@ -131,7 +161,7 @@ class UnitSupervisorController extends GetxController {
   void listenToInventoryLogs() {
     _inventorySubscription?.cancel();
     _inventorySubscription = _db.collection('inventory_logs')
-        .limit(300) // ✅ OPTIMIZED: Prevents downloading thousands of old logs
+        .limit(300)
         .snapshots().listen((snapshot) {
       Map<String, double> calculatedStock = {};
 
@@ -181,14 +211,12 @@ class UnitSupervisorController extends GetxController {
 
     _ordersSubscription = _db.collection('orders')
         .where('status', whereIn: factoryStages)
-    // ❌ REMOVED: .orderBy('deliveryDate') to prevent Firebase Index Crash
-        .limit(100) // ✅ OPTIMIZED: Hard cap on active items
+        .limit(200) // ✅ High enough for filtering, low enough to save quota
         .snapshots()
         .listen((snapshot) {
 
       final validDocs = snapshot.docs.where((doc) => doc.data()['isDeleted'] != true);
 
-      // Convert to list of OrderModels
       List<OrderModel> ordersList = validDocs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
 
       // ✅ LOCAL SORT: Sorts by delivery date perfectly without needing Firebase Indexes!
@@ -319,8 +347,15 @@ class UnitSupervisorController extends GetxController {
     return result;
   }
 
-  void setFilterStage(String stage) => selectedFilterStage.value = stage;
-  void updateSearchQuery(String query) => searchQuery.value = query;
+  void setFilterStage(String stage) {
+    selectedFilterStage.value = stage;
+    visibleOrdersCount.value = 10; // ✅ Reset main list pagination when changing tabs
+  }
+
+  void updateSearchQuery(String query) {
+    searchQuery.value = query;
+    visibleOrdersCount.value = 10; // ✅ Reset main list pagination when searching
+  }
 
   List<Map<String, dynamic>> get stageUnitBreakdown {
     final stages = [

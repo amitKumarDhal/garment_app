@@ -170,7 +170,7 @@ class NavigationController extends GetxController {
         const NavigationDestination(
             icon: Icon(Icons.palette_outlined),
             selectedIcon: Icon(Icons.palette_rounded, color: TColors.primary),
-            label: 'Mockup'
+            label: 'Design'
         ),
         const NavigationDestination(
             icon: Icon(Icons.explore_outlined),

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Needed for the StreamBuilder
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../data/models/order_model.dart';
@@ -17,7 +17,6 @@ import '../../notifications/notification_screen.dart';
 import '../../../controllers/notifications/notification_controller.dart';
 import '../../profile/profile_screen.dart';
 
-// ✅ OPTIMIZATION: Converted to StatefulWidget to stop 'Get.put' memory leaks in build()
 class SalesManagerHome extends StatefulWidget {
   const SalesManagerHome({super.key});
 
@@ -28,11 +27,20 @@ class SalesManagerHome extends StatefulWidget {
 class _SalesManagerHomeState extends State<SalesManagerHome> {
   late final SalesManagerController controller;
 
+  // ✅ OPTIMIZATION: Cache the stream so it doesn't rebuild and burn Firebase reads!
+  late final Stream<QuerySnapshot> _pendingPaymentsStream;
+
   @override
   void initState() {
     super.initState();
-    // ✅ Safe: Only runs exactly once when the screen loads
     controller = Get.put(SalesManagerController());
+
+    // ✅ Initialize the stream EXACTLY ONCE
+    _pendingPaymentsStream = FirebaseFirestore.instance
+        .collection('payment_requests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.fetchAllData();
     });
@@ -327,7 +335,13 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
                 ),
               ),
               const SizedBox(height: 16),
-              // --- 4. MAKE QUOTATION ROW ---
+
+              /// --- 4. MAKE QUOTATION ROW ---
+              const Text(
+                  "Quick Actions",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)
+              ),
+              const SizedBox(height: 12), // Adds perfect spacing between heading and card
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -338,7 +352,7 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF00796B), Color(0xFF009688)],
+                      colors: [Color(0xFF00796B), Color(0xFF009688)], // Teal gradient
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -623,11 +637,9 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
               ),
               const SizedBox(height: 8),
 
-              // ✅ ENHANCED: Combined Pending Actions (Payments & Orders)
+              // ✅ OPTIMIZED: Stable StreamBuilder using the cached stream from initState
               StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('payment_requests')
-                    .where('status', isEqualTo: 'pending')
-                    .snapshots(),
+                stream: _pendingPaymentsStream,
                 builder: (context, paymentSnap) {
                   return Obx(() {
                     final pendingOrders = controller.pendingOrders.toList();
@@ -831,6 +843,7 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
               );
             }
 
+            // ✅ UI PAGINATION: Slice the list based on the visible count
             int totalAgents = controller.topAgents.length;
             int displayCount = controller.visibleLeaderboardCount.value;
             if (displayCount > totalAgents) displayCount = totalAgents;
@@ -841,7 +854,7 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
               children: [
                 ListView.separated(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: const NeverScrollableScrollPhysics(), // Scroll is handled by the parent SingleChildScrollView
                   itemCount: displayedAgents.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
@@ -1010,6 +1023,7 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
                   },
                 ),
 
+                // ✅ THE "SHOW MORE" BUTTON
                 if (displayCount < totalAgents)
                   Padding(
                     padding: const EdgeInsets.only(top: 16, bottom: 40),
@@ -1018,7 +1032,7 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
                       child: OutlinedButton(
                         onPressed: () {
                           HapticFeedback.lightImpact();
-                          controller.visibleLeaderboardCount.value += 10;
+                          controller.visibleLeaderboardCount.value += 10; // Load next 10
                         },
                         style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),

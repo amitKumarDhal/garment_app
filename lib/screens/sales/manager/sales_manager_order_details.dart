@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
@@ -198,8 +198,8 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                 const SizedBox(height: 28),
               ],
 
-              // --- 1. KEY INFO CARD ---
-              _buildSectionTitle("Client & Delivery Info", Icons.business_center_outlined, isDark),
+              // --- 1. KEY INFO CARD (NOW FULLY DETAILED) ---
+              _buildSectionTitle("Client & Logistics Info", Icons.business_center_outlined, isDark),
               _buildCard(isDark, [
                 _buildDetailRow(Icons.person_outline_rounded, "Sales Associate", currentOrder.marketingPersonName, isDark),
                 _buildDivider(isDark),
@@ -209,12 +209,16 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                 _buildDivider(isDark),
                 _buildDetailRow(Icons.location_on_outlined, "Address", currentOrder.clientAddress ?? "N/A", isDark),
                 _buildDivider(isDark),
+                _buildDetailRow(Icons.map_outlined, "State", currentOrder.state ?? "N/A", isDark),
+                _buildDivider(isDark),
+                _buildDetailRow(Icons.pin_drop_outlined, "PIN Code", currentOrder.pincode ?? "N/A", isDark, isBold: true, color: TColors.primary),
+                _buildDivider(isDark),
                 _buildDetailRow(Icons.calendar_month_rounded, "Deadline", DateFormat('MMM dd, yyyy').format(currentOrder.deliveryDate), isDark, color: Colors.redAccent),
               ]),
               const SizedBox(height: 28),
 
-              // --- 2. DYNAMIC ITEM LIST ---
-              _buildSectionTitle("Itemized Products", Icons.inventory_2_outlined, isDark),
+              // --- 2. DYNAMIC ITEM LIST (NOW DEEPLY DETAILED) ---
+              _buildSectionTitle("Itemized Products (${currentOrder.products.length} Items)", Icons.inventory_2_outlined, isDark),
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -239,17 +243,78 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(child: Text(item['productName'] ?? "Unknown Item", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : Colors.black87))),
-                            Text(currency.format(iTotal), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green)),
+                            Expanded(child: Text(item['productName'] ?? "Unknown Item", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: isDark ? Colors.white : Colors.black87))),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                              child: Text("${item['qty']} Units", style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.blue, fontSize: 12)),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text("${item['qty']} Units × ${currency.format(iPrice)}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
+                        const SizedBox(height: 12),
+                        _buildProductDetailRow("SKU / Code", item['productCode'] ?? 'N/A', isDark),
+                        _buildProductDetailRow("Product Type", item['productType'] ?? 'N/A', isDark),
+                        _buildProductDetailRow("Neck Type", item['neckType'] ?? 'N/A', isDark),
+
+                        const SizedBox(height: 12),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("Unit Price", style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                            Text(currency.format(iPrice), style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Divider(height: 1, color: isDark ? Colors.white10 : Colors.black12),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("Item Total", style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text(currency.format(iTotal), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 14)),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+                        const Text("Size Breakdown", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.black26 : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            _extractSizes(item),
+                            style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87, height: 1.4),
+                          ),
+                        ),
                       ],
                     ),
                   );
                 },
               ),
+
+              // ✅ ADDED OVERALL ORDER NOTES
+              if (currentOrder.productDetails?.isNotEmpty == true) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Overall Notes", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      Text(currentOrder.productDetails!, style: TextStyle(fontStyle: FontStyle.italic, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, height: 1.4)),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 28),
 
               // --- 3. FINANCIAL BREAKDOWN ---
@@ -326,7 +391,7 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
                   child: Column(
                     children: [
                       DropdownButtonFormField<String>(
-                        value: controller.productionStages.contains(displayStatus) ? displayStatus : null,
+                        initialValue: controller.productionStages.contains(displayStatus) ? displayStatus : null,
                         decoration: InputDecoration(
                           labelText: "Move to Stage",
                           filled: true,
@@ -397,6 +462,47 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
 
   // --- UI Helpers ---
 
+  // ✅ SAFELY EXTRACT SIZES
+  String _extractSizes(dynamic item) {
+    if (item['sizeDescription'] != null && item['sizeDescription'].toString().trim().isNotEmpty) {
+      return item['sizeDescription'].toString();
+    }
+
+    if (item['sizes'] != null && item['sizes'] is Map) {
+      final Map sizesMap = item['sizes'];
+      if (sizesMap.isNotEmpty) {
+        final validSizes = sizesMap.entries
+            .where((e) => e.value.toString() != "0" && e.value.toString().isNotEmpty)
+            .map((e) => "${e.key}: ${e.value}")
+            .join(", ");
+        if (validSizes.isNotEmpty) return validSizes;
+      }
+    }
+
+    return "No specific sizes requested.";
+  }
+
+  // ✅ Helper for internal item attributes
+  Widget _buildProductDetailRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: 2, child: Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13))),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title, IconData icon, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 12),
@@ -426,17 +532,15 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start, // Ensures icon stays at the top if text wraps
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: Colors.grey.shade500),
           const SizedBox(width: 12),
-          // Wrapped in Expanded to prevent overflow
           Expanded(
               flex: 2,
               child: Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
           ),
           const SizedBox(width: 8),
-          // Wrapped in Expanded to allow long addresses/names to wrap to the next line
           Expanded(
             flex: 3,
             child: Text(
@@ -454,7 +558,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Wrapped in Expanded to prevent overflow if the label is long
         Expanded(
             child: Text(label, style: TextStyle(fontSize: fontSize, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600))
         ),
@@ -472,7 +575,6 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
     return Row(children: List.generate(40, (index) => Expanded(child: Container(color: index % 2 == 0 ? Colors.transparent : (isDark ? Colors.grey.shade800 : Colors.grey.shade300), height: 1.5))));
   }
 
-  // ✅ IMPROVED: Loading logic to prevent multi-popups
   void _confirmAction(String action, Color color, Future<void> Function() onConfirm) {
     Get.defaultDialog(
       title: "$action Order",

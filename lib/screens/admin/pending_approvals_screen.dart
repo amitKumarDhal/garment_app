@@ -65,7 +65,7 @@ class PendingApprovalsScreen extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 40),
           itemCount: controller.pendingRequests.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 16),
+          separatorBuilder: (_, _) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
             final user = controller.pendingRequests[index];
             return _buildRequestCard(controller, user, isDark);

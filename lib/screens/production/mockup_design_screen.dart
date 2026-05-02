@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -38,15 +40,11 @@ class MockupDesignScreen extends StatelessWidget {
         productDetail += " (+${order.products.length - 1} more)";
       }
 
-      // Fabric (Matching your DB 'fabricType')
+      // Fabric
       fabricDetail = firstProduct['fabricType'] ?? "Not specified";
 
-      // Sizes
-      if (firstProduct['sizeDescription'] != null && firstProduct['sizeDescription'].toString().isNotEmpty) {
-        sizesDetail = firstProduct['sizeDescription'];
-      } else if (firstProduct['sizes'] != null) {
-        sizesDetail = firstProduct['sizes'].toString();
-      }
+      // ✅ Safe Size Extraction (Removes ugly brackets if stored as a Map)
+      sizesDetail = _extractSizes(firstProduct);
     }
 
     // =========================================================================
@@ -116,7 +114,7 @@ class MockupDesignScreen extends StatelessWidget {
                   child: finalImageUrl != null && finalImageUrl.isNotEmpty
                       ? CachedNetworkImage(
                     imageUrl: finalImageUrl,
-                    fit: BoxFit.contain, // Better for seeing the whole design
+                    fit: BoxFit.contain,
                     placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
                     errorWidget: (context, url, error) => _buildImagePlaceholder(isDark),
                   )
@@ -201,6 +199,28 @@ class MockupDesignScreen extends StatelessWidget {
   }
 
   // ===========================================================================
+  // ✅ HELPER: SAFE SIZE EXTRACTION
+  // ===========================================================================
+  String _extractSizes(dynamic item) {
+    if (item['sizeDescription'] != null && item['sizeDescription'].toString().trim().isNotEmpty) {
+      return item['sizeDescription'].toString();
+    }
+
+    if (item['sizes'] != null && item['sizes'] is Map) {
+      final Map sizesMap = item['sizes'];
+      if (sizesMap.isNotEmpty) {
+        final validSizes = sizesMap.entries
+            .where((e) => e.value.toString() != "0" && e.value.toString().isNotEmpty)
+            .map((e) => "${e.key}: ${e.value}")
+            .join(", ");
+        if (validSizes.isNotEmpty) return validSizes;
+      }
+    }
+
+    return "Not specified";
+  }
+
+  // ===========================================================================
   // ✅ FULL SCREEN & DOWNLOAD LOGIC
   // ===========================================================================
   void _showFullScreenImage(BuildContext context, String imageUrl, String orderNo, bool isDark) {
@@ -271,7 +291,6 @@ class MockupDesignScreen extends StatelessWidget {
     );
   }
 
-  // ✅ Updated to accept Product, Fabric, and Sizes
   Widget _buildInfoCard(bool isDark, String productDetail, String fabric, String sizes) {
     return Container(
       width: double.infinity,

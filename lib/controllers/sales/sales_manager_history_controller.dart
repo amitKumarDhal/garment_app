@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -12,13 +14,10 @@ class SalesManagerHistoryController extends GetxController {
   var isLoading = false.obs;
   var isRefreshing = false.obs;
 
-  // ✅ Pagination State
-  var isLoadingMore = false.obs;
-  var hasMoreData = true.obs;
-  DocumentSnapshot? lastDocument; // 👈 The cursor
-  final int documentLimit = 25; // 👈 How many orders to fetch per swipe
+  // ✅ UI Pagination State (Prevents app from crashing when rendering thousands of cards)
+  var visibleLimit = 25.obs;
 
-  // ✅ Data Storage
+  // ✅ Data Storage (Holds ALL orders in the background)
   var allOrders = <OrderModel>[];
   var displayedOrders = <OrderModel>[].obs;
 
@@ -27,7 +26,7 @@ class SalesManagerHistoryController extends GetxController {
   var searchQuery = "".obs;
 
   // =========================================================================
-  // ✅ METRICS
+  // ✅ METRICS (Calculates instantly on the FULL filtered list)
   // =========================================================================
   int get filteredOrdersCount => displayedOrders.length;
 
@@ -38,106 +37,80 @@ class SalesManagerHistoryController extends GetxController {
       ? 0.0
       : (filteredTotalRevenue / filteredOrdersCount);
 
+  // =========================================================================
+  // ✅ SAFE RENDERING LIST
+  // =========================================================================
+  // This passes only a chunk of the data to the UI so the phone doesn't freeze
+  List<OrderModel> get renderableOrders {
+    if (visibleLimit.value >= displayedOrders.length) {
+      return displayedOrders;
+    }
+    return displayedOrders.sublist(0, visibleLimit.value);
+  }
+
+  bool get canLoadMoreUI => visibleLimit.value < displayedOrders.length;
+
+  void loadMoreUI() {
+    HapticFeedback.lightImpact();
+    visibleLimit.value += 25;
+  }
+
   @override
   void onInit() {
     super.onInit();
-    fetchInitialData();
+    fetchAllData();
   }
 
   // =========================================================================
-  // ✅ DATA FETCHING (PAGINATED)
+  // ✅ DATA FETCHING (UNLIMITED BUT CACHED)
   // =========================================================================
-
-  /// 1️⃣ INITIAL FETCH: Grabs the first batch of orders
-  Future<void> fetchInitialData({bool quiet = false}) async {
+  Future<void> fetchAllData({bool quiet = false}) async {
     try {
       if (!quiet) isLoading.value = true;
-      hasMoreData.value = true; // Reset the flag
 
+      // Fetches everything, but prioritizes cache to save your Firebase quota
       final snapshot = await _db
           .collection('orders')
           .orderBy('orderDate', descending: true)
-          .limit(documentLimit)
           .get(const GetOptions(source: Source.serverAndCache));
 
       if (snapshot.docs.isNotEmpty) {
         allOrders = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
-        lastDocument = snapshot.docs.last; // Save cursor
-
-        if (snapshot.docs.length < documentLimit) {
-          hasMoreData.value = false; // We got less than the limit, database is empty
-        }
       } else {
         allOrders = [];
-        hasMoreData.value = false;
       }
 
       applyFilter();
     } catch (e) {
-      debugPrint("❌ Master Ledger Initial Fetch error: $e");
+      debugPrint("❌ Master Ledger Fetch error: $e");
       Get.snackbar("Ledger Error", "Check your internet connection.",
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent.withOpacity(0.1), colorText: Colors.red);
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+          colorText: Colors.red);
     } finally {
       isLoading.value = false;
       isRefreshing.value = false;
     }
   }
 
-  /// 2️⃣ FETCH NEXT PAGE: Grabs the next batch when the user scrolls to the bottom
-  Future<void> fetchNextPage() async {
-    // Stop if we are already loading, or if we hit the end of the database
-    if (isLoadingMore.value || !hasMoreData.value || lastDocument == null) return;
-
-    try {
-      isLoadingMore.value = true;
-      HapticFeedback.selectionClick();
-
-      final snapshot = await _db
-          .collection('orders')
-          .orderBy('orderDate', descending: true)
-          .startAfterDocument(lastDocument!) // 👈 Start exactly where we left off
-          .limit(documentLimit)
-          .get(const GetOptions(source: Source.serverAndCache));
-
-      if (snapshot.docs.isNotEmpty) {
-        final newOrders = snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
-
-        allOrders.addAll(newOrders); // Add to master list
-        lastDocument = snapshot.docs.last; // Update cursor
-
-        if (snapshot.docs.length < documentLimit) {
-          hasMoreData.value = false; // Reached the end
-        }
-
-        applyFilter(); // Re-apply the current filter/search to the expanded list
-      } else {
-        hasMoreData.value = false;
-      }
-    } catch (e) {
-      debugPrint("❌ Master Ledger Pagination error: $e");
-    } finally {
-      isLoadingMore.value = false;
-    }
-  }
-
-  /// ✅ PULL TO REFRESH: Resets everything and starts from the top
   Future<void> refreshData() async {
     isRefreshing.value = true;
-    lastDocument = null; // Clear cursor
-    await fetchInitialData(quiet: true);
+    visibleLimit.value = 25; // Reset UI limit on pull-to-refresh
+    await fetchAllData(quiet: true);
   }
 
   // =========================================================================
-  // ✅ LOCAL FILTERING (Saves Quota)
+  // ✅ LOCAL FILTERING
   // =========================================================================
-
   void filterByStatus(String status) {
     currentFilter.value = status;
+    visibleLimit.value = 25; // Reset UI limit when changing tabs
     applyFilter();
   }
 
   void searchOrders(String query) {
     searchQuery.value = query;
+    visibleLimit.value = 25; // Reset UI limit when searching
     applyFilter();
   }
 

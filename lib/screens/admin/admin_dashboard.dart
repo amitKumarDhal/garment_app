@@ -130,48 +130,43 @@ class AdminDashboard extends StatelessWidget {
             children: [
 
               // =========================================================
-              // ✅ TIMEFRAME SELECTOR HEADER
+              // ✅ SECTION 1: THE FINANCIAL PULSE
               // =========================================================
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                      "Overview",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _showTimeframeBottomSheet(context, controller, isDark);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300),
-                        boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2))],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.calendar_month_rounded, size: 14, color: TColors.primary),
-                          const SizedBox(width: 8),
-                          Obx(() => Text(
-                            controller.timeframeLabel.value,
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                          )),
-                          const SizedBox(width: 4),
-                          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black54),
-                        ],
-                      ),
+              _buildSectionHeader(
+                "The Financial Pulse",
+                Icons.account_balance_wallet_rounded,
+                isDark,
+                iconColor: Colors.purple,
+                trailingWidget: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _showTimeframeBottomSheet(context, controller, isDark);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300),
+                      boxShadow: [if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2))],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_month_rounded, size: 12, color: TColors.primary),
+                        const SizedBox(width: 6),
+                        Obx(() => Text(
+                          controller.timeframeLabel.value,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? Colors.white : Colors.black87),
+                        )),
+                        const SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: isDark ? Colors.white70 : Colors.black54),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 16),
 
-              // --- 1. PRIMARY METRICS (DUAL CARDS) ---
               Row(
                 children: [
                   Expanded(
@@ -180,7 +175,7 @@ class AdminDashboard extends StatelessWidget {
                       mainValue: "₹${formatCurrency.format(controller.periodRevenue.value)}",
                       subTitle: "Today",
                       subValue: "₹${formatCurrency.format(controller.totalDailyProduction.value)}",
-                      icon: Icons.account_balance_wallet_rounded,
+                      icon: Icons.show_chart_rounded,
                       gradientColors: [const Color(0xFF6A1B9A), const Color(0xFF9C27B0)],
                       isDark: isDark,
                     )),
@@ -203,7 +198,6 @@ class AdminDashboard extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // --- HORIZONTAL UNITS CARD ---
               Obx(() => _buildHorizontalMetricCard(
                 title: "Total Units (Garments)",
                 mainValue: formatCurrency.format(controller.periodUnits.value),
@@ -214,9 +208,13 @@ class AdminDashboard extends StatelessWidget {
                 isDark: isDark,
               )),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
 
-              // --- PRODUCT ANALYTICS LAUNCHER BAR ---
+              // =========================================================
+              // ✅ SECTION 2: STRATEGIC ANALYTICS
+              // =========================================================
+              _buildSectionHeader("Strategic Analytics", Icons.insights_rounded, isDark, iconColor: Colors.blue),
+
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -260,18 +258,12 @@ class AdminDashboard extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-              // --- 2. SECONDARY KPI GRID ---
-              Padding(
-                padding: const EdgeInsets.only(right: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSectionHeader("Operational KPIs", Icons.analytics_outlined, isDark),
-                  ],
-                ),
-              ),
+              // =========================================================
+              // ✅ SECTION 3: FACTORY & TEAM OPERATIONS
+              // =========================================================
+              _buildSectionHeader("Factory & Team Operations", Icons.precision_manufacturing_rounded, isDark, iconColor: Colors.teal),
 
               GridView.count(
                 crossAxisCount: 2,
@@ -287,13 +279,17 @@ class AdminDashboard extends StatelessWidget {
 
                   _buildKPICard("Sales Force", "View Agents", Icons.support_agent_rounded, Colors.indigo, isDark, onTap: () => Get.to(() => const AgentListScreen())),
 
-                  _buildKPICard("Factory Orders", "View Floor", Icons.precision_manufacturing_rounded, Colors.blueGrey, isDark, onTap: () => Get.to(() => const UnitSupervisorOrdersScreen())),
+                  _buildKPICard("Factory Orders", "View Floor", Icons.factory_rounded, Colors.blueGrey, isDark, onTap: () => Get.to(() => const UnitSupervisorOrdersScreen())),
                 ],
               ),
+
               const SizedBox(height: 32),
 
-              // --- 3. QUICK ACTIONS ---
-              _buildSectionHeader("Quick Actions", Icons.bolt_rounded, isDark, iconColor: Colors.orange),
+              // =========================================================
+              // ✅ SECTION 4: THE ACTION HUB
+              // =========================================================
+              _buildSectionHeader("The Action Hub", Icons.notifications_active_rounded, isDark, iconColor: Colors.orange),
+
               Obx(() => _buildActionCard(
                 title: "Pending Approvals",
                 subtitle: "${controller.pendingApprovalsCount.value} requests waiting for verification",
@@ -515,9 +511,10 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, bool isDark, {Color? iconColor}) {
+  // ✅ UPDATED: Supports putting a widget (like the Timeframe button) at the end of the row
+  Widget _buildSectionHeader(String title, IconData icon, bool isDark, {Color? iconColor, Widget? trailingWidget}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      padding: const EdgeInsets.only(bottom: 16, left: 4),
       child: Row(
         children: [
           Container(
@@ -527,6 +524,10 @@ class AdminDashboard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+          if (trailingWidget != null) ...[
+            const Spacer(),
+            trailingWidget,
+          ]
         ],
       ),
     );

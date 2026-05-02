@@ -5,16 +5,10 @@ import 'package:get/get.dart';
 import '../../routes/route_names.dart';
 
 import '../../controllers/navigation_controller.dart';
-import '../../controllers/admin/inventory_controller.dart';
-import '../../controllers/admin/admin_controller.dart';
-import '../../controllers/admin/worker_report_controller.dart';
 
 import '../../screens/sales/manager/sales_manager_dashboard.dart';
 import '../../screens/auth/status_check_screen.dart';
 
-import '../../controllers/production/unit_supervisor_controller.dart';
-import '../../controllers/production/stock_summary_controller.dart';
-import '../../controllers/production/stock_in_out_controller.dart';
 
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();

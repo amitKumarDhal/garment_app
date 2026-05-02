@@ -82,9 +82,9 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
               // --- 0. DESIGN MOCKUP ---
               _MockupCard(order: order, isDark: isDark, textColor: textColor),
 
-              // --- 1. IDENTITY INFO ---
+              // --- 1. IDENTITY & LOGISTICS INFO ---
               _ModernCard(
-                title: "Identity Information",
+                title: "Identity & Logistics",
                 icon: Icons.badge_outlined,
                 isDark: isDark,
                 textColor: textColor,
@@ -92,10 +92,19 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                   _InfoRow(Icons.person_outline, "Client Name", order.clientName, subTextColor, textColor),
                   _InfoRow(Icons.business, "Organization", order.organization ?? "N/A", subTextColor, textColor),
                   _InfoRow(Icons.phone_outlined, "Phone", order.clientPhone ?? "N/A", subTextColor, textColor),
-                  _InfoRow(Icons.location_on_outlined, "Address", order.clientAddress ?? "N/A", subTextColor, textColor, isMultiLine: true),
 
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(height: 1, thickness: 0.5, color: subTextColor.withValues(alpha: 0.3)),
+                  ),
+
+                  // ✅ LOCATION, STATE, AND PINCODE DISPLAYED HERE
+                  _InfoRow(Icons.location_on_outlined, "Address", order.clientAddress ?? "N/A", subTextColor, textColor, isMultiLine: true),
+                  _InfoRow(Icons.map_outlined, "State", order.state ?? "N/A", subTextColor, textColor),
+                  _InfoRow(Icons.pin_drop_outlined, "PIN Code", order.pincode ?? "N/A", subTextColor, textColor, isBold: true, customValueColor: TColors.primary),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Divider(height: 1, thickness: 0.5, color: subTextColor.withValues(alpha: 0.3)),
                   ),
 
@@ -110,12 +119,13 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
               ),
               const SizedBox(height: 20),
 
-              // --- 2. MULTI-ITEM PRODUCT SPECIFICATIONS ---
+              // --- 2. MULTI-ITEM PRODUCT SPECIFICATIONS (WITH SIZES) ---
               _ProductSpecsCard(
                 order: order,
                 isDark: isDark,
                 textColor: textColor,
                 subTextColor: subTextColor,
+                currency: _currency,
               ),
               const SizedBox(height: 20),
 
@@ -126,7 +136,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                 isDark: isDark,
                 textColor: textColor,
                 children: [
-                  _FinanceRow("GST Percentage", "${order.gstPercentage}%", subTextColor, textColor),
+                  _FinanceRow("GST Percentage", "${order.gstPercentage.toStringAsFixed(1)}%", subTextColor, textColor),
                   _FinanceRow("Shipping Charges", _currency.format(order.shippingCharge), subTextColor, textColor),
                   const Divider(height: 24),
                   _FinanceRow("Grand Total", _currency.format(order.totalAmount), subTextColor, textColor, isTotal: true),
@@ -168,7 +178,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                       if (isCheckingPayments)
                         const Padding(
                           padding: EdgeInsets.all(20),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(child: CircularProgressIndicator(color: TColors.primary)),
                         ),
 
                       for (final doc in displayDocs)
@@ -209,6 +219,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }) {
     final String statusCheck = currentStatus.toLowerCase();
 
+    // Show buttons ONLY if status is Placed or Pending
     if (statusCheck == 'placed' || statusCheck == 'pending') {
       return Column(
         children: [
@@ -220,6 +231,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                 style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),
+
           Row(
             children: [
               Expanded(
@@ -227,8 +239,11 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     _confirmAction(context, "Reject", Colors.red, () async {
+                      // ✅ OPTIMISTIC UPDATE: Change UI instantly
+                      if (mounted) {
+                        setState(() => currentStatus = 'Rejected');
+                      }
                       await controller.rejectOrder(widget.order.id!);
-                      setState(() => currentStatus = 'Rejected');
                     });
                   },
                   style: OutlinedButton.styleFrom(
@@ -245,8 +260,11 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                   onPressed: (hasPendingPayments || isCheckingPayments) ? null : () {
                     HapticFeedback.lightImpact();
                     _confirmAction(context, "Approve", Colors.green, () async {
+                      // ✅ OPTIMISTIC UPDATE: Change UI instantly
+                      if (mounted) {
+                        setState(() => currentStatus = 'Approved');
+                      }
                       await controller.approveOrderWithMargin(widget.order.id!, 0.0, widget.order.totalAmount);
-                      setState(() => currentStatus = 'Approved');
                     });
                   },
                   style: ElevatedButton.styleFrom(
@@ -260,10 +278,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: isCheckingPayments
-                      ? const SizedBox(
-                    height: 20, width: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Text("APPROVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                 ),
               ),
@@ -276,6 +291,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     final bool isRejected = statusCheck == 'rejected';
     final Color themeColor = isRejected ? Colors.red : Colors.green;
 
+    // ✅ ONCE UPDATED, THE BUTTONS VANISH AND THIS BEAUTIFUL BANNER APPEARS
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -356,18 +372,21 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         ]),
       });
 
-      setState(() {
-        localAdvanceAmount = newAdvance;
-        localBalanceDue = newBalance;
-        isProcessingPayment = false;
-      });
+      // ✅ SAFETY CHECK: Only update UI if user hasn't left the screen
+      if (mounted) {
+        setState(() {
+          localAdvanceAmount = newAdvance;
+          localBalanceDue = newBalance;
+          isProcessingPayment = false;
+        });
+      }
 
       Get.snackbar(
         "Payment Approved", "The order balance has been successfully updated.",
         backgroundColor: Colors.green, colorText: Colors.white,
       );
     } catch (e) {
-      setState(() => isProcessingPayment = false);
+      if (mounted) setState(() => isProcessingPayment = false);
       Get.snackbar("Error", "Could not approve payment: $e", backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
@@ -387,6 +406,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
   String _formatDate(DateTime date) => _dateFormat.format(date);
 
+  // ✅ PERFECTED CONFIRM ACTION
   void _confirmAction(BuildContext context, String action, Color color, Future<void> Function() onConfirm) {
     Get.defaultDialog(
       title: "$action Order",
@@ -394,18 +414,15 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
       middleText: "Are you sure you want to $action this transaction?",
       barrierDismissible: false,
       confirm: ElevatedButton(
-        onPressed: () async {
+        onPressed: () {
           HapticFeedback.lightImpact();
-          Get.back();
+          Get.back(); // 1. Pop the dialog immediately
 
-          Get.dialog(
-            const Center(child: CircularProgressIndicator(color: TColors.primary)),
-            barrierDismissible: false,
-          );
-
-          await onConfirm();
-
-          if (Get.isDialogOpen ?? false) Get.back();
+          // 2. Add a tiny delay so the dialog fully finishes its exit animation
+          // before we aggressively swap the buttons for the "Approved" banner.
+          Future.delayed(const Duration(milliseconds: 150), () {
+            onConfirm(); // 3. Fire the optimistic update & background sync!
+          });
         },
         style: ElevatedButton.styleFrom(backgroundColor: color),
         child: const Text("Confirm", style: TextStyle(color: Colors.white)),
@@ -419,11 +436,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 }
 
-// =============================================================================
-// HELPER COMPONENTS
-// =============================================================================
-
-// ✅ NEW: The Design Mockup Card
 class _MockupCard extends StatelessWidget {
   final OrderModel order;
   final bool isDark;
@@ -456,7 +468,7 @@ class _MockupCard extends StatelessWidget {
                 ),
                 child: CachedNetworkImage(
                   imageUrl: order.mockupUrl!,
-                  fit: BoxFit.cover, // Clean crop for the card view
+                  fit: BoxFit.cover,
                   placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: TColors.primary)),
                   errorWidget: (context, url, error) => const Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey),
                 ),
@@ -702,12 +714,14 @@ class _ProductSpecsCard extends StatelessWidget {
   final bool isDark;
   final Color textColor;
   final Color subTextColor;
+  final NumberFormat currency;
 
   const _ProductSpecsCard({
     required this.order,
     required this.isDark,
     required this.textColor,
     required this.subTextColor,
+    required this.currency,
   });
 
   @override
@@ -718,7 +732,7 @@ class _ProductSpecsCard extends StatelessWidget {
       isDark: isDark,
       textColor: textColor,
       children: [
-        for (final item in order.products)
+        for (final item in order.products) ...[
           Container(
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),
@@ -730,6 +744,7 @@ class _ProductSpecsCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Product Name & Total Qty
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,7 +752,7 @@ class _ProductSpecsCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item['productName'] ?? "Unknown Item",
-                        style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 15),
+                        style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 16),
                       ),
                     ),
                     Container(
@@ -747,15 +762,50 @@ class _ProductSpecsCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        "${item['qty']} Units",
+                        "${item['qty'] ?? 0} Units",
                         style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.blue, fontSize: 12),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text("SKU / Code: ${item['productCode'] ?? 'N/A'}", style: TextStyle(color: subTextColor, fontSize: 13)),
                 const SizedBox(height: 12),
+
+                // Granular Attributes
+                _buildProductDetailRow("SKU / Code", item['productCode'] ?? 'N/A'),
+                _buildProductDetailRow("Product Type", item['productType'] ?? 'N/A'),
+                _buildProductDetailRow("Neck Type", item['neckType'] ?? 'N/A'),
+
+                const SizedBox(height: 12),
+
+                // Pricing Breakdown
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Unit Price", style: TextStyle(color: subTextColor, fontSize: 12)),
+                    Text(
+                        currency.format(double.tryParse(item['price']?.toString() ?? '0') ?? 0),
+                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13)
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, color: isDark ? Colors.white10 : Colors.black12),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Item Total", style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(
+                        currency.format(double.tryParse(item['total']?.toString() ?? '0') ?? 0),
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 14)
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ✅ SIZES DISPLAY (Robust extraction)
                 const Text("Size Breakdown", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                 const SizedBox(height: 6),
                 Container(
@@ -767,23 +817,65 @@ class _ProductSpecsCard extends StatelessWidget {
                     border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.2)),
                   ),
                   child: Text(
-                    item['sizeDescription']?.toString().isNotEmpty == true
-                        ? item['sizeDescription']
-                        : "No specific sizes requested.",
+                    _extractSizes(item),
                     style: TextStyle(fontSize: 14, color: textColor, height: 1.4),
                   ),
                 ),
               ],
             ),
           ),
+        ],
 
         if (order.productDetails?.isNotEmpty == true) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           const Text("Overall Notes", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
           const SizedBox(height: 4),
-          Text(order.productDetails!, style: TextStyle(fontStyle: FontStyle.italic, color: subTextColor)),
+          Text(order.productDetails!, style: TextStyle(fontStyle: FontStyle.italic, color: subTextColor, height: 1.4)),
         ],
       ],
+    );
+  }
+
+  // ✅ SAFELY EXTRACT SIZES
+  String _extractSizes(dynamic item) {
+    if (item['sizeDescription'] != null && item['sizeDescription'].toString().trim().isNotEmpty) {
+      return item['sizeDescription'].toString();
+    }
+
+    if (item['sizes'] != null && item['sizes'] is Map) {
+      final Map sizesMap = item['sizes'];
+      if (sizesMap.isNotEmpty) {
+        final validSizes = sizesMap.entries
+            .where((e) => e.value.toString() != "0" && e.value.toString().isNotEmpty)
+            .map((e) => "${e.key}: ${e.value}")
+            .join(", ");
+        if (validSizes.isNotEmpty) return validSizes;
+      }
+    }
+
+    return "No specific sizes requested.";
+  }
+
+  Widget _buildProductDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: TextStyle(color: subTextColor, fontSize: 13)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -905,10 +997,6 @@ class _PaymentApprovalCard extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// GLOBAL IMAGE FUNCTIONS
-// =============================================================================
-
 void _showFullScreenImage(String imageUrl, String orderNo) {
   Get.to(
         () => Scaffold(
@@ -934,7 +1022,7 @@ void _showFullScreenImage(String imageUrl, String orderNo) {
           maxScale: 4,
           child: CachedNetworkImage(
             imageUrl: imageUrl,
-            fit: BoxFit.contain, // Protects from cropping in full screen
+            fit: BoxFit.contain,
             placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
             errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.white, size: 50),
           ),
