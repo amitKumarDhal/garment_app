@@ -1,10 +1,8 @@
-// ignore_for_file: curly_braces_in_flow_control_structures
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../data/services/api_service.dart';
 import '../../controllers/admin/admin_notification_controller.dart';
 import '../../utils/constants/colors.dart';
 import '../../controllers/admin/admin_controller.dart';
@@ -30,8 +28,8 @@ class AdminDashboard extends StatelessWidget {
     final controller = Get.put(AdminController());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (FirebaseAuth.instance.currentUser != null) {
-        controller.startAdminListeners();
+      if (ApiService.token != null) {
+        controller.loadDashboardData();
       }
     });
 

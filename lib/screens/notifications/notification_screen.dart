@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart' as default_firebase;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -48,10 +48,10 @@ class NotificationScreen extends StatelessWidget {
             final note = controller.notifications[index];
             final bool isRead = note['isRead'] ?? true;
 
-            // Format Timestamp
             String timeText = "Just now";
-            if (note['timestamp'] != null) {
-              DateTime dt = (note['timestamp'] as default_firebase.Timestamp).toDate();
+            if (note['created_at'] != null || note['timestamp'] != null) {
+              final raw = note['created_at'] ?? note['timestamp'];
+              DateTime dt = raw is DateTime ? raw : DateTime.tryParse(raw.toString()) ?? DateTime.now();
               timeText = DateFormat('MMM dd, hh:mm a').format(dt);
             }
 

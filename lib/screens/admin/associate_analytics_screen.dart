@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AssociateAnalyticsScreen extends StatefulWidget {
   final Map<String, dynamic> agent;
@@ -46,10 +45,10 @@ class _AssociateAnalyticsScreenState extends State<AssociateAnalyticsScreen> {
       if (selectedTimeframe == "All Time") return true;
 
       DateTime? orderDate;
-      if (order['orderDate'] is Timestamp) {
-        orderDate = (order['orderDate'] as Timestamp).toDate();
-      } else if (order['orderDate'] is String) {
+      if (order['orderDate'] is String) {
         orderDate = DateTime.tryParse(order['orderDate']);
+      } else if (order['orderDate'] is DateTime) {
+        orderDate = order['orderDate'] as DateTime;
       }
 
       if (orderDate == null) return true; // Include if no date to be safe

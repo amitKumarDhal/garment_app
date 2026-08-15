@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:yoobbel/controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
 import '../../../utils/constants/colors.dart';
@@ -289,7 +288,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> with SingleTick
 
                           DateTime time = DateTime.now();
                           if (event['timestamp'] != null) {
-                            time = (event['timestamp'] as Timestamp).toDate();
+                            time = event['timestamp'] is String
+                                ? (DateTime.tryParse(event['timestamp'].toString()) ?? DateTime.now())
+                                : (event['timestamp'] is DateTime ? event['timestamp'] as DateTime : DateTime.now());
                           }
 
                           String stage = event['stage'] ?? 'Unknown Stage';

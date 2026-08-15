@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PackingModel {
   String? id; // Firestore Document ID
@@ -19,11 +18,10 @@ class PackingModel {
     this.timestamp,
   });
 
-  // 1. Convert Firestore Document to Dart Object
-  factory PackingModel.fromSnapshot(
-    DocumentSnapshot<Map<String, dynamic>> document,
-  ) {
-    final data = document.data()!;
+  // 1. Convert Map / Snapshot to Dart Object
+  factory PackingModel.fromSnapshot(dynamic snapshot) {
+    final data = snapshot is Map<String, dynamic> ? snapshot : (snapshot.data() as Map<String, dynamic>);
+    final idVal = snapshot is Map<String, dynamic> ? snapshot['id']?.toString() : snapshot.id;
 
     // Handle the nested breakdown map safely
     Map<String, int> safeBreakdown = {};
@@ -35,15 +33,16 @@ class PackingModel {
     }
 
     return PackingModel(
-      id: document.id,
+      id: idVal,
       cartonNo: data['cartonNo'] ?? '',
       styleNo: data['styleNo'] ?? '',
       category: data['category'] ?? 'M',
       totalPieces: data['totalPieces'] ?? 0,
       breakdown: safeBreakdown,
-      // Handle Firestore Timestamp conversion
       timestamp: data['timestamp'] != null
-          ? (data['timestamp'] as Timestamp).toDate()
+          ? (data['timestamp'] is String
+              ? DateTime.tryParse(data['timestamp'].toString())
+              : null)
           : null,
     );
   }
@@ -56,8 +55,7 @@ class PackingModel {
       "category": category,
       "totalPieces": totalPieces,
       "breakdown": breakdown,
-      "timestamp":
-          FieldValue.serverTimestamp(), // Always use server time on create
+      "timestamp": DateTime.now().toIso8601String(),
       "status": "Packed",
     };
   }

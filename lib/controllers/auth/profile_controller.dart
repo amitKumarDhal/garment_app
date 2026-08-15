@@ -1,12 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
+import '../../data/services/api_service.dart';
 import '../../data/repositories/authentication_repository.dart';
 
 class ProfileController extends GetxController {
   static ProfileController get instance => Get.find();
 
-  // Observable variables for UI
   final RxString name = "Loading...".obs;
   final RxString email = "".obs;
   final RxString role = "".obs;
@@ -19,28 +17,25 @@ class ProfileController extends GetxController {
     fetchUserProfile();
   }
 
-  /// Fetches REAL user details from Firestore
   Future<void> fetchUserProfile() async {
     try {
       isLoading.value = true;
-      User? currentUser = FirebaseAuth.instance.currentUser;
+      final localUser = ApiService.currentUser;
+      if (localUser != null) {
+        name.value = localUser['name'] ?? localUser['FullName'] ?? "User";
+        email.value = localUser['email'] ?? localUser['Email'] ?? "";
+        role.value = (localUser['role'] ?? localUser['Role'] ?? "UNIT_SUPERVISOR").toString().replaceAll('_', ' ');
+        employeeId.value = localUser['employee_id'] ?? localUser['employeeId'] ?? localUser['EmployeeID'] ?? "N/A";
+      }
 
-      if (currentUser != null) {
-        // ✅ FIX 1: Query the permanent 'users' collection, not 'id_requests'
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-
-        if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>;
-
-          // ✅ FIX 2: Dual-case safety (handles both old and new data structures)
-          name.value = data['name'] ?? data['FullName'] ?? "Unknown User";
-          email.value = data['email'] ?? data['Email'] ?? "";
-          role.value = data['role'] ?? data['Role'] ?? "Worker";
-          employeeId.value = data['employeeId'] ?? data['EmployeeID'] ?? "N/A";
-        }
+      final response = await ApiService.get('/auth/profile');
+      if (response['success'] == true && response['user'] != null) {
+        final data = response['user'] as Map<String, dynamic>;
+        name.value = data['name'] ?? "User";
+        email.value = data['email'] ?? "";
+        role.value = (data['role'] ?? "UNIT_SUPERVISOR").toString().replaceAll('_', ' ');
+        employeeId.value = data['employee_id'] ?? "N/A";
+        ApiService.saveSession(ApiService.token ?? '', data);
       }
     } catch (e) {
       print("Error loading profile: $e");
@@ -49,7 +44,6 @@ class ProfileController extends GetxController {
     }
   }
 
-  /// ✅ CALL THE REPO FOR SAFE LOGOUT
   Future<void> logout() async {
     await AuthenticationRepository.instance.logout();
   }

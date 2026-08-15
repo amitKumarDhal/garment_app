@@ -30,10 +30,10 @@ class StitchingEntryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Section 1: Worker Assignment ---
+              // --- Section 1: Operator & Line Assignment ---
               _buildSectionHeader(
                 context,
-                "Worker Assignment",
+                "Operator & Line Assignment",
                 Icons.person_add_alt_1_outlined,
               ),
               Container(
@@ -47,7 +47,7 @@ class StitchingEntryScreen extends StatelessWidget {
                         color: isDark ? Colors.white : TColors.textPrimary,
                       ),
                       decoration: InputDecoration(
-                        labelText: "Select Worker",
+                        labelText: "Select Operator / Line",
                         prefixIcon: const Icon(
                           Icons.badge_outlined,
                           color: TColors.stitching,
@@ -56,14 +56,14 @@ class StitchingEntryScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(TSizes.sm),
                         ),
                       ),
-                      items: controller.availableWorkers.map((String worker) {
+                      items: controller.availableOperators.map((String op) {
                         return DropdownMenuItem(
-                          value: worker,
-                          child: Text(worker),
+                          value: op,
+                          child: Text(op),
                         );
                       }).toList(),
                       onChanged: (value) =>
-                          controller.workerName.text = value ?? "",
+                          controller.operatorName.text = value ?? "",
                       validator: (value) => value == null ? "Required" : null,
                     ),
                     const SizedBox(height: TSizes.inputFieldSpacing),
@@ -172,7 +172,7 @@ class StitchingEntryScreen extends StatelessWidget {
                       const Divider(height: 30),
                       _statusRow(
                         context,
-                        "Worker Efficiency:",
+                        "Output Efficiency:",
                         "${controller.efficiency.value.toStringAsFixed(1)}%",
                         controller.efficiency.value > 80
                             ? TColors.stitching

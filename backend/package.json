@@ -1,0 +1,59 @@
+{
+  "name": "zobra-production-backend",
+  "version": "1.0.0",
+  "description": "Enterprise Node.js/TypeScript REST API Backend for Zobra Production ERP powered by Supabase PostgreSQL & Cloudinary.",
+  "main": "dist/src/server.js",
+  "scripts": {
+    "build": "npx tsc",
+    "start": "node dist/src/server.js",
+    "dev": "npx ts-node-dev --respawn --transpile-only src/server.ts",
+    "test": "npx jest --runInBand --detectOpenHandles",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "test:e2e": "cypress run",
+    "test:all": "npm test && npm run test:e2e",
+    "seed": "npx ts-node database/seed/seed.ts"
+  },
+  "keywords": [
+    "yoobbel",
+    "erp",
+    "supabase",
+    "postgresql",
+    "express",
+    "typescript",
+    "cloudinary"
+  ],
+  "author": "Yoobbel Development Team",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "@types/pg": "^8.21.0",
+    "cloudinary": "^2.5.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pg": "^8.23.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.13.9",
+    "@types/supertest": "^6.0.2",
+    "cypress": "^15.20.1",
+    "jest": "^29.7.0",
+    "start-server-and-test": "^3.0.12",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.6",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.2"
+  }
+}

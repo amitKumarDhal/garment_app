@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StitchingModel {
   final String? id;
@@ -31,7 +30,7 @@ class StitchingModel {
     "completedQty": completedQty,
     "rejectedQty": rejectedQty,
     "efficiency": efficiency,
-    "timestamp": FieldValue.serverTimestamp(),
+    "timestamp": DateTime.now().toIso8601String(),
     "status": "Stitching Completed",
   };
 }

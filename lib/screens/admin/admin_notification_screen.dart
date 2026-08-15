@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../controllers/admin/admin_notification_controller.dart';
 
 class AdminNotificationScreen extends StatelessWidget {
@@ -43,7 +42,9 @@ class AdminNotificationScreen extends StatelessWidget {
             // Safe timestamp parsing
             DateTime time = DateTime.now();
             if (note['timestamp'] != null) {
-              time = (note['timestamp'] as Timestamp).toDate();
+              time = note['timestamp'] is String
+                  ? (DateTime.tryParse(note['timestamp'].toString()) ?? DateTime.now())
+                  : (note['timestamp'] is DateTime ? note['timestamp'] as DateTime : DateTime.now());
             }
 
             return GestureDetector(

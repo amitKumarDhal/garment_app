@@ -1,7 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -713,74 +712,73 @@ class _SalesOrderHistoryScreenState extends State<SalesOrderHistoryScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ✅ PAYMENT BUTTONS WRAPPED IN STREAM BUILDER
+              // ✅ PAYMENT BUTTONS
               if (order.balanceDue > 0 && !isDeleted) ...[
-                StreamBuilder<bool>(
-                    stream: Get.find<SalesHistoryController>().hasPendingPayment(order.id),
-                    builder: (context, snapshot) {
-                      bool isPending = snapshot.data ?? false;
+                Builder(
+                  builder: (context) {
+                    bool isPending = Get.find<SalesHistoryController>().hasPendingPayment(order);
 
-                      return Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: OutlinedButton.icon(
-                                  onPressed: isPending ? null : () {
-                                    Navigator.pop(context);
-                                    _showPaymentDialog(context, order, Get.find<SalesHistoryController>());
-                                  },
-                                  icon: const Icon(Icons.edit_note_rounded, size: 18),
-                                  label: const Text("Update Due"),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    foregroundColor: isPending ? Colors.grey : TColors.primary,
-                                  ),
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: OutlinedButton.icon(
+                                onPressed: isPending ? null : () {
+                                  Navigator.pop(context);
+                                  _showPaymentDialog(context, order, Get.find<SalesHistoryController>());
+                                },
+                                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                                label: const Text("Update Due"),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  foregroundColor: isPending ? Colors.grey : TColors.primary,
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                flex: 1,
-                                child: ElevatedButton.icon(
-                                  onPressed: isPending ? null : () {
-                                    HapticFeedback.mediumImpact();
-                                    _confirmFullPayment(context, order);
-                                  },
-                                  icon: Icon(
-                                      isPending ? Icons.hourglass_empty_rounded : Icons.done_all_rounded,
-                                      size: 18,
-                                      color: Colors.white
-                                  ),
-                                  label: Text(
-                                      isPending ? "PENDING" : "FULLY PAID",
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    disabledBackgroundColor: Colors.grey.shade400,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    elevation: 0,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          // Informational Text if Pending
-                          if (isPending)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 12.0),
-                              child: Text(
-                                "A payment request is waiting for Manager approval.",
-                                style: TextStyle(color: Colors.orange.shade700, fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                             ),
-                        ],
-                      );
-                    }
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 1,
+                              child: ElevatedButton.icon(
+                                onPressed: isPending ? null : () {
+                                  HapticFeedback.mediumImpact();
+                                  _confirmFullPayment(context, order);
+                                },
+                                icon: Icon(
+                                    isPending ? Icons.hourglass_empty_rounded : Icons.done_all_rounded,
+                                    size: 18,
+                                    color: Colors.white
+                                ),
+                                label: Text(
+                                    isPending ? "PENDING" : "FULLY PAID",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  disabledBackgroundColor: Colors.grey.shade400,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Informational Text if Pending
+                        if (isPending)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12.0),
+                            child: Text(
+                              "A payment request is waiting for Manager approval.",
+                              style: TextStyle(color: Colors.orange.shade700, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
               ],
@@ -805,7 +803,9 @@ class _SalesOrderHistoryScreenState extends State<SalesOrderHistoryScreen> {
                     ),
                     itemBuilder: (context, index) {
                       final record = order.paymentHistory[index];
-                      DateTime date = (record['date'] as Timestamp).toDate();
+                      DateTime date = record['date'] is String
+                          ? (DateTime.tryParse(record['date'].toString()) ?? DateTime.now())
+                          : (record['date'] is DateTime ? record['date'] as DateTime : DateTime.now());
                       double amount = double.tryParse(record['amount'].toString()) ?? 0.0;
 
                       return Row(

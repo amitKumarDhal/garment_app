@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../data/services/api_service.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
@@ -114,18 +114,8 @@ class _SalesManagerApprovalsState extends State<SalesManagerApprovals> {
               color: TColors.primary,
               backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               onRefresh: () async => controller.fetchPendingOrders(), // Dummy refresh to maintain UX feel
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('payment_requests')
-                    .where('status', isEqualTo: 'pending')
-                    .snapshots(),
-                builder: (context, paymentSnap) {
-                  if (!paymentSnap.hasData && paymentSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: TColors.primary));
-                  }
-
-                  final paymentDocs = paymentSnap.data?.docs ?? [];
-
+              child: Obx(() {
+                  final paymentDocs = controller.pendingPaymentRequests;
                   if (paymentDocs.isEmpty) {
                     return _buildEmptyState(
                         isDark,
@@ -133,7 +123,6 @@ class _SalesManagerApprovalsState extends State<SalesManagerApprovals> {
                         "There are no payment requests\nwaiting for your approval."
                     );
                   }
-
                   return ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -142,8 +131,7 @@ class _SalesManagerApprovalsState extends State<SalesManagerApprovals> {
                       return _buildPremiumPaymentCard(context, paymentDocs[index], isDark, formatCurrency);
                     },
                   );
-                },
-              ),
+                }),
             ),
           ],
         ),
@@ -151,13 +139,11 @@ class _SalesManagerApprovalsState extends State<SalesManagerApprovals> {
     );
   }
 
-  // ✅ PREMIUM PAYMENT REQUEST CARD
-  Widget _buildPremiumPaymentCard(BuildContext context, QueryDocumentSnapshot doc, bool isDark, NumberFormat formatCurrency) {
-    final data = doc.data() as Map<String, dynamic>;
+  Widget _buildPremiumPaymentCard(BuildContext context, Map<String, dynamic> data, bool isDark, NumberFormat formatCurrency) {
     final amount = data['amount'] ?? 0.0;
-    final agent = data['agentName'] ?? 'Associate';
-    final orderNo = data['manualOrderNo'] ?? 'Unknown';
-    final orderId = data['orderId'];
+    final agent = data['agentName'] ?? data['agent_name'] ?? 'Associate';
+    final orderNo = data['manualOrderNo'] ?? data['manual_order_no'] ?? 'Unknown';
+    final orderId = data['orderId'] ?? data['order_id'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -165,7 +151,7 @@ class _SalesManagerApprovalsState extends State<SalesManagerApprovals> {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.5), // Highlighted border for payments
+          color: Colors.orange.withValues(alpha: 0.5),
           width: 1.5,
         ),
         boxShadow: [
@@ -185,10 +171,10 @@ class _SalesManagerApprovalsState extends State<SalesManagerApprovals> {
             HapticFeedback.lightImpact();
             Get.dialog(const Center(child: CircularProgressIndicator(color: TColors.primary)), barrierDismissible: false);
             try {
-              final orderDoc = await FirebaseFirestore.instance.collection('orders').doc(orderId).get();
-              Get.back(); // close loading
-              if (orderDoc.exists) {
-                Get.to(() => OrderApprovalScreen(order: OrderModel.fromSnapshot(orderDoc)));
+              final res = await ApiService.get('/orders/$orderId');
+              Get.back();
+              if (res['success'] == true && res['order'] != null) {
+                Get.to(() => OrderApprovalScreen(order: OrderModel.fromJson(res['order'])));
               } else {
                 Get.snackbar("Error", "Order not found.", backgroundColor: Colors.redAccent.withValues(alpha:0.1), colorText: Colors.red);
               }

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PrintingModel {
   final String? id;
@@ -19,30 +18,29 @@ class PrintingModel {
     required this.timestamp,
   });
 
-  // Convert to JSON for Firestore
+  // Convert to JSON
   Map<String, dynamic> toJson() => {
     "styleNo": styleNo,
     "receivedFromCutting": receivedFromCutting,
     "damagedQuantities": damagedQuantities,
     "totalDamaged": totalDamaged,
     "netGoodPieces": netGoodPieces,
-    "timestamp": FieldValue.serverTimestamp(),
+    "timestamp": DateTime.now().toIso8601String(),
     "status": "Printing Completed",
   };
 
-  // Create Model from Firestore Snapshot
-  factory PrintingModel.fromSnapshot(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data()!;
+  // Create Model from Map / Snapshot
+  factory PrintingModel.fromSnapshot(dynamic doc) {
+    final data = doc is Map<String, dynamic> ? doc : (doc.data() as Map<String, dynamic>);
+    final idVal = doc is Map<String, dynamic> ? doc['id']?.toString() : doc.id;
     return PrintingModel(
-      id: doc.id,
+      id: idVal,
       styleNo: data['styleNo'] ?? '',
       receivedFromCutting: data['receivedFromCutting'] ?? 0,
       damagedQuantities: Map<String, int>.from(data['damagedQuantities'] ?? {}),
       totalDamaged: data['totalDamaged'] ?? 0,
       netGoodPieces: data['netGoodPieces'] ?? 0,
-      timestamp: (data['timestamp'] as Timestamp).toDate(),
+      timestamp: data['timestamp'] is String ? (DateTime.tryParse(data['timestamp']) ?? DateTime.now()) : DateTime.now(),
     );
   }
 }

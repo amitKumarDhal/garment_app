@@ -74,24 +74,20 @@ class PendingApprovalsScreen extends StatelessWidget {
       }),
     );
   }
-
   // --- 2. PREMIUM SECURITY CLEARANCE TICKET ---
   Widget _buildRequestCard(AdminController controller, Map<String, dynamic> user, bool isDark) {
-    final String docId = user['id'] ?? '';
-    final String role = (user['role'] ?? 'Worker').toString().toUpperCase();
-
-    // Determine what stage we are currently approving
-    String currentStageAction = "Approve Unit";
-    if (user['unitApproved'] == true) currentStageAction = "Approve Shift";
-    if (user['shiftApproved'] == true) currentStageAction = "Final Admin Approval";
+    final String docId = user['id']?.toString() ?? '';
+    final String role = (user['role'] ?? 'SALES_ASSOCIATE').toString().replaceAll('_', ' ').toUpperCase();
+    final String employeeId = user['employee_id']?.toString() ?? user['employeeId']?.toString() ?? '---';
+    final String email = user['email']?.toString() ?? '';
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.orange.withValues(alpha:0.3), width: 1.5),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
-          if (!isDark) BoxShadow(color: Colors.orange.withValues(alpha:0.05), blurRadius: 15, offset: const Offset(0, 5)),
+          if (!isDark) BoxShadow(color: Colors.orange.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -106,13 +102,15 @@ class PendingApprovalsScreen extends StatelessWidget {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha:0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.blue.withValues(alpha:0.3), width: 1.5),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1.5),
                   ),
                   child: Center(
                     child: Text(
-                      user['name']?[0].toUpperCase() ?? 'U',
+                      user['name'] != null && user['name'].toString().isNotEmpty
+                          ? user['name'][0].toUpperCase()
+                          : 'U',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.blue),
                     ),
                   ),
@@ -125,22 +123,31 @@ class PendingApprovalsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user['name'] ?? 'Unknown User',
+                        user['name']?.toString() ?? 'Unknown User',
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (email.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)),
-                            child: Text(role, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                            child: Text(role, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.orange.shade700, letterSpacing: 0.5)),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            "ID: ${user['employeeId'] ?? '---'}",
+                            "ID: $employeeId",
                             style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -153,131 +160,83 @@ class PendingApprovalsScreen extends StatelessWidget {
           ),
 
           // Divider
-          Container(height: 1, color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
-
-          // Progress Visualizer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            decoration: BoxDecoration(color: isDark ? Colors.black26 : Colors.grey.shade50),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatusCircle("UNIT", user['unitApproved'] ?? false),
-                _buildLine(user['unitApproved'] ?? false, user['shiftApproved'] ?? false, isDark),
-                _buildStatusCircle("SHIFT", user['shiftApproved'] ?? false),
-                _buildLine(user['shiftApproved'] ?? false, user['adminApproved'] ?? false, isDark),
-                _buildStatusCircle("ADMIN", user['adminApproved'] ?? false, isFinal: true),
-              ],
-            ),
-          ),
-
-          // Divider
-          Container(height: 1, color: isDark ? Colors.white10 : Colors.black.withValues(alpha:0.03)),
+          Container(height: 1, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.03)),
 
           // Actions
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      _confirmAction(
-                          "Reject Request",
-                          "Are you sure you want to delete this ID request?",
-                          Colors.redAccent,
-                              () => controller.rejectRequest(docId)
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
-                      side: const BorderSide(color: Colors.redAccent, width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Obx(() {
+              final isProcessing = controller.processingUserIds.contains(docId);
+
+              if (isProcessing) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation<Color>(Colors.orange)),
                     ),
-                    child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Colors.orange, Colors.deepOrange]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha:0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                    ),
-                    child: ElevatedButton(
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
                       onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        controller.approveNextStage(docId, user);
+                        HapticFeedback.lightImpact();
+                        _confirmAction(
+                          "Reject Request",
+                          "Are you sure you want to reject and delete this ID request?",
+                          Colors.redAccent,
+                          () => controller.rejectRequest(docId),
+                        );
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent, width: 1.5),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: Text(currentStageAction, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                     ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Colors.orange, Colors.deepOrange]),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          HapticFeedback.mediumImpact();
+                          controller.approveNextStage(docId, user);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text("Approve Clearance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }),
           ),
         ],
       ),
     );
   }
 
-  // --- 3. MODERNIZED TIMELINE HELPERS ---
-
-  Widget _buildStatusCircle(String label, bool active, {bool isFinal = false}) {
-    return Column(
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: active ? Colors.green : (isFinal ? Colors.transparent : Colors.grey.withValues(alpha:0.1)),
-            shape: BoxShape.circle,
-            border: Border.all(color: active ? Colors.green : Colors.grey.shade300, width: 2),
-          ),
-          child: Icon(
-            active ? Icons.check_rounded : (isFinal ? Icons.admin_panel_settings_rounded : Icons.radio_button_unchecked_rounded),
-            color: active ? Colors.white : Colors.grey.shade400,
-            size: 16,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: active ? FontWeight.w900 : FontWeight.w600,
-            color: active ? Colors.green : Colors.grey.shade500,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLine(bool isLeftActive, bool isRightActive, bool isDark) {
-    // The line is only fully green if BOTH sides of it are completed
-    Color lineColor = (isLeftActive && isRightActive) ? Colors.green : (isDark ? Colors.white10 : Colors.grey.shade300);
-
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 20), // Offset to align with circles, not text
-        height: 2,
-        color: lineColor,
-      ),
-    );
-  }
-
-  // --- 4. SAFETY DIALOG ---
+  // --- 3. SAFETY DIALOG ---
   void _confirmAction(String title, String message, Color color, VoidCallback onConfirm) {
     Get.defaultDialog(
       title: title,

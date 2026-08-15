@@ -1,4 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -7,7 +6,6 @@ import 'package:yoobbel/utils/theme/theme.dart';
 import 'bindings/general_bindings.dart';
 import 'routes/route_names.dart';
 import 'routes/app_routes.dart';
-import 'firebase_options.dart';
 
 void main() async {
   // 1. Ensure Flutter Engine is ready (MUST BE FIRST)
@@ -15,9 +13,6 @@ void main() async {
 
   // 2. Initialize Local Storage (Critical for Instant Speed)
   await GetStorage.init();
-
-  // 3. Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // 4. UI Styling (Transparent Status Bar)
   SystemChrome.setSystemUIOverlayStyle(

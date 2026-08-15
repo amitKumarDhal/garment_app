@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
@@ -1008,8 +1007,12 @@ class _UnitSupervisorOrdersScreenState extends State<UnitSupervisorOrdersScreen>
 
     List<dynamic> history = List.from(order.stageHistory);
     history.sort((a, b) {
-      DateTime timeA = (a['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
-      DateTime timeB = (b['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      DateTime timeA = a['timestamp'] is String
+          ? (DateTime.tryParse(a['timestamp'].toString()) ?? DateTime.now())
+          : (a['timestamp'] is DateTime ? a['timestamp'] as DateTime : DateTime.now());
+      DateTime timeB = b['timestamp'] is String
+          ? (DateTime.tryParse(b['timestamp'].toString()) ?? DateTime.now())
+          : (b['timestamp'] is DateTime ? b['timestamp'] as DateTime : DateTime.now());
       return timeA.compareTo(timeB);
     });
 
@@ -1021,14 +1024,18 @@ class _UnitSupervisorOrdersScreenState extends State<UnitSupervisorOrdersScreen>
         itemCount: history.length,
         itemBuilder: (context, index) {
           var current = history[index];
-          DateTime currentTime = (current['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+          DateTime currentTime = current['timestamp'] is String
+              ? (DateTime.tryParse(current['timestamp'].toString()) ?? DateTime.now())
+              : (current['timestamp'] is DateTime ? current['timestamp'] as DateTime : DateTime.now());
           String currentStage = current['stage'] ?? 'Unknown';
           Color stageColor = _getStatusColor(currentStage);
 
           String timeTakenStr = '';
           if (index < history.length - 1) {
             var next = history[index + 1];
-            DateTime nextTime = (next['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+            DateTime nextTime = next['timestamp'] is String
+                ? (DateTime.tryParse(next['timestamp'].toString()) ?? DateTime.now())
+                : (next['timestamp'] is DateTime ? next['timestamp'] as DateTime : DateTime.now());
             Duration diff = nextTime.difference(currentTime);
 
             if (diff.inDays > 0) {
@@ -1116,7 +1123,11 @@ class _UnitSupervisorOrdersScreenState extends State<UnitSupervisorOrdersScreen>
                         itemBuilder: (context, index) {
                           var event = history[index];
                           DateTime time = DateTime.now();
-                          if (event['timestamp'] != null) time = (event['timestamp'] as Timestamp).toDate();
+                          if (event['timestamp'] != null) {
+                            time = event['timestamp'] is String
+                                ? (DateTime.tryParse(event['timestamp'].toString()) ?? DateTime.now())
+                                : (event['timestamp'] is DateTime ? event['timestamp'] as DateTime : DateTime.now());
+                          }
 
                           String stage = event['stage'] ?? 'Unknown Stage';
                           String updater = event['updatedBy'] ?? 'System';

@@ -174,15 +174,8 @@ class StatusCheckScreen extends StatelessWidget {
                                   // Always true if document exists
                                   _buildTrackerStep("Profile Generated", "Identity logged in system", true, isCurrent: false, isDark: isDark),
 
-                                  // Role Specific Logic
-                                  if (role == 'Worker')
-                                    _buildTrackerStep("Unit Verification", data['unitApproved'] ? "Verified" : "Awaiting Unit Supervisor", data['unitApproved'], isCurrent: !data['unitApproved'], isDark: isDark),
-
-                                  if (role == 'Worker' || role == 'Unit Supervisor')
-                                    _buildTrackerStep("Shift Verification", data['shiftApproved'] ? "Verified" : "Awaiting Shift Manager", data['shiftApproved'], isCurrent: (data['unitApproved'] ?? true) && !data['shiftApproved'], isDark: isDark),
-
                                   // Final Admin Step
-                                  _buildTrackerStep("System Authorization", data['adminApproved'] ? "Clearance Granted" : "Final Admin Review", data['adminApproved'], isCurrent: (data['shiftApproved'] ?? true) && !data['adminApproved'], isLast: true, isDark: isDark),
+                                  _buildTrackerStep("System Authorization", data['adminApproved'] ? "Clearance Granted" : "Final Admin Review", data['adminApproved'] ?? false, isCurrent: !(data['adminApproved'] ?? false), isLast: true, isDark: isDark),
                                 ],
                               ),
                             ),

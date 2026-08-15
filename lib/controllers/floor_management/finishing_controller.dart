@@ -1,78 +1,39 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../data/services/api_service.dart';
 
 class FinishingController extends GetxController {
-  static FinishingController get instance => Get.find();
-
-  final formKey = GlobalKey<FormState>();
-  final isLoading = false.obs;
-
-  // --- Input Controllers ---
-  final checkerName = TextEditingController(); // Who checked/packed it
+  final checkerName = TextEditingController();
   final styleNo = TextEditingController();
-
-  // Quantities
-  final receivedQty = TextEditingController(); // Qty received from stitching
+  final receivedQty = TextEditingController();
   final ironedQty = TextEditingController();
   final packedQty = TextEditingController();
-  final defectiveQty = TextEditingController(); // Rejections at final stage
+  final defectiveQty = TextEditingController();
+  final isLoading = false.obs;
+  final finishingFormKey = GlobalKey<FormState>();
+  GlobalKey<FormState> get formKey => finishingFormKey;
 
-  // --- Logic ---
-  Future<void> submitFinishingEntry() async {
-    if (!formKey.currentState!.validate()) return;
-
+  Future<void> submitFinishingEntry([dynamic orderId]) async {
     try {
       isLoading.value = true;
-
-      // Calculate Net Good Pieces ready for shipment
-      int packed = int.tryParse(packedQty.text) ?? 0;
-      int defective = int.tryParse(defectiveQty.text) ?? 0;
-
-      await FirebaseFirestore.instance.collection('finishing_entries').add({
-        "checkerName": checkerName.text.trim(),
-        "styleNo": styleNo.text.trim(),
-        "receivedQty": int.tryParse(receivedQty.text) ?? 0,
-        "ironedQty": int.tryParse(ironedQty.text) ?? 0,
-        "packedQty": packed,
-        "defectiveQty": defective,
-        "timestamp": FieldValue.serverTimestamp(),
-        "status": "Ready for Shipment",
+      final res = await ApiService.post('/production/finishing', {
+        'order_id': orderId?.toString(),
+        'checker_name': checkerName.text.trim(),
+        'style_no': styleNo.text.trim(),
+        'received_qty': int.tryParse(receivedQty.text.trim()) ?? 0,
+        'ironed_qty': int.tryParse(ironedQty.text.trim()) ?? 0,
+        'packed_qty': int.tryParse(packedQty.text.trim()) ?? 0,
+        'defective_qty': int.tryParse(defectiveQty.text.trim()) ?? 0,
       });
 
-      Get.snackbar(
-        "Shipment Ready",
-        "Style ${styleNo.text} - $packed Pcs Packed",
-        backgroundColor: Colors.green.withValues(alpha: 0.1),
-        colorText: Colors.green,
-      );
-
-      _clearFields();
-      Get.back(); // Return to menu
+      if (res['success'] == true) {
+        Get.snackbar("Success", "Finishing entry saved", backgroundColor: Colors.green.withValues(alpha: 0.1));
+        Get.back();
+      }
     } catch (e) {
-      Get.snackbar("Error", "Could not save entry: $e");
+      Get.snackbar("Error", "Failed: $e");
     } finally {
       isLoading.value = false;
     }
-  }
-
-  void _clearFields() {
-    checkerName.clear();
-    styleNo.clear();
-    receivedQty.clear();
-    ironedQty.clear();
-    packedQty.clear();
-    defectiveQty.clear();
-  }
-
-  @override
-  void onClose() {
-    checkerName.dispose();
-    styleNo.dispose();
-    receivedQty.dispose();
-    ironedQty.dispose();
-    packedQty.dispose();
-    defectiveQty.dispose();
-    super.onClose();
   }
 }

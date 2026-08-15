@@ -1,84 +1,53 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../data/models/order_model.dart';
+import '../../data/services/api_service.dart';
 
 class OrderTrackingController extends GetxController {
-  final searchController = TextEditingController();
+  var searchedOrder = Rxn<OrderModel>();
   var isLoading = false.obs;
-  var searchResults = <OrderModel>[].obs;
   var hasSearched = false.obs;
+  final searchController = TextEditingController();
 
-  // ✅ NEW: Filter state for Active vs Trash
-  var currentFilter = "Active".obs;
-
-  // ✅ NEW: Change filter and automatically re-run search
-  void setFilter(String filter) {
-    currentFilter.value = filter;
-    if (searchController.text.trim().isNotEmpty) {
-      searchOrder(searchController.text);
-    } else {
-      searchResults.clear();
-    }
-  }
-
-  // Search Logic
   Future<void> searchOrder(String query) async {
-    if (query.isEmpty) return;
-
-    isLoading.value = true;
-    hasSearched.value = true;
-    searchResults.clear();
+    if (query.trim().isEmpty) {
+      Get.snackbar("Error", "Please enter Order Number or Client Name");
+      return;
+    }
 
     try {
-      List<OrderModel> tempResults = [];
+      isLoading.value = true;
+      hasSearched.value = true;
+      searchedOrder.value = null;
 
-      // 1. Try Searching by Manual Order ID (Exact Match)
-      // Added .toUpperCase() assuming your IDs are like 'YB028'
-      final idSnapshot = await FirebaseFirestore.instance
-          .collection('orders')
-          .where('manualOrderNo', isEqualTo: query.trim().toUpperCase())
-          .get();
+      final res = await ApiService.get('/orders');
+      if (res['success'] == true && res['orders'] != null) {
+        final list = List<Map<String, dynamic>>.from(res['orders']);
+        final q = query.trim().toLowerCase();
+        final match = list.firstWhereOrNull((o) {
+          final no = (o['manual_order_no'] ?? o['manualOrderNo'] ?? o['id'] ?? '').toString().toLowerCase();
+          final client = (o['client_name'] ?? o['clientName'] ?? '').toString().toLowerCase();
+          return no.contains(q) || client.contains(q);
+        });
 
-      if (idSnapshot.docs.isNotEmpty) {
-        tempResults = idSnapshot.docs
-            .map((doc) => OrderModel.fromSnapshot(doc))
-            .toList();
-      } else {
-        // 2. If ID fails, Try Searching by Client Name
-        final nameSnapshot = await FirebaseFirestore.instance
-            .collection('orders')
-            .where('clientName', isGreaterThanOrEqualTo: query)
-            .where('clientName', isLessThan: '${query}z')
-            .get();
-
-        tempResults = nameSnapshot.docs
-            .map((doc) => OrderModel.fromSnapshot(doc))
-            .toList();
+        if (match != null) {
+          searchedOrder.value = OrderModel.fromSnapshot(match);
+        } else {
+          Get.snackbar("Not Found", "No order matching '$query'");
+        }
       }
-
-      // ✅ 3. LOCAL FILTERING FOR SOFT DELETE
-      // We filter locally because Firestore blocks multiple inequality filters in one query.
-      bool isLookingForTrash = currentFilter.value == "Trash";
-
-      searchResults.value = tempResults.where((order) {
-        // Check if the order has the isDeleted flag
-        bool isDeleted = order.toJson()['isDeleted'] == true;
-
-        // If we want Trash, keep deleted ones. If we want Active, keep non-deleted ones.
-        return isLookingForTrash ? isDeleted : !isDeleted;
-      }).toList();
-
     } catch (e) {
-      Get.snackbar("Error", "Could not track order: $e");
+      Get.snackbar("Error", "Could not fetch order: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
+  List<OrderModel> get searchResults => searchedOrder.value != null ? [searchedOrder.value!] : [];
+
   void clearSearch() {
     searchController.clear();
-    searchResults.clear();
+    searchedOrder.value = null;
     hasSearched.value = false;
   }
 }

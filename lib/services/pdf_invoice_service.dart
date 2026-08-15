@@ -3,7 +3,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/models/order_model.dart';
 
 class PdfInvoiceService {
@@ -211,7 +210,9 @@ class PdfInvoiceService {
                           double amount = double.tryParse(payment['amount']?.toString() ?? '0') ?? 0.0;
                           String dateStr = "";
                           if (payment['date'] != null) {
-                            DateTime dt = (payment['date'] as Timestamp).toDate();
+                            DateTime dt = payment['date'] is String
+                                ? (DateTime.tryParse(payment['date'].toString()) ?? DateTime.now())
+                                : (payment['date'] is DateTime ? payment['date'] as DateTime : DateTime.now());
                             dateStr = DateFormat('dd MMM').format(dt);
                           }
                           return _buildSummaryRow("Paid on $dateStr", "- ${currency.format(amount)}", font, color: PdfColors.red800, size: 9);
@@ -283,13 +284,13 @@ class PdfInvoiceService {
     // ✅ Define the Brand Red Color
     final PdfColor brandRed = const PdfColor.fromInt(0xFFC62828);
 
-    // ✅ Load the Logo from assets
+    // ✅ Load Zobbra Logo from assets
     pw.MemoryImage? logoImage;
     try {
-      final ByteData bytes = await rootBundle.load('assets/images/Yoobbel.png');
+      final ByteData bytes = await rootBundle.load('assets/images/zobbra.jpeg');
       logoImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (e) {
-      print("Warning: Could not load Yoobbel.png from assets. Make sure it's added to pubspec.yaml.");
+      print("Warning: Could not load zobbra.jpeg from assets.");
     }
 
     pdf.addPage(

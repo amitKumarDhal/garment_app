@@ -86,7 +86,7 @@ class SupervisorMenuScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // ✅ NEW: FABRIC INVENTORY (Works for Shift Supervisor & Cutting Check)
+            // ✅ NEW: FABRIC INVENTORY (Works for Unit Supervisor & Cutting Check)
             _buildMenuCard(
               "Fabric Inventory",
               "Inward stock & Check availability",

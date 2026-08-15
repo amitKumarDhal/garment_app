@@ -3,14 +3,12 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // Applied Google Services for Firebase integration
-    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.yoobbel.app"
     compileSdk = 36 // Updated to API 36
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

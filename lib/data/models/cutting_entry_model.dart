@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CuttingEntryModel {
   final String? id;
@@ -25,7 +24,7 @@ class CuttingEntryModel {
     required this.status,
   });
 
-  // Convert to JSON (for Firestore Write)
+  // Convert to JSON
   Map<String, dynamic> toJson() => {
     "styleNo": styleNo,
     "lotNo": lotNo,
@@ -34,16 +33,17 @@ class CuttingEntryModel {
     "totalFabricUsed": totalFabricUsed,
     "sizes": sizes,
     "totalQuantity": totalQuantity,
-    "entryDate": entryDate,
+    "entryDate": entryDate.toIso8601String(),
     "status": status,
-    "timestamp": FieldValue.serverTimestamp(),
+    "timestamp": DateTime.now().toIso8601String(),
   };
 
-  // Create from Snapshot (for Firestore Read)
-  factory CuttingEntryModel.fromSnapshot(DocumentSnapshot snapshot) {
-    final data = snapshot.data() as Map<String, dynamic>;
+  // Create from Map / Snapshot
+  factory CuttingEntryModel.fromSnapshot(dynamic snapshot) {
+    final data = snapshot is Map<String, dynamic> ? snapshot : (snapshot.data() as Map<String, dynamic>);
+    final idVal = snapshot is Map<String, dynamic> ? snapshot['id']?.toString() : snapshot.id;
     return CuttingEntryModel(
-      id: snapshot.id,
+      id: idVal,
       styleNo: data['styleNo'] ?? '',
       lotNo: data['lotNo'] ?? '',
       fabricType: data['fabricType'] ?? '',
@@ -51,7 +51,7 @@ class CuttingEntryModel {
       totalFabricUsed: (data['totalFabricUsed'] as num?)?.toDouble() ?? 0.0,
       sizes: Map<String, int>.from(data['sizes'] ?? {}),
       totalQuantity: data['totalQuantity'] ?? 0,
-      entryDate: (data['entryDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      entryDate: data['entryDate'] is String ? (DateTime.tryParse(data['entryDate']) ?? DateTime.now()) : DateTime.now(),
       status: data['status'] ?? 'Pending',
     );
   }

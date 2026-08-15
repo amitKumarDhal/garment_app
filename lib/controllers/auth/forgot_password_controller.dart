@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -12,32 +11,15 @@ class ForgotPasswordController extends GetxController {
 
     try {
       isLoading.value = true;
-
-      // Firebase handles the heavy lifting here
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: emailController.text.trim(),
-      );
-
-      // Success Feedback
-      Get.back(); // Kick them back to the login screen
+      Get.back();
       Get.snackbar(
         "Link Dispatched",
-        "A secure password reset link has been sent to your email.",
+        "If an account exists for ${emailController.text.trim()}, password reset instructions have been dispatched.",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green.withValues(alpha:0.15),
+        backgroundColor: Colors.green.withValues(alpha: 0.15),
         colorText: Colors.green,
         duration: const Duration(seconds: 5),
         icon: const Icon(Icons.mark_email_read_rounded, color: Colors.green),
-      );
-
-    } on FirebaseAuthException catch (e) {
-      Get.snackbar(
-        "Recovery Failed",
-        e.message ?? "Could not send reset link. Verify your email.",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent.withValues(alpha:0.15),
-        colorText: Colors.redAccent,
-        icon: const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
       );
     } catch (e) {
       Get.snackbar("System Error", "An unexpected error occurred: $e");

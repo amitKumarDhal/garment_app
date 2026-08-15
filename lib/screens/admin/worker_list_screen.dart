@@ -21,7 +21,7 @@ class WorkerListScreen extends StatelessWidget {
       ),
       body: Obx(() {
         if (controller.allApprovedWorkers.isEmpty) {
-          return const Center(child: Text("No approved workers found."));
+          return const Center(child: Text("No active personnel found."));
         }
 
         return ListView.separated(
@@ -31,7 +31,7 @@ class WorkerListScreen extends StatelessWidget {
           itemBuilder: (context, index) {
             final worker = controller.allApprovedWorkers[index];
             final String name = worker['name'] ?? 'Unknown';
-            final String role = worker['role'] ?? 'Worker';
+            final String role = worker['role'] ?? 'Unit Supervisor';
             final String dept = worker['department'] ?? 'General';
 
             return Container(
@@ -63,7 +63,7 @@ class WorkerListScreen extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  role, // e.g., "Shift Supervisor"
+                  role, // e.g., "Unit Supervisor"
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 trailing: Chip(

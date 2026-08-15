@@ -1,6 +1,4 @@
-// ignore_for_file: curly_braces_in_flow_control_structures
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -13,6 +11,7 @@ import '../../utils/constants/colors.dart';
 import 'package:yoobbel/controllers/notifications/notification_controller.dart';
 import 'package:yoobbel/screens/notifications/notification_screen.dart';
 import '../profile/profile_screen.dart';
+import '../../data/services/api_service.dart';
 
 // ✅ IMPORT THE MAKE QUOTATION SCREEN
 import 'make_quotation_screen.dart';
@@ -26,7 +25,7 @@ class SalesDashboard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (FirebaseAuth.instance.currentUser != null) {
+      if (ApiService.token != null) {
         if (controller.leaderboardData.isEmpty) {
           controller.loadDashboardData();
         }

@@ -1,7 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../data/services/api_service.dart';
+import '../../data/repositories/authentication_repository.dart';
 
 class LoginController extends GetxController {
   static LoginController get instance => Get.find();
@@ -12,23 +12,19 @@ class LoginController extends GetxController {
 
   final isLoading = false.obs;
   final hidePassword = true.obs;
-  final selectedRole = 'Worker'.obs;
+  final selectedRole = 'Sales Associate'.obs;
 
   final List<String> roles = [
     'Admin',
     'Sales Manager',
-    'Shift Supervisor',
     'Unit Supervisor',
-    'Worker',
     'Sales Associate',
   ];
 
   final Map<String, IconData> roleIcons = {
     'Admin': Icons.admin_panel_settings_outlined,
     'Sales Manager': Icons.domain_verification,
-    'Shift Supervisor': Icons.domain_outlined,
     'Unit Supervisor': Icons.engineering_outlined,
-    'Worker': Icons.assignment_ind_outlined,
     'Sales Associate': Icons.support_agent,
   };
 
@@ -37,48 +33,37 @@ class LoginController extends GetxController {
 
     try {
       isLoading.value = true;
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email.text.trim(), password: password.text.trim());
+      final response = await ApiService.post('/auth/login', {
+        'email': email.text.trim(),
+        'password': password.text.trim(),
+      });
 
-      Map<String, dynamic>? userData;
+      final data = response['data'] is Map<String, dynamic> ? response['data'] as Map<String, dynamic> : response;
+      final token = (data['accessToken'] ?? data['token'] ?? response['token']) as String?;
+      final user = (data['user'] ?? response['user']) as Map<String, dynamic>?;
 
-      // Check 'users' first
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).get();
-      if (userDoc.exists) {
-        userData = userDoc.data() as Map<String, dynamic>;
-      } else {
-        // Fallback to 'id_requests'
-        DocumentSnapshot requestDoc = await FirebaseFirestore.instance.collection('id_requests').doc(userCredential.user!.uid).get();
-        if (requestDoc.exists) userData = requestDoc.data() as Map<String, dynamic>;
-      }
+      if (response['success'] == true && token != null && user != null) {
+        final String dbRole = (user['role'] ?? 'SALES_ASSOCIATE').toString().replaceAll('_', ' ').toLowerCase().trim();
+        final String selectedDropdownRole = selectedRole.value.toLowerCase().trim();
 
-      if (userData != null) {
-        // ✅ MAGIC FIX: Convert all database keys to lowercase in memory
-        final safeData = userData.map((key, value) => MapEntry(key.toLowerCase(), value));
-
-        final String dbRole = (safeData['role'] ?? 'Worker').toString().trim();
-        final String selectedDropdownRole = selectedRole.value.trim();
-
-        bool isRoleMismatch = dbRole.toLowerCase() != selectedDropdownRole.toLowerCase();
-
-        if (dbRole.toLowerCase() == 'sales agent' && selectedDropdownRole.toLowerCase() == 'sales associate') {
+        bool isRoleMismatch = dbRole != selectedDropdownRole;
+        if (dbRole == 'sales associate' && selectedDropdownRole == 'sales associate') {
           isRoleMismatch = false;
         }
 
-        if (isRoleMismatch) {
-          await FirebaseAuth.instance.signOut();
-          _showError("Access Denied!\nYou are registered as a '$dbRole', but selected '$selectedDropdownRole'.");
+        if (isRoleMismatch && dbRole != 'admin') {
+          _showError("Access Denied!\nYou are registered as '$dbRole', but selected '${selectedRole.value}'.");
           return;
         }
+
+        ApiService.saveSession(token, user);
+        await AuthenticationRepository.instance.checkAuthSession();
       } else {
-        await FirebaseAuth.instance.signOut();
-        _showError("Access Denied!\nNo profile found in the system.");
-        return;
+        _showError(response['message']?.toString() ?? "Login failed");
       }
-    } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? "Login failed");
     } catch (e) {
-      _showError("System Error: $e");
+      final cleanMessage = e.toString().replaceFirst(RegExp(r'^(Exception|ApiException):\s*'), '');
+      _showError(cleanMessage);
     } finally {
       isLoading.value = false;
     }

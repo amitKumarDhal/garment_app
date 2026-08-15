@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class OrderModel {
@@ -131,7 +130,7 @@ class OrderModel {
       "clientGstNumber": clientGstNumber, // ✅ ADDED
       "pincode": pincode,
       "state": state,
-      "createdAt": createdAt ?? FieldValue.serverTimestamp(),
+      "createdAt": createdAt ?? DateTime.now().toIso8601String(),
       "updatedAt": updatedAt,
       "lastUpdatedBy": lastUpdatedBy,
       "marketingPersonId": marketingPersonId,
@@ -180,9 +179,11 @@ class OrderModel {
     };
   }
 
-  factory OrderModel.fromSnapshot(DocumentSnapshot<Map<String, dynamic>> document) {
-    final data = document.data();
-    if (data == null) throw Exception("Document ${document.id} is empty!");
+  factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel.fromSnapshot(json);
+
+  factory OrderModel.fromSnapshot(dynamic document) {
+    final data = document is Map<String, dynamic> ? document : (document.data != null ? document.data() as Map<String, dynamic> : <String, dynamic>{});
+    if (data == null) throw Exception("Document data is empty!");
 
     // SMART PARSING
     List<Map<String, dynamic>> parsedProducts = [];
@@ -271,13 +272,13 @@ class OrderModel {
   }
 
   static DateTime _parseTimestamp(dynamic value) {
-    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
     return DateTime.now();
   }
 
   static DateTime? _parseTimestampNullable(dynamic value) {
-    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     return null;
   }

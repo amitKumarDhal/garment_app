@@ -1,0 +1,111 @@
+{
+  "invalidAuth": {
+    "empty": {},
+    "badEmail": { "email": "notanemail", "password": "pass" },
+    "shortPassword": { "email": "valid@zobra.test", "password": "123" }
+  },
+  "legacyRoles": {
+    "worker": {
+      "name": "E2E Legacy Worker",
+      "email": "legacy.worker@zobra.test",
+      "password": "Password123!",
+      "role": "WORKER"
+    },
+    "shiftSupervisor": {
+      "name": "E2E Legacy Shift Sup",
+      "email": "legacy.shift@zobra.test",
+      "password": "Password123!",
+      "role": "SHIFT_SUPERVISOR"
+    },
+    "adminPublic": {
+      "name": "E2E Rogue Admin",
+      "email": "rogue.admin@zobra.test",
+      "password": "Password123!",
+      "role": "ADMIN"
+    }
+  },
+  "validSalesAssociate": {
+    "name": "E2E Sales Associate",
+    "email": "e2e-sales@zobra.test",
+    "password": "SecurePassword123!",
+    "role": "SALES_ASSOCIATE"
+  },
+  "validUnitSupervisor": {
+    "name": "E2E Unit Supervisor",
+    "email": "e2e-supervisor@zobra.test",
+    "password": "SecurePassword123!",
+    "role": "UNIT_SUPERVISOR"
+  },
+  "validSalesManager": {
+    "name": "E2E Sales Manager",
+    "email": "e2e-manager@zobra.test",
+    "password": "SecurePassword123!",
+    "role": "SALES_MANAGER"
+  },
+  "sampleClient": {
+    "name": "Acme Garments Ltd",
+    "phone": "+919876543210",
+    "organization": "Acme Corp",
+    "address": "42 Textile Hub, Mumbai",
+    "gstNumber": "27AABCU9603R1ZM",
+    "pincode": "400001",
+    "state": "Maharashtra"
+  },
+  "sampleQuotation": {
+    "clientName": "Acme Garments Ltd",
+    "clientAddress": "42 Textile Hub, Mumbai",
+    "clientGst": "27AABCU9603R1ZM",
+    "subTotal": 10000,
+    "totalGst": 500,
+    "shipping": 200,
+    "grandTotal": 10700,
+    "items": [
+      {
+        "name": "Round Neck Cotton T-Shirt",
+        "price": 200,
+        "quantity": 50,
+        "gstPercent": 5,
+        "itemTotal": 10500
+      }
+    ]
+  },
+  "sampleCuttingEntry": {
+    "styleNo": "ZBR-STY-001",
+    "lotNo": "LOT-2026-A",
+    "fabricType": "Dryfit Poly",
+    "consumption": 1.45,
+    "totalFabricUsed": 145.0,
+    "sizes": { "S": 20, "M": 40, "L": 30, "XL": 10 },
+    "totalQuantity": 100
+  },
+  "samplePrintingEntry": {
+    "styleNo": "ZBR-STY-001",
+    "receivedFromCutting": 100,
+    "damagedQuantities": { "screen_bleed": 2 },
+    "totalDamaged": 2,
+    "netGoodPieces": 98
+  },
+  "sampleStitchingEntry": {
+    "operator": "Operator Ramesh",
+    "styleNo": "ZBR-STY-001",
+    "operationType": "Full Stitching Assembly",
+    "assignedQty": 98,
+    "completedQty": 96,
+    "rejectedQty": 2,
+    "efficiency": 97.96
+  },
+  "samplePackingEntry": {
+    "cartonNo": "CTN-ZBR-001",
+    "styleNo": "ZBR-STY-001",
+    "category": "Standard Carton",
+    "totalPieces": 96,
+    "breakdown": { "S": 19, "M": 39, "L": 29, "XL": 9 }
+  },
+  "sampleInventoryTx": {
+    "fabricType": "Cotton Single Jersey",
+    "color": "Navy Blue",
+    "action": "IN",
+    "quantity": 250.0,
+    "unit": "KG"
+  }
+}

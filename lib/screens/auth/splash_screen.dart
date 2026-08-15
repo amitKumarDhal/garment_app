@@ -55,13 +55,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       body: Center(
         child: ScaleTransition(
           scale: _scaleAnimation,
-          child: Image.asset(
-            // ✅ 3. Swap the exact file path based on the theme
-            isDark
-                ? 'assets/logos/Yoobbel-onblack-cup.png'
-                : 'assets/logos/Yoobbel-onwhite-cup.png',
-            width: 250,
-            fit: BoxFit.contain,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Image.asset(
+              'assets/images/zobbra.jpeg',
+              width: 240,
+              height: 240,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
       ),

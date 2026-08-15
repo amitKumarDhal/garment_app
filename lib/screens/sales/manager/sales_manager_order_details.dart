@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../data/services/api_service.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
@@ -38,11 +39,10 @@ class _SalesManagerOrderDetailsState extends State<SalesManagerOrderDetails> {
 
   Future<void> _refreshOrder() async {
     try {
-      if (widget.order.id == null) return;
-      final doc = await FirebaseFirestore.instance.collection('orders').doc(widget.order.id).get();
-      if (doc.exists) {
+      final res = await ApiService.get('/orders/${widget.order.id}');
+      if (res['success'] == true && res['order'] != null) {
         setState(() {
-          currentOrder = OrderModel.fromSnapshot(doc);
+          currentOrder = OrderModel.fromJson(res['order']);
           displayStatus = currentOrder.status;
         });
       }
@@ -681,9 +681,9 @@ class EffectiveRevenueController extends GetxController {
       isSaving.value = true;
       HapticFeedback.mediumImpact();
 
-      await FirebaseFirestore.instance.collection('orders').doc(order.id).update({
-        'marginNumber': marginX.value,
-        'effectiveRevenue': effectiveRevenue.value,
+      await ApiService.put('/orders/${order.id}', {
+        'margin_number': marginX.value,
+        'effective_revenue': effectiveRevenue.value,
       });
 
       Get.snackbar(

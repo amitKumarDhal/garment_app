@@ -1,54 +1,45 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../data/services/api_service.dart';
 
 class AdminNotificationController extends GetxController {
-  final _db = FirebaseFirestore.instance;
-
   var notifications = <Map<String, dynamic>>[].obs;
-  var unreadCount = 0.obs;
   var isLoading = true.obs;
 
   @override
   void onInit() {
     super.onInit();
-    fetchGlobalNotifications();
+    fetchNotifications();
   }
 
-  // ✅ Fetch ALL activity across the company for the Admin
-  void fetchGlobalNotifications() {
-    _db.collection('notifications')
-        .orderBy('timestamp', descending: true)
-        .limit(100) // Keep the app fast by loading the latest 100
-        .snapshots()
-        .listen((snapshot) {
-
-      final docs = snapshot.docs.map((doc) {
-        var data = doc.data();
-        data['id'] = doc.id; // Save the document ID to mark as read later
-        return data;
-      }).toList();
-
-      notifications.value = docs;
-
-      // Update the badge count for the Bell Icon
-      unreadCount.value = docs.where((n) => n['isRead'] == false).length;
-      isLoading.value = false;
-    });
-  }
-
-  // ✅ Mark a specific notification as read when clicked
-  void markAsRead(String docId) {
-    _db.collection('notifications').doc(docId).update({'isRead': true});
-  }
-
-  // ✅ Mark all as read
-  void markAllAsRead() async {
-    final batch = _db.batch();
-    for (var n in notifications) {
-      if (n['isRead'] == false) {
-        batch.update(_db.collection('notifications').doc(n['id']), {'isRead': true});
+  Future<void> fetchNotifications() async {
+    try {
+      isLoading.value = true;
+      final res = await ApiService.get('/notifications');
+      if (res['success'] == true && res['notifications'] != null) {
+        notifications.assignAll(List<Map<String, dynamic>>.from(res['notifications']));
       }
+    } catch (e) {
+      debugPrint("Fetch Notifications Error: $e");
+    } finally {
+      isLoading.value = false;
     }
-    await batch.commit();
+  }
+
+  RxInt get unreadCount => notifications.where((n) => n['isRead'] != true).length.obs;
+
+  Future<void> markAllAsRead() async {
+    for (var n in notifications) {
+      n['isRead'] = true;
+    }
+    notifications.refresh();
+  }
+
+  Future<void> markAsRead(String id) async {
+    final note = notifications.firstWhereOrNull((n) => n['id'] == id);
+    if (note != null) {
+      note['isRead'] = true;
+      notifications.refresh();
+    }
   }
 }

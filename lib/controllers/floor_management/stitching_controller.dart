@@ -1,117 +1,50 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../data/services/api_service.dart';
 
 class StitchingController extends GetxController {
-  static StitchingController get instance => Get.find();
-  final stitchingFormKey = GlobalKey<FormState>();
-  final isLoading = false.obs;
-
-  // --- Input Controllers ---
-  final workerName = TextEditingController();
+  final operatorName = TextEditingController();
   final styleNo = TextEditingController();
   final operationType = TextEditingController();
-
   final assignedQty = TextEditingController();
   final completedQty = TextEditingController();
   final rejectedQty = TextEditingController();
+  final isLoading = false.obs;
 
-  var availableWorkers = <String>[
-    "Worker 001 - Rahul",
-    "Worker 002 - Priya",
-    "Worker 003 - Amit",
-    "Worker 004 - Suman",
-  ].obs;
-
-  // --- Summary Calculations ---
-  RxInt balanceQty = 0.obs;
-  RxDouble efficiency = 0.0.obs;
-
-  void calculateStitchingStats() {
-    int assigned = int.tryParse(assignedQty.text) ?? 0;
-    int completed = int.tryParse(completedQty.text) ?? 0;
-    int rejected = int.tryParse(rejectedQty.text) ?? 0;
-
-    balanceQty.value = assigned - (completed + rejected);
-
-    if (assigned > 0) {
-      efficiency.value = (completed / assigned) * 100;
-    }
-  }
-
-  /// --- Submit Logic with Firestore Integration ---
-  Future<void> submitStitchingEntry() async {
-    if (!stitchingFormKey.currentState!.validate()) return;
-
+  Future<void> submitStitchingEntry([dynamic orderId]) async {
+    final String? oId = orderId?.toString();
     try {
       isLoading.value = true;
-      final firestore = FirebaseFirestore.instance;
+      final assigned = int.tryParse(assignedQty.text.trim()) ?? 0;
+      final completed = int.tryParse(completedQty.text.trim()) ?? 0;
+      final rejected = int.tryParse(rejectedQty.text.trim()) ?? 0;
+      final eff = assigned > 0 ? ((completed / assigned) * 100) : 0.0;
 
-      // 1. Save to 'stitching_entries' collection
-      await firestore.collection('stitching_entries').add({
-        "workerName": workerName.text.trim(),
-        "styleNo": styleNo.text.trim(),
-        "operationType": operationType.text.trim(),
-        "assignedQty": int.tryParse(assignedQty.text) ?? 0,
-        "completedQty": int.tryParse(completedQty.text) ?? 0,
-        "rejectedQty": int.tryParse(rejectedQty.text) ?? 0,
-        "efficiency": efficiency.value,
-        "timestamp": FieldValue.serverTimestamp(),
-        "status": "Stitching Record Added",
+      final res = await ApiService.post('/production/stitching', {
+        'order_id': orderId,
+        'operator': operatorName.text.trim(),
+        'style_no': styleNo.text.trim(),
+        'operation_type': operationType.text.trim(),
+        'assigned_qty': assigned,
+        'completed_qty': completed,
+        'rejected_qty': rejected,
+        'efficiency': eff,
       });
 
-      // ✅ 2. BROADCAST TO LIVE FEED
-      await firestore.collection('activities').add({
-        "title": "Stitching: ${styleNo.text.trim()}",
-        "subtitle": "${workerName.text} • ${completedQty.text} Pcs Done",
-        "time": FieldValue.serverTimestamp(),
-        "iconCode": Icons.handyman.codePoint,
-        "colorValue": Colors.teal.value,
-      });
-
-      Get.snackbar(
-        "Production Saved",
-        "Record for ${workerName.text} synced to Cloud.",
-        backgroundColor: Colors.green.withValues(alpha: 0.1),
-        colorText: Colors.green,
-      );
-
-      _clearFields();
-      Get.back();
+      if (res['success'] == true) {
+        Get.snackbar("Success", "Stitching entry saved", backgroundColor: Colors.green.withValues(alpha: 0.1));
+        Get.back();
+      }
     } catch (e) {
-      Get.snackbar("Error", "Cloud Update Failed: $e");
+      Get.snackbar("Error", "Failed: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
-  void _clearFields() {
-    for (var c in [
-      workerName,
-      styleNo,
-      operationType,
-      assignedQty,
-      completedQty,
-      rejectedQty,
-    ]) {
-      c.clear();
-    }
-    balanceQty.value = 0;
-    efficiency.value = 0.0;
-  }
-
-  @override
-  void onClose() {
-    for (var c in [
-      workerName,
-      styleNo,
-      operationType,
-      assignedQty,
-      completedQty,
-      rejectedQty,
-    ]) {
-      c.dispose();
-    }
-    super.onClose();
-  }
+  final stitchingFormKey = GlobalKey<FormState>();
+  List<String> get availableOperators => ['Operator A', 'Operator B', 'Operator C'];
+  void calculateStitchingStats() {}
+  var balanceQty = 0.obs;
+  var efficiency = 0.0.obs;
 }

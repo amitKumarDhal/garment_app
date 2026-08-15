@@ -1,42 +1,76 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../data/services/api_service.dart';
 
 class PackingController extends GetxController {
-  static PackingController get instance => Get.find();
-
-  final packingFormKey = GlobalKey<FormState>();
-
-  // --- Input Controllers ---
   final cartonNo = TextEditingController();
   final styleNo = TextEditingController();
+  final category = TextEditingController();
+  final totalPieces = TextEditingController();
+  final isLoading = false.obs;
 
-  // --- State Variables ---
-  var selectedCartonSize = 'M'.obs;
-  final List<String> sizeOptions = ['S', 'M', 'L', 'XL', 'XXL'];
+  Future<void> submitPackingEntry(String? orderId) async {
+    try {
+      isLoading.value = true;
+      final res = await ApiService.post('/production/packing', {
+        'order_id': orderId,
+        'carton_no': cartonNo.text.trim(),
+        'style_no': styleNo.text.trim(),
+        'category': category.text.trim().isEmpty ? 'M' : category.text.trim(),
+        'total_pieces': int.tryParse(totalPieces.text.trim()) ?? 0,
+        'breakdown': {},
+      });
 
-  // --- Inventory Data (Live from Firestore) ---
-  var inventoryList = <Map<String, dynamic>>[].obs;
-
-  // --- SEARCH & FILTER STATE ---
-  final RxString searchQuery = ''.obs;
-  final RxString activeFilter = 'All'.obs;
-
-  List<Map<String, dynamic>> get filteredInventory {
-    return inventoryList.where((item) {
-      final query = searchQuery.value.toLowerCase();
-      final cNo = item['cartonNo']?.toString().toLowerCase() ?? '';
-      final sNo = item['styleNo']?.toString().toLowerCase() ?? '';
-      bool matchesSearch = cNo.contains(query) || sNo.contains(query);
-      bool matchesFilter =
-          activeFilter.value == 'All' || item['category'] == activeFilter.value;
-      return matchesSearch && matchesFilter;
-    }).toList();
+      if (res['success'] == true) {
+        Get.snackbar("Success", "Packing entry saved", backgroundColor: Colors.green.withValues(alpha: 0.1));
+        Get.back();
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Failed: $e");
+    } finally {
+      isLoading.value = false;
+    }
   }
 
-  // --- Input Grid Controllers ---
-  final Map<String, TextEditingController> boxContents = {
+  final packingEntries = <Map<String, dynamic>>[].obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    fetchPackingEntries();
+  }
+
+  Future<void> fetchPackingEntries() async {
+    try {
+      final res = await ApiService.get('/production/activities');
+      if (res['success'] == true && res['data'] != null) {
+        final raw = List<Map<String, dynamic>>.from(res['data']);
+        packingEntries.assignAll(raw.where((e) => e['stage']?.toString().toLowerCase() == 'packing').toList());
+      }
+    } catch (_) {}
+  }
+
+  var searchQuery = ''.obs;
+  var activeFilter = 'All'.obs;
+  List<Map<String, dynamic>> get filteredInventory {
+    final q = searchQuery.value.toLowerCase().trim();
+    if (q.isEmpty) return packingEntries;
+    return packingEntries.where((e) =>
+      (e['carton_no'] ?? '').toString().toLowerCase().contains(q) ||
+      (e['style_no'] ?? '').toString().toLowerCase().contains(q)
+    ).toList();
+  }
+
+  int get countSmall => packingEntries.where((e) => (e['category'] ?? '').toString().toUpperCase() == 'S').fold(0, (sum, e) => sum + (int.tryParse(e['total_pieces']?.toString() ?? '0') ?? 0));
+  int get countMedium => packingEntries.where((e) => (e['category'] ?? '').toString().toUpperCase() == 'M').fold(0, (sum, e) => sum + (int.tryParse(e['total_pieces']?.toString() ?? '0') ?? 0));
+  int get countLarge => packingEntries.where((e) => (e['category'] ?? '').toString().toUpperCase() == 'L').fold(0, (sum, e) => sum + (int.tryParse(e['total_pieces']?.toString() ?? '0') ?? 0));
+  int get countXL => packingEntries.where((e) => (e['category'] ?? '').toString().toUpperCase() == 'XL').fold(0, (sum, e) => sum + (int.tryParse(e['total_pieces']?.toString() ?? '0') ?? 0));
+  int get countXXL => packingEntries.where((e) => (e['category'] ?? '').toString().toUpperCase() == 'XXL').fold(0, (sum, e) => sum + (int.tryParse(e['total_pieces']?.toString() ?? '0') ?? 0));
+  int get totalPiecesInFactory => packingEntries.fold(0, (sum, e) => sum + (int.tryParse(e['total_pieces']?.toString() ?? '0') ?? 0));
+
+  var selectedCartonSize = 'Medium'.obs;
+  List<String> get cartonSizes => ['Small', 'Medium', 'Large'];
+  final boxContents = <String, TextEditingController>{
     'S': TextEditingController(),
     'M': TextEditingController(),
     'L': TextEditingController(),
@@ -44,137 +78,10 @@ class PackingController extends GetxController {
     'XXL': TextEditingController(),
   };
 
-  final RxInt totalInBox = 0.obs;
-  final RxBool isSubmitting = false.obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    _bindInventoryStream();
-  }
-
-  void _bindInventoryStream() {
-    FirebaseFirestore.instance
-        .collection('packing_entries')
-        .orderBy('timestamp', descending: true)
-        .limit(100)
-        .snapshots()
-        .listen(
-          (snapshot) {
-            inventoryList.value = snapshot.docs
-                .map((doc) => doc.data())
-                .toList();
-          },
-          onError: (e) {
-            if (kDebugMode) print("Firestore Error: $e");
-          },
-        );
-  }
-
-  int get countSmall => inventoryList.where((c) => c['category'] == 'S').length;
-  int get countMedium =>
-      inventoryList.where((c) => c['category'] == 'M').length;
-  int get countLarge => inventoryList.where((c) => c['category'] == 'L').length;
-  int get countXL => inventoryList.where((c) => c['category'] == 'XL').length;
-  int get countXXL => inventoryList.where((c) => c['category'] == 'XXL').length;
-
-  int get totalPiecesInFactory => inventoryList.fold(
-    0,
-    (sum, item) => sum + (item['totalPieces'] as int? ?? 0),
-  );
-
-  void calculateBoxTotal() {
-    int sum = 0;
-    for (final controller in boxContents.values) {
-      if (controller.text.isNotEmpty) sum += int.tryParse(controller.text) ?? 0;
-    }
-    totalInBox.value = sum;
-  }
-
-  void clearForm() {
-    cartonNo.clear();
-    styleNo.clear();
-    for (final controller in boxContents.values) {
-      controller.clear();
-    }
-    totalInBox.value = 0;
-  }
-
-  // --- ✅ UPDATED SUBMIT LOGIC ---
-  Future<void> submitCarton() async {
-    if (!packingFormKey.currentState!.validate()) return;
-    calculateBoxTotal();
-
-    if (totalInBox.value == 0) {
-      Get.snackbar(
-        "Error",
-        "Carton cannot be empty",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-      );
-      return;
-    }
-
-    isSubmitting.value = true;
-    final firestore = FirebaseFirestore.instance;
-
-    try {
-      final newEntry = {
-        "cartonNo": cartonNo.text.trim(),
-        "styleNo": styleNo.text.trim(),
-        "category": selectedCartonSize.value,
-        "totalPieces": totalInBox.value,
-        "breakdown": {
-          "S": int.tryParse(boxContents['S']!.text) ?? 0,
-          "M": int.tryParse(boxContents['M']!.text) ?? 0,
-          "L": int.tryParse(boxContents['L']!.text) ?? 0,
-          "XL": int.tryParse(boxContents['XL']!.text) ?? 0,
-          "XXL": int.tryParse(boxContents['XXL']!.text) ?? 0,
-        },
-        "timestamp": FieldValue.serverTimestamp(),
-        "status": "Packed",
-      };
-
-      // 1. Save detailed entry
-      await firestore.collection('packing_entries').add(newEntry);
-
-      // ✅ 2. BROADCAST TO LIVE FEED
-      await firestore.collection('activities').add({
-        "title": "Packed: ${styleNo.text.trim()}",
-        "subtitle": "Carton ${cartonNo.text} (${totalInBox.value} Pcs)",
-        "time": FieldValue.serverTimestamp(),
-        "iconCode": Icons.inventory_2.codePoint,
-        "colorValue": Colors.brown.value,
-      });
-
-      Get.toNamed('/factory-stock-summary');
-
-      Get.snackbar(
-        "Success",
-        "Carton ${cartonNo.text} Added to Factory Stock",
-        backgroundColor: Colors.green.withValues(alpha: 0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-
-      clearForm();
-    } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Save failed: $e",
-        backgroundColor: Colors.red.withValues(alpha: 0.1),
-      );
-    } finally {
-      isSubmitting.value = false;
-    }
-  }
-
-  @override
-  void onClose() {
-    cartonNo.dispose();
-    styleNo.dispose();
-    for (var c in boxContents.values) {
-      c.dispose();
-    }
-    super.onClose();
-  }
+  void calculateBoxTotal() {}
+  final packingFormKey = GlobalKey<FormState>();
+  List<String> get sizeOptions => ['S', 'M', 'L', 'XL', 'XXL'];
+  var totalInBox = 0.obs;
+  RxBool get isSubmitting => isLoading;
+  Future<void> submitCarton() async => await submitPackingEntry(null);
 }

@@ -17,23 +17,17 @@ class _SignupScreenState extends State<SignupScreen> {
   final controller = Get.put(SignupController());
 
   final Map<String, IconData> roleIcons = {
-    'Worker': Icons.engineering_outlined,
     'Unit Supervisor': Icons.manage_accounts_outlined,
-    'Shift Supervisor': Icons.supervisor_account_outlined,
-    'Admin': Icons.admin_panel_settings_outlined,
     'Sales Associate': Icons.support_agent_rounded,
     'Sales Manager': Icons.domain_verification_rounded,
   };
 
-  String selectedRole = 'Worker';
+  String selectedRole = 'Sales Associate';
 
   final List<String> roles = [
-    'Worker',
-    'Unit Supervisor',
-    'Shift Supervisor',
     'Sales Associate',
+    'Unit Supervisor',
     'Sales Manager',
-    'Admin',
   ];
 
   @override
@@ -242,14 +236,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // --- DYNAMIC APPROVAL INFO BOX ---
   Widget _buildApprovalInfoBox(bool isDark) {
-    String chain = "Unit Supervisor ➔ Shift Supervisor ➔ Admin";
+    String chain = "Admin Direct Verification";
     Color iconColor = TColors.primary;
 
-    if (selectedRole == 'Unit Supervisor') chain = "Shift Supervisor ➔ Admin";
-    if (selectedRole == 'Shift Supervisor') chain = "Admin Final Approval";
-    if (selectedRole == 'Admin') chain = "System Owner Verification";
-
-    if (selectedRole == 'Sales Associate') {
+    if (selectedRole == 'Unit Supervisor') {
+      chain = "Floor Operations Approval (Admin)";
+      iconColor = Colors.teal;
+    } else if (selectedRole == 'Sales Associate') {
       chain = "Admin Verification (Direct Access)";
       iconColor = Colors.orange;
     } else if (selectedRole == 'Sales Manager') {

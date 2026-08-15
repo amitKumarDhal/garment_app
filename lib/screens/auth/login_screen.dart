@@ -67,15 +67,16 @@ class LoginScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Header
-                      // Container(
-                      //   padding: const EdgeInsets.all(16),
-                      //   decoration: BoxDecoration(
-                      //     color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03),
-                      //     shape: BoxShape.circle,
-                      //   ),
-                      //   child: Icon(Icons.fingerprint_rounded, size: 48, color: isDark ? Colors.white : TColors.primary),
-                      // ),
-                      const SizedBox(height: 20),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/zobbra.jpeg',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Text(
                         "Secure Portal",
                         style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87, letterSpacing: -1),

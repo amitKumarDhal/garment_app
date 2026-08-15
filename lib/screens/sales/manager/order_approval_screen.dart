@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
@@ -13,6 +12,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:yoobbel/controllers/sales/sales_manager_controller.dart';
 import '../../../data/models/order_model.dart';
+import '../../../data/services/api_service.dart';
 import '../../../utils/constants/colors.dart';
 
 class OrderApprovalScreen extends StatefulWidget {
@@ -147,61 +147,12 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                 ],
               ),
 
-              // --- 4 & 5. COMBINED PAYMENT & ACTION AREA ---
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('payment_requests')
-                    .where('orderId', isEqualTo: order.id)
-                    .where('status', isEqualTo: 'pending')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  final bool isCheckingPayments = snapshot.connectionState == ConnectionState.waiting;
-                  final List<QueryDocumentSnapshot> displayDocs = [];
-
-                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    final uniqueRequests = <String, QueryDocumentSnapshot>{};
-                    for (var doc in snapshot.data!.docs) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final key = "${data['agentName'] ?? 'Unknown'}_${data['amount']?.toString() ?? '0'}";
-                      uniqueRequests.putIfAbsent(key, () => doc);
-                    }
-                    displayDocs.addAll(uniqueRequests.values);
-                  }
-
-                  final bool hasPendingPayments = displayDocs.isNotEmpty;
-
-                  return Column(
-                    children: [
-                      if (snapshot.hasError)
-                        _ErrorBanner(error: snapshot.error.toString()),
-
-                      if (isCheckingPayments)
-                        const Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Center(child: CircularProgressIndicator(color: TColors.primary)),
-                        ),
-
-                      for (final doc in displayDocs)
-                        _PaymentApprovalCard(
-                          doc: doc,
-                          currency: _currency,
-                          textColor: textColor,
-                          isProcessingPayment: isProcessingPayment,
-                          onApprove: (id, amount, data) => _approvePaymentRequest(id, amount, order.id!, data),
-                          onReject: _rejectPaymentRequest,
-                        ),
-
-                      const SizedBox(height: 32),
-
-                      _buildActionArea(
-                        context: context,
-                        isDark: isDark,
-                        hasPendingPayments: hasPendingPayments,
-                        isCheckingPayments: isCheckingPayments,
-                      ),
-                    ],
-                  );
-                },
+              const SizedBox(height: 16),
+              _buildActionArea(
+                context: context,
+                isDark: isDark,
+                hasPendingPayments: false,
+                isCheckingPayments: false,
               ),
               const SizedBox(height: 30),
             ],
@@ -323,68 +274,15 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
       ) async {
     setState(() => isProcessingPayment = true);
     try {
-      final db = FirebaseFirestore.instance;
-
-      await db.collection('payment_requests').doc(requestId).update({
-        'status': 'approved',
-        'approvedAt': FieldValue.serverTimestamp(),
-      });
-
-      String? associateUid = requestData['agentUid']?.toString();
-
-      if (associateUid == null || associateUid.isEmpty) {
-        final associateName = requestData['agentName'] ?? "Associate";
-        final associateSnap = await db
-            .collection('id_requests')
-            .where('name', isEqualTo: associateName)
-            .limit(1)
-            .get();
-        if (associateSnap.docs.isNotEmpty) {
-          associateUid = associateSnap.docs.first.id;
+      final res = await ApiService.post('/payments/$requestId/approve', {});
+      if (res['success'] == true) {
+        if (mounted) {
+          setState(() {
+            isProcessingPayment = false;
+          });
         }
+        Get.snackbar("Payment Approved", "Payment request approved cleanly", backgroundColor: Colors.green, colorText: Colors.white);
       }
-
-      if (associateUid != null && associateUid.isNotEmpty) {
-        await db.collection('notifications').add({
-          'targetUserId': associateUid,
-          'title': 'Payment Approved! ✅',
-          'message': 'Manager approved your collection of ₹$amount for Order #${widget.order.manualOrderNo}.',
-          'orderId': orderId,
-          'timestamp': FieldValue.serverTimestamp(),
-          'isRead': false,
-        });
-      }
-
-      final orderDoc = await db.collection('orders').doc(orderId).get();
-      final orderData = orderDoc.data() ?? {};
-      final double currentTotal = (orderData['totalAmount'] ?? 0).toDouble();
-      final double currentAdvance = (orderData['advanceAmount'] ?? 0).toDouble();
-
-      final double newAdvance = currentAdvance + amount;
-      final double newBalance = (currentTotal - newAdvance).clamp(0.0, double.infinity);
-
-      await db.collection('orders').doc(orderId).update({
-        'advanceAmount': newAdvance,
-        'balanceDue': newBalance,
-        'paymentStatus': newBalance <= 0 ? 'Fully Paid' : 'Partially Paid',
-        'paymentHistory': FieldValue.arrayUnion([
-          {'amount': amount, 'date': Timestamp.now(), 'recordedBy': 'Manager Approved'},
-        ]),
-      });
-
-      // ✅ SAFETY CHECK: Only update UI if user hasn't left the screen
-      if (mounted) {
-        setState(() {
-          localAdvanceAmount = newAdvance;
-          localBalanceDue = newBalance;
-          isProcessingPayment = false;
-        });
-      }
-
-      Get.snackbar(
-        "Payment Approved", "The order balance has been successfully updated.",
-        backgroundColor: Colors.green, colorText: Colors.white,
-      );
     } catch (e) {
       if (mounted) setState(() => isProcessingPayment = false);
       Get.snackbar("Error", "Could not approve payment: $e", backgroundColor: Colors.red, colorText: Colors.white);
@@ -393,12 +291,8 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
   Future<void> _rejectPaymentRequest(String requestId) async {
     try {
-      await FirebaseFirestore.instance.collection('payment_requests').doc(requestId).update({
-        'status': 'rejected',
-        'rejectedAt': FieldValue.serverTimestamp(),
-      });
-      Get.snackbar("Payment Rejected", "The payment request has been dismissed.",
-          backgroundColor: Colors.orange, colorText: Colors.white);
+      await ApiService.put('/payments/$requestId/reject', {});
+      Get.snackbar("Payment Rejected", "The payment request has been dismissed.", backgroundColor: Colors.orange, colorText: Colors.white);
     } catch (e) {
       Get.snackbar("Error", "Could not reject payment: $e", backgroundColor: Colors.red, colorText: Colors.white);
     }
@@ -904,7 +798,7 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 class _PaymentApprovalCard extends StatelessWidget {
-  final QueryDocumentSnapshot doc;
+  final Map<String, dynamic> doc;
   final NumberFormat currency;
   final Color textColor;
   final bool isProcessingPayment;
@@ -922,7 +816,7 @@ class _PaymentApprovalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc;
     final double amount = (data['amount'] as num).toDouble();
     final String agent = data['agentName'] ?? 'Associate';
 
@@ -957,7 +851,7 @@ class _PaymentApprovalCard extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: isProcessingPayment ? null : () {
                     HapticFeedback.lightImpact();
-                    onReject(doc.id);
+                    onReject(doc['id'] ?? '');
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -973,7 +867,7 @@ class _PaymentApprovalCard extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: isProcessingPayment ? null : () {
                     HapticFeedback.lightImpact();
-                    onApprove(doc.id, amount, data);
+                    onApprove(doc['id'] ?? '', amount, data);
                   },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),

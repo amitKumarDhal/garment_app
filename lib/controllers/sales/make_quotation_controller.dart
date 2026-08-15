@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 // ✅ IMPORT THE PDF SERVICE
 import '../../services/pdf_invoice_service.dart';
+import '../../data/services/api_service.dart';
 
 // A simple model to hold the text controllers for each dynamic item row
 class QuotationItemModel {
@@ -15,7 +15,6 @@ class QuotationItemModel {
 }
 
 class MakeQuotationController extends GetxController {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // --- Static Fields ---
   final quotationNoCtrl = TextEditingController();
@@ -49,48 +48,23 @@ class MakeQuotationController extends GetxController {
   }
 
   // ===========================================================================
-  // ✅ AUTO-FETCH SEQUENTIAL QUOTATION NUMBER (YBL + YY + 001)
+  // ✅ AUTO-FETCH SEQUENTIAL QUOTATION NUMBER (ZBR + YY + 001)
   // ===========================================================================
   Future<void> _fetchNextQuotationNumber() async {
     try {
-      // 1. Generate the prefix based on current Year (e.g., "26" for 2026)
       String year = DateFormat('yy').format(DateTime.now());
-      String prefix = "YBL$year"; // Result: YBL26
-
-      // 2. Query the database for the highest quotation number THAT STARTS WITH this prefix
-      // This automatically limits the search to the current year!
-      final querySnapshot = await _db.collection('quotations')
-          .where('quotationNo', isGreaterThanOrEqualTo: prefix)
-          .where('quotationNo', isLessThan: '$prefix\uf8ff')
-          .orderBy('quotationNo', descending: true)
-          .limit(1)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        // 3. A quotation exists for this year! Get the string (e.g., "YBL26004")
-        String lastQtnString = querySnapshot.docs.first.data()['quotationNo'] ?? "";
-
-        // 4. Extract the last 3 characters (the serial number) and increment
-        if (lastQtnString.length >= 3) {
-          String serialPart = lastQtnString.substring(lastQtnString.length - 3);
-          int lastNumber = int.tryParse(serialPart) ?? 0;
-          int nextNumber = lastNumber + 1;
-
-          // 5. Format back to 3 digits (e.g., 5 becomes "005")
-          String nextSerial = nextNumber.toString().padLeft(3, '0');
-          quotationNoCtrl.text = "$prefix$nextSerial";
-        } else {
-          quotationNoCtrl.text = "${prefix}001";
-        }
+      String prefix = "ZBR$year";
+      final res = await ApiService.get('/quotations');
+      if (res['success'] == true && res['quotations'] != null) {
+        final list = List<Map<String, dynamic>>.from(res['quotations']);
+        int count = list.length + 1;
+        quotationNoCtrl.text = "$prefix${count.toString().padLeft(3, '0')}";
       } else {
-        // 6. Database has no quotations for this year yet. Start at 001!
         quotationNoCtrl.text = "${prefix}001";
       }
     } catch (e) {
-      debugPrint("Error fetching next QTN number: $e");
-      // Fallback if the database read fails
       String year = DateFormat('yy').format(DateTime.now());
-      quotationNoCtrl.text = "YBL${year}001";
+      quotationNoCtrl.text = "ZBR${year}001";
     } finally {
       isLoadingInitialData.value = false;
     }
@@ -168,12 +142,12 @@ class MakeQuotationController extends GetxController {
         'totalGst': totalGst.value,
         'shipping': shippingCharge.value,
         'grandTotal': grandTotal.value,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': DateTime.now().toIso8601String(),
         'status': 'Draft',
       };
 
-      // 3. Save to Firebase
-      await _db.collection('quotations').doc(quotationNoCtrl.text.trim()).set(quotationData);
+      // 3. Save via REST API
+      await ApiService.post('/quotations', quotationData);
 
       Get.snackbar("Success", "Quotation saved to database!", backgroundColor: Colors.green, colorText: Colors.white);
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ActivityItem {
   final String title;
@@ -16,18 +15,16 @@ class ActivityItem {
     required this.color,
   });
 
-  // ✅ ADD THIS: Factory to convert Firestore Document to ActivityItem
-  factory ActivityItem.fromSnapshot(DocumentSnapshot snapshot) {
-    final data = snapshot.data() as Map<String, dynamic>;
+  factory ActivityItem.fromSnapshot(dynamic snapshot) {
+    final data = snapshot is Map<String, dynamic> ? snapshot : (snapshot.data != null ? snapshot.data() as Map<String, dynamic> : <String, dynamic>{});
 
     return ActivityItem(
       title: data['title'] ?? '',
       subtitle: data['subtitle'] ?? '',
-      // Read time as Timestamp and convert to DateTime
-      time: (data['time'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      // Read Icon codePoint (int) and convert back to IconData
+      time: data['time'] is String
+          ? (DateTime.tryParse(data['time']) ?? DateTime.now())
+          : (data['time'] is DateTime ? data['time'] as DateTime : DateTime.now()),
       icon: IconData(data['iconCode'] ?? 58835, fontFamily: 'MaterialIcons'),
-      // Read Color value (int) and convert back to Color
       color: Color(data['colorValue'] ?? 0xFF2196F3),
     );
   }

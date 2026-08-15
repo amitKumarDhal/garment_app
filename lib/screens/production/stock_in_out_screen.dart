@@ -1,6 +1,5 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -380,9 +379,13 @@ class StockInOutScreen extends StatelessWidget {
 
               DateTime date = DateTime.now();
               if (log['timestamp'] != null) {
-                date = (log['timestamp'] as Timestamp).toDate();
+                date = log['timestamp'] is String
+                    ? (DateTime.tryParse(log['timestamp'].toString()) ?? DateTime.now())
+                    : (log['timestamp'] is DateTime ? log['timestamp'] as DateTime : DateTime.now());
               } else if (log['date'] != null) {
-                date = (log['date'] as Timestamp).toDate();
+                date = log['date'] is String
+                    ? (DateTime.tryParse(log['date'].toString()) ?? DateTime.now())
+                    : (log['date'] is DateTime ? log['date'] as DateTime : DateTime.now());
               }
               String dateStr = DateFormat('dd MMM, hh:mm a').format(date);
 

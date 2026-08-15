@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:excel/excel.dart' hide Border;
 import 'package:path_provider/path_provider.dart';
@@ -672,7 +671,9 @@ class _SalesManagerHistoryScreenState extends State<SalesManagerHistoryScreen> {
 
                           DateTime time = DateTime.now();
                           if (event['timestamp'] != null) {
-                            time = (event['timestamp'] as Timestamp).toDate();
+                            time = event['timestamp'] is String
+                                ? (DateTime.tryParse(event['timestamp'].toString()) ?? DateTime.now())
+                                : (event['timestamp'] is DateTime ? event['timestamp'] as DateTime : DateTime.now());
                           }
 
                           String stage = event['stage'] ?? 'Unknown Stage';

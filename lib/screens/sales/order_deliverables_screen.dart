@@ -37,8 +37,11 @@ class OrderDeliverablesScreen extends StatelessWidget {
         color: TColors.primary,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         onRefresh: () async {
-          await controller.smController.fetchMonthlyStats();
-          await Future.delayed(const Duration(milliseconds: 800));
+          await controller.fetchDeliverables();
+          if (controller.smController != null) {
+            await controller.smController!.fetchMonthlyStats();
+          }
+          await Future.delayed(const Duration(milliseconds: 400));
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../data/services/api_service.dart';
 import '../../../controllers/sales/sales_manager_controller.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../data/models/order_model.dart';
@@ -27,19 +27,13 @@ class SalesManagerHome extends StatefulWidget {
 class _SalesManagerHomeState extends State<SalesManagerHome> {
   late final SalesManagerController controller;
 
-  // ✅ OPTIMIZATION: Cache the stream so it doesn't rebuild and burn Firebase reads!
-  late final Stream<QuerySnapshot> _pendingPaymentsStream;
+
+
 
   @override
   void initState() {
     super.initState();
     controller = Get.put(SalesManagerController());
-
-    // ✅ Initialize the stream EXACTLY ONCE
-    _pendingPaymentsStream = FirebaseFirestore.instance
-        .collection('payment_requests')
-        .where('status', isEqualTo: 'pending')
-        .snapshots();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.fetchAllData();
@@ -638,33 +632,28 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
               const SizedBox(height: 8),
 
               // ✅ OPTIMIZED: Stable StreamBuilder using the cached stream from initState
-              StreamBuilder<QuerySnapshot>(
-                stream: _pendingPaymentsStream,
-                builder: (context, paymentSnap) {
-                  return Obx(() {
-                    final pendingOrders = controller.pendingOrders.toList();
-                    final paymentDocs = paymentSnap.data?.docs ?? [];
+              Obx(() {
+                final pendingOrders = controller.pendingOrders.toList();
+                final paymentDocs = controller.pendingPaymentRequests.toList();
 
-                    if (pendingOrders.isEmpty && paymentDocs.isEmpty) {
-                      return _buildEmptyState(isDark, "All caught up! No pending actions.", Icons.check_circle_outline);
-                    }
+                if (pendingOrders.isEmpty && paymentDocs.isEmpty) {
+                  return _buildEmptyState(isDark, "All caught up! No pending actions.", Icons.check_circle_outline);
+                }
 
-                    return SizedBox(
-                      height: 130,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        children: [
-                          // 1. Show Pending Payment Requests First
-                          ...paymentDocs.map((doc) => _buildHorizontalPaymentCard(context, doc, isDark)),
-                          // 2. Show Pending Orders Next (Limit to 5)
-                          ...pendingOrders.take(5).map((order) => _buildHorizontalPendingOrderCard(context, order, isDark)),
-                        ],
-                      ),
-                    );
-                  });
-                },
-              ),
+                return SizedBox(
+                  height: 130,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      // 1. Show Pending Payment Requests First
+                      ...paymentDocs.map((doc) => _buildHorizontalPaymentCard(context, doc, isDark)),
+                      // 2. Show Pending Orders Next (Limit to 5)
+                      ...pendingOrders.take(5).map((order) => _buildHorizontalPendingOrderCard(context, order, isDark)),
+                    ],
+                  ),
+                );
+              }),
               const SizedBox(height: 32),
 
               _buildTopAssociatesLeaderboard(context, isDark, controller),
@@ -676,8 +665,8 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
   }
 
   // ✅ NEW: Horizontal Payment Request Card
-  Widget _buildHorizontalPaymentCard(BuildContext context, QueryDocumentSnapshot doc, bool isDark) {
-    final data = doc.data() as Map<String, dynamic>;
+  Widget _buildHorizontalPaymentCard(BuildContext context, Map<String, dynamic> doc, bool isDark) {
+    final data = doc;
     final amount = data['amount'] ?? 0.0;
     final agent = data['agentName'] ?? 'Associate';
     final orderNo = data['manualOrderNo'] ?? 'Unknown';
@@ -698,10 +687,11 @@ class _SalesManagerHomeState extends State<SalesManagerHome> {
             HapticFeedback.lightImpact();
             Get.dialog(const Center(child: CircularProgressIndicator(color: TColors.primary)), barrierDismissible: false);
             try {
-              final orderDoc = await FirebaseFirestore.instance.collection('orders').doc(data['orderId']).get();
+              final orderId = data['orderId'] ?? data['order_id'] ?? '';
+              final res = await ApiService.get('/orders/$orderId');
               Get.back(); // close loading
-              if (orderDoc.exists) {
-                Get.to(() => OrderApprovalScreen(order: OrderModel.fromSnapshot(orderDoc)));
+              if (res['success'] == true && res['order'] != null) {
+                Get.to(() => OrderApprovalScreen(order: OrderModel.fromJson(res['order'])));
               } else {
                 Get.snackbar("Error", "Order not found.", backgroundColor: Colors.redAccent.withValues(alpha:0.1), colorText: Colors.red);
               }
