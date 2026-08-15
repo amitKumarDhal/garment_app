@@ -2,7 +2,7 @@ class TTexts {
   TTexts._();
 
   // --- 🌍 Global Generic ---
-  static const String appName = "Yoobbel";
+  static const String appName = "Zobbra";
   static const String submit = "Submit";
   static const String save = "Save Entry";
   static const String cancel = "Cancel";

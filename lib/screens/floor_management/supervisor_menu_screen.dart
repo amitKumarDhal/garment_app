@@ -29,7 +29,7 @@ class SupervisorMenuScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Yoobbel Production"),
+        title: const Text("Zobbra Production"),
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),

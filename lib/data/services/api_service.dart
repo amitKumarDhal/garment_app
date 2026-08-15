@@ -23,7 +23,7 @@ class ApiService {
       final normalized = trimmed.endsWith('/') ? trimmed.substring(0, trimmed.length - 1) : trimmed;
       return normalized.endsWith('/api/v1') ? normalized : '$normalized/api/v1';
     }
-    return 'http://localhost:5000/api/v1';
+    return 'https://api.zobbra.com/api/v1';
   }
 
   static final GetStorage _box = GetStorage();

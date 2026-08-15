@@ -44,7 +44,7 @@ class PdfInvoiceService {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text("YOOBBEL", style: pw.TextStyle(font: boldFont, fontSize: 32, color: const PdfColor.fromInt(0xFF1A237E))),
+                    pw.Text("ZOBBRA", style: pw.TextStyle(font: boldFont, fontSize: 32, color: const PdfColor.fromInt(0xFF1A237E))),
                     pw.SizedBox(height: 4),
                     pw.Text("Premium Manufacturing & Logistics", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
                     pw.Text("Bhubaneswar, Odisha", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
@@ -254,7 +254,7 @@ class PdfInvoiceService {
                     ],
                   ),
                   pw.Text(
-                    "Thank you for doing business with Yoobbel!",
+                    "Thank you for doing business with Zobbra!",
                     style: pw.TextStyle(font: boldFont, fontSize: 10, color: const PdfColor.fromInt(0xFF1A237E), fontStyle: pw.FontStyle.italic),
                   ),
                 ]
@@ -316,10 +316,10 @@ class PdfInvoiceService {
                           width: 40, height: 40,
                           decoration: pw.BoxDecoration(color: brandRed, borderRadius: pw.BorderRadius.circular(8)),
                           alignment: pw.Alignment.center,
-                          child: pw.Text("y", style: pw.TextStyle(font: boldFont, color: PdfColors.white, fontSize: 24)),
+                          child: pw.Text("Z", style: pw.TextStyle(font: boldFont, color: PdfColors.white, fontSize: 24)),
                         ),
                         pw.SizedBox(width: 8),
-                        pw.Text("yoobbel", style: pw.TextStyle(font: boldFont, fontSize: 26, color: PdfColors.grey800, letterSpacing: -1)),
+                        pw.Text("Zobbra", style: pw.TextStyle(font: boldFont, fontSize: 26, color: PdfColors.grey800, letterSpacing: -1)),
                       ],
                     ),
 
