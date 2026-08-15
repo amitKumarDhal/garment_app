@@ -8,6 +8,8 @@ import { errorHandler } from './middleware/error.middleware';
 import { apiRateLimiter } from './middleware/rateLimit.middleware';
 
 const app: Application = express();
+// Trust Hostinger's reverse proxy
+app.set('trust proxy', 1);
 
 // Security Middleware
 app.use(helmet());
