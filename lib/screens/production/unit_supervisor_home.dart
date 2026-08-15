@@ -172,11 +172,11 @@ class UnitSupervisorHome extends StatelessWidget {
                       return _buildCompactStageCard(
                           isDark,
                           textColor,
-                          stage['name'],
-                          stage['count'],
-                          stage['orderCount'] ?? 0,
-                          stage['color'],
-                          stage['icon']
+                          (stage['name'] as String?) ?? 'Stage',
+                          (stage['count'] as int?) ?? 0,
+                          (stage['orderCount'] as int?) ?? 0,
+                          (stage['color'] as Color?) ?? TColors.primary,
+                          (stage['icon'] as IconData?) ?? Icons.precision_manufacturing_rounded
                       );
                     },
                   ),

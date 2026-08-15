@@ -171,16 +171,42 @@ class UnitSupervisorController extends GetxController {
 
   List<Map<String, dynamic>> get stageUnitBreakdown {
     final Map<String, int> counts = {};
+    final Map<String, int> orderCounts = {};
     for (var o in activeOrders) {
       final s = o.status.trim().toLowerCase();
       final qty = int.tryParse(o.quantity.toString()) ?? 0;
       counts[s] = (counts[s] ?? 0) + qty;
+      orderCounts[s] = (orderCounts[s] ?? 0) + 1;
     }
     return [
-      {'name': 'Cutting', 'count': (counts['cutting'] ?? 0) + (counts['cutting done'] ?? 0), 'color': Colors.orange},
-      {'name': 'Printing', 'count': (counts['printing'] ?? 0) + (counts['printed'] ?? 0), 'color': Colors.indigo},
-      {'name': 'Stitching', 'count': (counts['stitching'] ?? 0) + (counts['stitched'] ?? 0), 'color': Colors.amber},
-      {'name': 'Packing', 'count': (counts['packing'] ?? 0) + (counts['packed'] ?? 0), 'color': Colors.purple},
+      {
+        'name': 'Cutting',
+        'count': (counts['cutting'] ?? 0) + (counts['cutting done'] ?? 0),
+        'orderCount': (orderCounts['cutting'] ?? 0) + (orderCounts['cutting done'] ?? 0),
+        'color': Colors.orange,
+        'icon': Icons.content_cut_rounded,
+      },
+      {
+        'name': 'Printing',
+        'count': (counts['printing'] ?? 0) + (counts['printed'] ?? 0),
+        'orderCount': (orderCounts['printing'] ?? 0) + (orderCounts['printed'] ?? 0),
+        'color': Colors.indigo,
+        'icon': Icons.print_rounded,
+      },
+      {
+        'name': 'Stitching',
+        'count': (counts['stitching'] ?? 0) + (counts['stitched'] ?? 0),
+        'orderCount': (orderCounts['stitching'] ?? 0) + (orderCounts['stitched'] ?? 0),
+        'color': Colors.amber,
+        'icon': Icons.precision_manufacturing_rounded,
+      },
+      {
+        'name': 'Packing',
+        'count': (counts['packing'] ?? 0) + (counts['packed'] ?? 0),
+        'orderCount': (orderCounts['packing'] ?? 0) + (orderCounts['packed'] ?? 0),
+        'color': Colors.purple,
+        'icon': Icons.inventory_2_rounded,
+      },
     ];
   }
 
