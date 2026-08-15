@@ -2,11 +2,12 @@ import { defineConfig } from 'cypress';
 
 export default defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:5000/api/v1',
+    baseUrl: process.env.CYPRESS_BASE_URL || process.env.CYPRESS_baseUrl || 'http://localhost:5000',
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     video: false,
     screenshotOnRunFailure: true,
+    allowCypressEnv: false,
     retries: {
       runMode: 1,
       openMode: 0,
@@ -17,9 +18,5 @@ export default defineConfig({
     setupNodeEvents(on, config) {
       return config;
     },
-  },
-  env: {
-    apiUrl: 'http://localhost:5000/api/v1',
-    testAdminEmail: 'admin@zobra.com',
   },
 });
