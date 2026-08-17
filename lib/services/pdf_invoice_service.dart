@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart'; // ✅ Required to load the logo image
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -290,7 +291,7 @@ class PdfInvoiceService {
       final ByteData bytes = await rootBundle.load('assets/images/zobbra.jpeg');
       logoImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (e) {
-      print("Warning: Could not load zobbra.jpeg from assets.");
+      debugPrint("Warning: Could not load zobbra.jpeg from assets.");
     }
 
     pdf.addPage(

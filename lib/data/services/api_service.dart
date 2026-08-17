@@ -63,11 +63,18 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> Function(String method, String endpoint, dynamic body)? mockHandler;
+
   static Future<Map<String, dynamic>> _execute(
     String method,
     String endpoint,
-    Future<http.Response> Function(Uri uri, Map<String, String> headers) makeRequest,
-  ) async {
+    Future<http.Response> Function(Uri uri, Map<String, String> headers) makeRequest, [
+    dynamic body,
+  ]) async {
+    if (mockHandler != null) {
+      return await mockHandler!(method, endpoint, body);
+    }
+
     final uri = Uri.parse('$baseUrl$endpoint');
     _logRequest(method, endpoint);
     try {
@@ -95,6 +102,7 @@ class ApiService {
       'POST',
       endpoint,
       (uri, headers) => http.post(uri, headers: headers, body: jsonEncode(body)),
+      body,
     );
   }
 
@@ -103,6 +111,7 @@ class ApiService {
       'PUT',
       endpoint,
       (uri, headers) => http.put(uri, headers: headers, body: jsonEncode(body)),
+      body,
     );
   }
 

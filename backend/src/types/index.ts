@@ -9,9 +9,12 @@ export type AgentRank = 'JSA' | 'SSA' | 'SC' | 'SM';
 export type UserStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export type OrderStatus =
-  | 'Placed'
   | 'Pending'
   | 'Approved'
+  | 'Production'
+  | 'Dispatched'
+  | 'Delivered'
+  | 'Placed'
   | 'Fab Purchased'
   | 'Fab Ready'
   | 'Cutting'
@@ -26,7 +29,6 @@ export type OrderStatus =
   | 'Out SRC'
   | 'Shipping'
   | 'Shipped'
-  | 'Delivered'
   | 'Completed'
   | 'Rejected'
   | 'Cancelled'

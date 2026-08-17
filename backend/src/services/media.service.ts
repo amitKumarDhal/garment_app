@@ -27,11 +27,17 @@ export class MediaService {
   }
 
   async uploadDirect(base64OrPath: string, folder = 'yoobbel_mockups') {
+    if (!base64OrPath) {
+      throw ApiError.badRequest('No image data provided for upload');
+    }
+
     try {
-      const result = await cloudinary.uploader.upload(base64OrPath, {
+      const uploadOptions: Record<string, any> = {
         folder,
-        upload_preset: envConfig.cloudinary.uploadPreset,
-      });
+        resource_type: 'auto',
+      };
+
+      const result = await cloudinary.uploader.upload(base64OrPath, uploadOptions);
 
       return {
         url: result.secure_url,

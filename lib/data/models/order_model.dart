@@ -182,16 +182,36 @@ class OrderModel {
   factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel.fromSnapshot(json);
 
   factory OrderModel.fromSnapshot(dynamic document) {
-    final data = document is Map<String, dynamic> ? document : (document.data != null ? document.data() as Map<String, dynamic> : <String, dynamic>{});
-    if (data == null) throw Exception("Document data is empty!");
+    final Map<String, dynamic> data = document is Map<String, dynamic>
+        ? document
+        : (document is Map
+            ? Map<String, dynamic>.from(document)
+            : (document?.data != null ? document.data() as Map<String, dynamic> : <String, dynamic>{}));
 
     // SMART PARSING
     List<Map<String, dynamic>> parsedProducts = [];
-    int qty = _parseInt(data['quantity']);
-    double total = _parseDouble(data['totalAmount']);
+    int qty = _parseInt(data['quantity'] ?? data['qty']);
+    double total = _parseDouble(data['total_amount'] ?? data['totalAmount'] ?? data['total']);
 
-    if (data['products'] != null && data['products'] is List && (data['products'] as List).isNotEmpty) {
-      // Ultra-safe mapping prevents Map<dynamic, dynamic> cast crashes
+    if (data['order_items'] != null && data['order_items'] is List && (data['order_items'] as List).isNotEmpty) {
+      parsedProducts = (data['order_items'] as List).map((item) {
+        final m = item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{};
+        return {
+          'id': m['id']?.toString() ?? '',
+          'productCode': m['product_code'] ?? m['productCode'] ?? '',
+          'productName': m['product_name'] ?? m['productName'] ?? '',
+          'sizeDescription': m['size_description'] ?? m['sizeDescription'] ?? '',
+          'qty': _parseInt(m['qty'] ?? m['quantity']),
+          'price': _parseDouble(m['price']),
+          'gstPercentage': _parseDouble(m['gst_percentage'] ?? m['gstPercentage']),
+          'total': _parseDouble(m['total']),
+          'neckType': m['neck_type'] ?? m['neckType'] ?? 'Not Specified',
+          'productType': m['product_type'] ?? m['productType'] ?? 'Not Specified',
+          'color': m['color'] ?? 'Not Specified',
+          'fabricType': m['fabric_type'] ?? m['fabricType'] ?? 'Not Specified',
+        };
+      }).toList();
+    } else if (data['products'] != null && data['products'] is List && (data['products'] as List).isNotEmpty) {
       parsedProducts = (data['products'] as List)
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
@@ -199,75 +219,85 @@ class OrderModel {
       // Legacy conversion
       double unitPrice = (qty > 0) ? (total / qty) : 0.0;
       parsedProducts.add({
-        'productCode': data['productCode'] ?? '',
-        'productName': data['productName'] ?? '',
-        'sizeDescription': data['sizeDescription'] ?? '',
+        'productCode': data['product_code'] ?? data['productCode'] ?? '',
+        'productName': data['product_name'] ?? data['productName'] ?? '',
+        'sizeDescription': data['size_description'] ?? data['sizeDescription'] ?? '',
         'qty': qty,
         'price': unitPrice,
-        'gstPercentage': _parseDouble(data['gstPercentage']),
+        'gstPercentage': _parseDouble(data['gst_percentage'] ?? data['gstPercentage']),
         'total': total,
-        'neckType': data['neckType'] ?? 'Not Specified',
-        'productType': data['productType'] ?? 'Not Specified',
+        'neckType': data['neck_type'] ?? data['neckType'] ?? 'Not Specified',
+        'productType': data['product_type'] ?? data['productType'] ?? 'Not Specified',
         'color': data['color'] ?? 'Not Specified',
+        'fabricType': data['fabric_type'] ?? data['fabricType'] ?? 'Not Specified',
       });
     }
 
+    String? docId;
+    if (data['id'] != null) {
+      docId = data['id'].toString();
+    } else {
+      try {
+        docId = document?.id?.toString();
+      } catch (_) {
+        docId = null;
+      }
+    }
+
     return OrderModel(
-      id: document.id,
-      manualOrderNo: data['manualOrderNo'] ?? '',
-      clientName: data['clientName'] ?? 'Unknown Client',
-      clientPhone: data['clientPhone'] ?? '',
+      id: docId,
+      manualOrderNo: data['manual_order_no'] ?? data['manualOrderNo'] ?? '',
+      clientName: data['client_name'] ?? data['clientName'] ?? 'Unknown Client',
+      clientPhone: data['client_phone'] ?? data['clientPhone'] ?? '',
       organization: data['organization'] ?? '',
-      clientAddress: data['clientAddress'] ?? '',
-      clientGstNumber: data['clientGstNumber'] ?? '', // ✅ ADDED
+      clientAddress: data['client_address'] ?? data['clientAddress'] ?? '',
+      clientGstNumber: data['client_gst_number'] ?? data['clientGstNumber'] ?? '',
       pincode: data['pincode']?.toString() ?? '',
       state: data['state']?.toString() ?? '',
-      productCode: data['productCode'] ?? '',
-      productName: data['productName'] ?? '',
-      productDetails: data['productDetails'] ?? '',
+      productCode: data['product_code'] ?? data['productCode'] ?? '',
+      productName: data['product_name'] ?? data['productName'] ?? '',
+      productDetails: data['product_details'] ?? data['productDetails'] ?? '',
       quantity: qty,
       priority: data['priority'] ?? 'Medium',
-      createdAt: _parseTimestampNullable(data['createdAt']),
-      updatedAt: _parseTimestampNullable(data['updatedAt']),
-      lastUpdatedBy: data['lastUpdatedBy'],
-      marketingPersonId: data['marketingPersonId'],
-      orderDate: _parseTimestamp(data['orderDate']),
-      deliveryDate: _parseTimestamp(data['deliveryDate']),
-      marketingPersonName: data['marketingPersonName'] ?? 'Unknown Agent',
+      createdAt: _parseTimestampNullable(data['created_at'] ?? data['createdAt']),
+      updatedAt: _parseTimestampNullable(data['updated_at'] ?? data['updatedAt']),
+      lastUpdatedBy: data['last_updated_by'] ?? data['lastUpdatedBy'],
+      marketingPersonId: data['marketing_person_id'] ?? data['marketingPersonId'],
+      orderDate: _parseTimestamp(data['order_date'] ?? data['orderDate']),
+      deliveryDate: _parseTimestamp(data['delivery_date'] ?? data['deliveryDate']),
+      marketingPersonName: data['marketing_person_name'] ?? data['marketingPersonName'] ?? 'Unknown Agent',
       status: data['status'] ?? 'Pending',
-      isDeleted: data['isDeleted'] ?? false,
+      isDeleted: data['is_deleted'] ?? data['isDeleted'] ?? false,
       totalAmount: total,
-      gstPercentage: _parseDouble(data['gstPercentage']),
-      sizeDescription: data['sizeDescription'] ?? '',
-      shippingCharge: _parseDouble(data['shippingCharge']),
-      advanceAmount: _parseDouble(data['advanceAmount']),
-      balanceDue: _parseDouble(data['balanceDue']),
-      imageUrl: data['imageUrl'] ?? '',
-      localImagePath: data['localImagePath'] ?? '',
-
-      mockupUrl: data['mockupUrl'] ?? data['designMockupUrl'] ?? '',
-
+      gstPercentage: _parseDouble(data['gst_percentage'] ?? data['gstPercentage']),
+      sizeDescription: data['size_description'] ?? data['sizeDescription'] ?? '',
+      shippingCharge: _parseDouble(data['shipping_charge'] ?? data['shippingCharge']),
+      advanceAmount: _parseDouble(data['advance_amount'] ?? data['advanceAmount']),
+      balanceDue: _parseDouble(data['balance_due'] ?? data['balanceDue']),
+      imageUrl: data['image_url'] ?? data['imageUrl'] ?? '',
+      localImagePath: data['local_image_path'] ?? data['localImagePath'] ?? '',
+      mockupUrl: data['mockup_url'] ?? data['mockupUrl'] ?? data['design_mockup_url'] ?? data['designMockupUrl'] ?? '',
       products: parsedProducts,
 
       // FETCH MARGIN DATA SAFELY
-      marginNumber: _parseInt(data['marginNumber']),
-      effectiveRevenue: _parseDouble(data['effectiveRevenue']),
+      marginNumber: _parseInt(data['margin_number'] ?? data['marginNumber']),
+      effectiveRevenue: _parseDouble(data['effective_revenue'] ?? data['effectiveRevenue']),
 
       // FETCH DELETION FLAG SAFELY
-      isDeleteRequested: data['isDeleteRequested'] ?? false,
+      isDeleteRequested: data['is_delete_requested'] ?? data['isDeleteRequested'] ?? false,
 
       // FETCH PAYMENT HISTORY SAFELY
-      paymentHistory: data['paymentHistory'] ?? [],
+      paymentHistory: data['payment_history'] ?? data['paymentHistory'] ?? [],
 
       // FETCH STAGE HISTORY SAFELY
-      stageHistory: data['stageHistory'] ?? [],
+      stageHistory: data['stage_history'] ?? data['stageHistory'] ?? [],
 
-      neckType: data['neckType'] ?? 'Not Specified',
-      productType: data['productType'] ?? 'Not Specified',
+      neckType: data['neck_type'] ?? data['neckType'] ?? 'Not Specified',
+      productType: data['product_type'] ?? data['productType'] ?? 'Not Specified',
       color: data['color'] ?? 'Not Specified',
-      mockupDone: data['mockupDone'] ?? false,
-      mockupApprovedBy: data['mockupApprovedBy'] ?? '',
-      mockupDoneAt: _parseTimestampNullable(data['mockupDoneAt']),
+      mockupDone: data['mockup_done'] ?? data['mockupDone'] ?? false,
+      mockupApprovedBy: data['mockup_approved_by'] ?? data['mockupApprovedBy'] ?? '',
+      mockupDoneAt: _parseTimestampNullable(data['mockup_done_at'] ?? data['mockupDoneAt']),
     );
   }
 

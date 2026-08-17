@@ -21,7 +21,7 @@ class StitchingController extends GetxController {
       final eff = assigned > 0 ? ((completed / assigned) * 100) : 0.0;
 
       final res = await ApiService.post('/production/stitching', {
-        'order_id': orderId,
+        'order_id': oId,
         'operator': operatorName.text.trim(),
         'style_no': styleNo.text.trim(),
         'operation_type': operationType.text.trim(),

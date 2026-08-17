@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../data/services/api_service.dart';
+import '../../utils/constants/app_constants.dart';
 
 class InventoryController extends GetxController {
   var inventoryItems = <Map<String, dynamic>>[].obs;
@@ -33,8 +34,8 @@ class InventoryController extends GetxController {
   }
 
   Future<void> fetchInventoryData({bool showSpinner = true}) async => await fetchInventory();
-  List<String> get fabricTypes => ['PC Matty', 'Spun Matty', 'Nokia', 'Dotknit'];
-  List<String> get colors => ['Black', 'White', 'Navy', 'Red', 'Royal Blue'];
+  List<String> get fabricTypes => AppConstants.materialOptions;
+  List<String> get colors => AppConstants.colorOptions;
   List<Map<String, dynamic>> get filteredStock => inventoryItems;
   List<Map<String, dynamic>> get filteredLogs => inventoryItems;
   void updateSearch(String query) {}

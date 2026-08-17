@@ -33,6 +33,25 @@ export class OrderController {
     }
   };
 
+  update = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const order = await this.orderService.updateOrder(req.params.id, req.body, req.user!);
+      return ApiResponse.success(res, order, 'Order updated successfully');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateStatus = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { status, ...extra } = req.body;
+      const order = await this.orderService.updateOrderStatus(req.params.id, status, req.user!, extra);
+      return ApiResponse.success(res, order, 'Order status updated successfully');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   approve = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const order = await this.orderService.approveOrder(req.params.id, req.user!, req.body);
@@ -46,6 +65,15 @@ export class OrderController {
     try {
       const order = await this.orderService.rejectOrder(req.params.id, req.user!);
       return ApiResponse.success(res, order, 'Order rejected successfully');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  delete = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.orderService.deleteOrder(req.params.id, req.user!);
+      return ApiResponse.success(res, result, 'Order deleted successfully');
     } catch (err) {
       next(err);
     }

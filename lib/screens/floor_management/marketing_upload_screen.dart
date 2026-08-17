@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../data/models/order_model.dart';
 import '../../utils/constants/colors.dart';
+import '../../utils/constants/app_constants.dart';
 import '../../utils/widgets/custom_text_field.dart';
 import '../../controllers/floor_management/marketing_upload_controller.dart';
 
@@ -25,33 +26,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
   final RxBool showGstField = false.obs;
 
   Color _getColorFromString(String colorName) {
-    switch (colorName) {
-      case 'White': return Colors.white;
-      case 'Off white': return const Color(0xFFFAF9F6);
-      case 'Beige': return const Color(0xFFF5F5DC);
-      case 'Light grey': return Colors.grey.shade300;
-      case 'Dark grey': return Colors.grey.shade700;
-      case 'Black': return Colors.black;
-      case 'Sky blue': return Colors.lightBlue.shade300;
-      case 'Ocean blue': return const Color(0xFF0077BE);
-      case 'Royal blue': return const Color(0xFF4169E1);
-      case 'Navy blue': return const Color(0xFF000080);
-      case 'Neon green': return const Color(0xFF39FF14);
-      case 'Green': return Colors.green;
-      case 'Bottle green': return const Color(0xFF006A4E);
-      case 'Lemon yellow': return const Color(0xFFFFF44F);
-      case 'Yellow': return Colors.yellow;
-      case 'Mustard yellow': return const Color(0xFFFFDB58);
-      case 'Orange': return Colors.orange;
-      case 'Red': return Colors.red;
-      case 'Maroon': return const Color(0xFF800000);
-      case 'Pink': return Colors.pink;
-      case 'Light pink': return const Color(0xFFFFB6C1);
-      case 'Brown': return Colors.brown;
-      case 'Purple': return Colors.purple;
-      case 'Lavender': return const Color(0xFFE6E6FA);
-      default: return Colors.transparent;
-    }
+    return AppConstants.getColor(colorName);
   }
 
   @override
@@ -194,7 +169,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                       ),
                       const SizedBox(width: 12),
 
-                      // ✅ FIX: Replaced the static Container with your dropdown helper!
+                      // State Dropdown
                       Expanded(
                         flex: 3,
                         child: Obx(() => _buildDropdown(
@@ -203,11 +178,26 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                           items: controller.indianStates,
                           icon: Icons.map_rounded,
                           isDark: isDark,
-                          onChanged: (val) => controller.selectedState.value = val,
+                          onChanged: (val) => controller.onStateChanged(val),
                         )),
                       ),
                     ],
                   ),
+                  Obx(() {
+                    final districts = controller.availableDistricts;
+                    if (districts.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: _buildDropdown(
+                        label: "District (${controller.selectedState.value ?? 'State'})",
+                        value: controller.selectedDistrict.value,
+                        items: districts,
+                        icon: Icons.location_city_rounded,
+                        isDark: isDark,
+                        onChanged: (val) => controller.selectedDistrict.value = val,
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 16),
 
                   TCustomTextField(label: "Organization / Business", controller: controller.organization, prefixIcon: Icons.domain_rounded),
@@ -398,11 +388,11 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
 
                                 // Custom Color Pop-up field
                                 Obx(() {
-                                  if (itemForm.selectedColor.value == 'Custom/Mixed') {
+                                  if (itemForm.selectedColor.value == 'Other' || itemForm.selectedColor.value == 'Custom/Mixed') {
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 12),
                                       child: TCustomTextField(
-                                        label: "Specify Custom/Mixed Color",
+                                        label: "Specify Color *",
                                         controller: itemForm.customColor,
                                         prefixIcon: Icons.format_paint_rounded,
                                         validator: (val) => val!.isEmpty ? "Please specify color" : null,
@@ -570,7 +560,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
           value: item,
           child: Row(
             children: [
-              if (isColorDropdown && item != 'Custom/Mixed') ...[
+              if (isColorDropdown && item != 'Other' && item != 'Custom/Mixed') ...[
                 Container(
                   width: 14,
                   height: 14,
@@ -582,7 +572,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                 ),
                 const SizedBox(width: 8),
               ],
-              if (isColorDropdown && item == 'Custom/Mixed') ...[
+              if (isColorDropdown && (item == 'Other' || item == 'Custom/Mixed')) ...[
                 Icon(Icons.palette_rounded, size: 14, color: isDark ? Colors.white70 : Colors.black54),
                 const SizedBox(width: 8),
               ],

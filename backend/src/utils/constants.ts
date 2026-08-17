@@ -1,0 +1,76 @@
+export const ORDER_STATUSES = [
+  'Pending',
+  'Approved',
+  'Production',
+  'Dispatched',
+  'Delivered',
+] as const;
+
+export const ORDER_FILTER_OPTIONS = [
+  'All',
+  'Pending',
+  'Approved',
+  'Production',
+  'Dispatched',
+  'Delivered',
+] as const;
+
+export const COLOR_OPTIONS = [
+  'Black',
+  'White',
+  'Navy Blue',
+  'Royal Blue',
+  'Grey',
+  'Maroon',
+  'Red',
+  'Sky',
+  'Bottle Green',
+  'Other',
+] as const;
+
+export const MATERIAL_OPTIONS = [
+  'Spun Matty',
+  'PC Matty',
+  'US Polo',
+  'Techno Matty',
+  'Drifit',
+  'Dot knit',
+  'Serena',
+  'Red Tag',
+  'Oversized',
+  'Promotional',
+  'Others',
+] as const;
+
+export const ODISHA_DISTRICTS = [
+  'Angul',
+  'Balangir',
+  'Balasore',
+  'Bargarh',
+  'Bhadrak',
+  'Boudh',
+  'Cuttack',
+  'Deogarh',
+  'Dhenkanal',
+  'Gajapati',
+  'Ganjam',
+  'Jagatsinghpur',
+  'Jajpur',
+  'Jharsuguda',
+  'Kalahandi',
+  'Kandhamal',
+  'Kendrapara',
+  'Kendujhar',
+  'Khordha',
+  'Koraput',
+  'Malkangiri',
+  'Mayurbhanj',
+  'Nabarangpur',
+  'Nayagarh',
+  'Nuapada',
+  'Puri',
+  'Rayagada',
+  'Sambalpur',
+  'Subarnapur',
+  'Sundargarh',
+] as const;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../data/models/order_model.dart';
 import '../../data/services/api_service.dart';
@@ -47,7 +48,7 @@ class ClientController extends GetxController {
       clients.value = grouped;
       filteredClientNames.value = sortedKeys;
     } catch (e) {
-      print("Error fetching clients: $e");
+      debugPrint("Error fetching clients: $e");
     } finally {
       isLoading.value = false;
     }

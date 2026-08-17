@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../data/services/api_service.dart';
 
@@ -44,7 +45,7 @@ class MarketingController extends GetxController {
         filteredAgents.assignAll(list);
       }
     } catch (e) {
-      print("MarketingController fetch error: $e");
+      debugPrint("MarketingController fetch error: $e");
     } finally {
       isLoading.value = false;
     }

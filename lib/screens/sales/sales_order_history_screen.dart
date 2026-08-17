@@ -105,21 +105,9 @@ class _SalesOrderHistoryScreenState extends State<SalesOrderHistoryScreen> {
                       _buildFilterChip(controller, "All", isDark),
                       _buildFilterChip(controller, "Pending", isDark),
                       _buildFilterChip(controller, "Approved", isDark),
-                      _buildFilterChip(controller, "Fab Purchased", isDark),
-                      _buildFilterChip(controller, "Fab Ready", isDark),
-                      _buildFilterChip(controller, "Cutting", isDark),
-                      _buildFilterChip(controller, "Cutting Done", isDark),
-                      _buildFilterChip(controller, "Printing", isDark),
-                      _buildFilterChip(controller, "Printed", isDark),
-                      _buildFilterChip(controller, "Stitching", isDark),
-                      _buildFilterChip(controller, "Stitched", isDark),
-                      _buildFilterChip(controller, "Packing", isDark),
-                      _buildFilterChip(controller, "Packed", isDark),
-                      _buildFilterChip(controller, "Shipping", isDark),
-                      _buildFilterChip(controller, "Shipped", isDark),
+                      _buildFilterChip(controller, "Production", isDark),
+                      _buildFilterChip(controller, "Dispatched", isDark),
                       _buildFilterChip(controller, "Delivered", isDark),
-                      _buildFilterChip(controller, "Rejected", isDark),
-                      _buildFilterChip(controller, "Trash", isDark),
                     ],
                   ),
                 ),
@@ -938,6 +926,8 @@ class _SalesOrderHistoryScreenState extends State<SalesOrderHistoryScreen> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved': return Colors.blue;
+      case 'production': return Colors.orange;
+      case 'dispatched': return Colors.teal;
       case 'fab purchased': return Colors.pink;
       case 'fab ready': return Colors.lightGreen;
       case 'cutting': return Colors.orange;

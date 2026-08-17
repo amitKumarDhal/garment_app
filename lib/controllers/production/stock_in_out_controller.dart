@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../data/services/api_service.dart';
+import '../../utils/constants/app_constants.dart';
 
 class StockInOutController extends GetxController {
   final fabricType = TextEditingController();
@@ -60,15 +61,11 @@ class StockInOutController extends GetxController {
   final selectedRibStyle = 'Solid color'.obs;
   final selectedRibColor = ''.obs;
 
-  List<String> get fabricTypes => ['PC Matty', 'Spun Matty', 'Nokia', 'Dotknit'];
-  List<String> get colors => ['Black', 'White', 'Navy', 'Red', 'Royal Blue'];
-  List<Map<String, dynamic>> get allColors => [
-    {'name': 'Black', 'color': Colors.black},
-    {'name': 'White', 'color': Colors.white},
-    {'name': 'Navy', 'color': Colors.indigo},
-    {'name': 'Red', 'color': Colors.red},
-    {'name': 'Royal Blue', 'color': Colors.blue},
-  ];
+  List<String> get fabricTypes => AppConstants.materialOptions;
+  List<String> get colors => AppConstants.colorOptions;
+  List<Map<String, dynamic>> get allColors => AppConstants.colorOptions
+      .map((c) => {'name': c, 'color': AppConstants.getColor(c)})
+      .toList();
   List<String> get collarStyles => ['Solid color', 'Tipping', 'Jacquard'];
 
   void updateType(String type) => selectedTransactionType.value = type;

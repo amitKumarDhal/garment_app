@@ -18,11 +18,14 @@ class SalesHistoryController extends GetxController {
     try {
       isLoading.value = true;
       final res = await ApiService.get('/orders');
-      if (res['success'] == true && res['orders'] != null) {
-        final list = List<Map<String, dynamic>>.from(res['orders']);
-        final orders = list.map((e) => OrderModel.fromJson(e)).toList();
-        myOrders.assignAll(orders);
-        filteredOrders.assignAll(orders);
+      if (res['success'] == true) {
+        final raw = res['data'] ?? res['orders'] ?? [];
+        if (raw is List) {
+          final list = List<Map<String, dynamic>>.from(raw);
+          final orders = list.map((e) => OrderModel.fromJson(e)).toList();
+          myOrders.assignAll(orders);
+          filterByStatus(currentFilter.value);
+        }
       }
     } catch (e) {
       debugPrint("Fetch My Orders Error: $e");
@@ -33,7 +36,7 @@ class SalesHistoryController extends GetxController {
 
   void searchOrders(String query) {
     if (query.isEmpty) {
-      filteredOrders.assignAll(myOrders);
+      filterByStatus(currentFilter.value);
       return;
     }
     final q = query.toLowerCase();
@@ -58,10 +61,38 @@ class SalesHistoryController extends GetxController {
 
   void filterByStatus(String status) {
     currentFilter.value = status;
-    if (status == 'All') {
+    final lower = status.toLowerCase().trim();
+
+    if (lower == 'all') {
       filteredOrders.assignAll(myOrders);
+    } else if (lower == 'production') {
+      const prodStages = [
+        'production',
+        'fab purchased',
+        'fab ready',
+        'cutting',
+        'cutting done',
+        'printing',
+        'printed',
+        'stitching',
+        'stitched',
+        'finishing',
+        'packing',
+        'packed',
+        'out src',
+      ];
+      filteredOrders.assignAll(
+        myOrders.where((o) => prodStages.contains(o.status.toLowerCase().trim())).toList(),
+      );
+    } else if (lower == 'dispatched') {
+      const dispatchStages = ['dispatched', 'shipping', 'shipped'];
+      filteredOrders.assignAll(
+        myOrders.where((o) => dispatchStages.contains(o.status.toLowerCase().trim())).toList(),
+      );
     } else {
-      filteredOrders.assignAll(myOrders.where((o) => o.status.toLowerCase() == status.toLowerCase()).toList());
+      filteredOrders.assignAll(
+        myOrders.where((o) => o.status.toLowerCase().trim() == lower).toList(),
+      );
     }
   }
 

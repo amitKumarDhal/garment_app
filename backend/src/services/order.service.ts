@@ -48,7 +48,7 @@ export class OrderService {
     const grandTotal = subTotal + totalTax + shipping;
     const balanceDue = grandTotal - advance;
 
-    const initialStatus = advance > 0 ? 'Pending' : 'Placed';
+    const initialStatus = 'Pending';
     const firstProdName = data.products[0]?.productName || 'Garments';
     const rootProdName = data.products.length > 1 ? `${firstProdName} + ${data.products.length - 1} more` : firstProdName;
 
@@ -95,6 +95,88 @@ export class OrderService {
     return newOrder;
   }
 
+  async updateOrder(id: string, data: any, user: AuthUser) {
+    const existing = await this.orderRepo.findById(id);
+    if (!existing) throw ApiError.notFound('Order not found');
+
+    const updatePayload: Record<string, any> = {
+      last_updated_by: user.name,
+    };
+
+    if (data.clientName) updatePayload.client_name = data.clientName.trim();
+    if (data.clientPhone !== undefined) updatePayload.client_phone = data.clientPhone?.trim() || null;
+    if (data.organization !== undefined) updatePayload.organization = data.organization?.trim() || null;
+    if (data.clientAddress !== undefined) updatePayload.client_address = data.clientAddress?.trim() || null;
+    if (data.clientGstNumber !== undefined) updatePayload.client_gst_number = data.clientGstNumber?.trim() || null;
+    if (data.pincode) updatePayload.pincode = data.pincode;
+    if (data.state) updatePayload.state = data.state;
+    if (data.deliveryDate) updatePayload.delivery_date = data.deliveryDate;
+    if (data.mockupUrl !== undefined) updatePayload.mockup_url = data.mockupUrl;
+    if (data.productDetails || data.product_details) {
+      updatePayload.product_details = data.productDetails || data.product_details;
+    }
+    if (data.status) updatePayload.status = data.status;
+
+    // Financial calculations
+    if (data.products && data.products.length > 0) {
+      let subTotal = 0;
+      let totalTax = 0;
+      let totalQty = 0;
+
+      data.products.forEach((prod: any) => {
+        const price = Number(prod.price) || 0;
+        const qty = Number(prod.qty) || 1;
+        const gstPct = Number(prod.gstPercentage) || 0;
+
+        const base = price * qty;
+        const tax = base * (gstPct / 100);
+
+        subTotal += base;
+        totalTax += tax;
+        totalQty += qty;
+      });
+
+      const shipping = data.shippingCharge !== undefined ? Number(data.shippingCharge) : Number(existing.shipping_charge || 0);
+      const advance = data.advanceAmount !== undefined ? Number(data.advanceAmount) : Number(existing.advance_amount || 0);
+      const grandTotal = subTotal + totalTax + shipping;
+      const balanceDue = grandTotal - advance;
+
+      updatePayload.quantity = totalQty;
+      updatePayload.shipping_charge = shipping;
+      updatePayload.advance_amount = advance;
+      updatePayload.total_amount = grandTotal;
+      updatePayload.balance_due = balanceDue;
+      updatePayload.effective_revenue = grandTotal;
+      updatePayload.gst_percentage = data.products[0]?.gstPercentage || existing.gst_percentage || 0;
+
+      const firstProdName = data.products[0]?.productName || existing.product_name;
+      updatePayload.product_name = data.products.length > 1 ? `${firstProdName} + ${data.products.length - 1} more` : firstProdName;
+
+      return this.orderRepo.updateOrderWithItems(id, updatePayload, data.products);
+    } else if (data.quantity !== undefined || data.total_amount !== undefined || data.totalAmount !== undefined) {
+      const newQty = Number(data.quantity) || existing.quantity;
+      const newTotal = Number(data.total_amount ?? data.totalAmount) || existing.total_amount;
+      const advance = Number(existing.advance_amount || 0);
+      const newBalance = newTotal - advance;
+
+      updatePayload.quantity = newQty;
+      updatePayload.total_amount = newTotal;
+      updatePayload.balance_due = newBalance;
+      updatePayload.effective_revenue = newTotal;
+
+      return this.orderRepo.updateOrderWithItems(id, updatePayload);
+    }
+
+    return this.orderRepo.updateOrderWithItems(id, updatePayload);
+  }
+
+  async updateOrderStatus(id: string, status: string, user: AuthUser, extraFields: Record<string, any> = {}) {
+    const order = await this.orderRepo.findById(id);
+    if (!order) throw ApiError.notFound('Order not found');
+
+    return this.orderRepo.updateStatus(id, status, user.name, extraFields);
+  }
+
   async approveOrder(id: string, user: AuthUser, approvalData: { effectiveRevenue?: number; marginNumber?: number }) {
     const order = await this.orderRepo.findById(id);
     if (!order) throw ApiError.notFound('Order not found');
@@ -137,6 +219,13 @@ export class OrderService {
     }
 
     return updated;
+  }
+
+  async deleteOrder(id: string, user: AuthUser) {
+    const order = await this.orderRepo.findById(id);
+    if (!order) throw ApiError.notFound('Order not found');
+
+    return this.orderRepo.deleteOrder(id, true);
   }
 
   async requestDeletion(id: string, user: AuthUser) {

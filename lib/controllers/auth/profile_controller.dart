@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../data/services/api_service.dart';
 import '../../data/repositories/authentication_repository.dart';
@@ -38,7 +39,7 @@ class ProfileController extends GetxController {
         ApiService.saveSession(ApiService.token ?? '', data);
       }
     } catch (e) {
-      print("Error loading profile: $e");
+      debugPrint("Error loading profile: $e");
     } finally {
       isLoading.value = false;
     }

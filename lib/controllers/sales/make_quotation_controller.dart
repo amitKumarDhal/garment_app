@@ -97,9 +97,9 @@ class MakeQuotationController extends GetxController {
     double tempGst = 0.0;
 
     for (var item in items) {
-      double price = double.tryParse(item.priceCtrl.text) ?? 0.0;
-      double qty = double.tryParse(item.qtyCtrl.text) ?? 0.0;
-      double gstPercent = double.tryParse(item.gstCtrl.text) ?? 0.0;
+      double price = double.tryParse(item.priceCtrl.text.trim()) ?? 0.0;
+      double qty = double.tryParse(item.qtyCtrl.text.trim()) ?? 0.0;
+      double gstPercent = double.tryParse(item.gstCtrl.text.trim()) ?? 0.0;
 
       double itemTotal = price * qty;
       double itemGst = itemTotal * (gstPercent / 100);
@@ -110,7 +110,7 @@ class MakeQuotationController extends GetxController {
 
     subTotal.value = tempSubTotal;
     totalGst.value = tempGst;
-    shippingCharge.value = double.tryParse(shippingCtrl.text) ?? 0.0;
+    shippingCharge.value = double.tryParse(shippingCtrl.text.trim()) ?? 0.0;
     grandTotal.value = subTotal.value + totalGst.value + shippingCharge.value;
   }
 

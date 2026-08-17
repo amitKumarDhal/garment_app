@@ -44,20 +44,28 @@ export class OrderRepository {
     if (orderErr) throw orderErr;
 
     // 2. Insert order items
-    const formattedItems = items.map((item) => ({
-      order_id: order.id,
-      product_code: item.productCode || null,
-      product_name: item.productName,
-      size_description: item.sizeDescription || null,
-      qty: item.qty,
-      price: item.price,
-      gst_percentage: item.gstPercentage || 0,
-      total: (item.qty * item.price) * (1 + (item.gstPercentage || 0) / 100),
-      neck_type: item.neckType || 'Not Specified',
-      product_type: item.productType || 'Not Specified',
-      color: item.color || 'Not Specified',
-      fabric_type: item.fabricType || 'Not Specified',
-    }));
+    const formattedItems = items.map((item) => {
+      const price = Number(item.price) || 0;
+      const qty = Number(item.qty) || 1;
+      const gstPct = Number(item.gstPercentage) || 0;
+      const itemBase = price * qty;
+      const itemGst = itemBase * (gstPct / 100);
+
+      return {
+        order_id: order.id,
+        product_code: item.productCode || null,
+        product_name: item.productName,
+        size_description: item.sizeDescription || null,
+        qty: qty,
+        price: price,
+        gst_percentage: gstPct,
+        total: itemBase + itemGst,
+        neck_type: item.neckType || 'Not Specified',
+        product_type: item.productType || 'Not Specified',
+        color: item.color || 'Not Specified',
+        fabric_type: item.fabricType || 'Not Specified',
+      };
+    });
 
     const { data: insertedItems, error: itemsErr } = await supabaseAdmin
       .from('order_items')
@@ -73,7 +81,59 @@ export class OrderRepository {
       updated_by: order.marketing_person_name,
     });
 
-    return { ...order, items: insertedItems };
+    return { ...order, order_items: insertedItems };
+  }
+
+  async updateOrderWithItems(id: string, orderData: Record<string, any>, items?: any[]) {
+    const { data: updatedOrder, error: updateErr } = await supabaseAdmin
+      .from('orders')
+      .update({
+        ...orderData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    if (items && items.length > 0) {
+      // Clean delete existing items and insert updated items
+      await supabaseAdmin.from('order_items').delete().eq('order_id', id);
+
+      const formattedItems = items.map((item) => {
+        const price = Number(item.price) || 0;
+        const qty = Number(item.qty) || 1;
+        const gstPct = Number(item.gstPercentage) || 0;
+        const itemBase = price * qty;
+        const itemGst = itemBase * (gstPct / 100);
+
+        return {
+          order_id: id,
+          product_code: item.productCode || null,
+          product_name: item.productName,
+          size_description: item.sizeDescription || null,
+          qty: qty,
+          price: price,
+          gst_percentage: gstPct,
+          total: itemBase + itemGst,
+          neck_type: item.neckType || 'Not Specified',
+          product_type: item.productType || 'Not Specified',
+          color: item.color || 'Not Specified',
+          fabric_type: item.fabricType || 'Not Specified',
+        };
+      });
+
+      const { data: newItems, error: itemsErr } = await supabaseAdmin
+        .from('order_items')
+        .insert(formattedItems)
+        .select();
+
+      if (itemsErr) throw itemsErr;
+      return { ...updatedOrder, order_items: newItems };
+    }
+
+    return updatedOrder;
   }
 
   async updateStatus(id: string, status: string, updatedBy: string, extraFields: Record<string, any> = {}) {
@@ -99,6 +159,23 @@ export class OrderRepository {
     });
 
     return updatedOrder;
+  }
+
+  async deleteOrder(id: string, soft = true) {
+    if (soft) {
+      const { data, error } = await supabaseAdmin
+        .from('orders')
+        .update({ is_deleted: true, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } else {
+      const { error } = await supabaseAdmin.from('orders').delete().eq('id', id);
+      if (error) throw error;
+      return { id, deleted: true };
+    }
   }
 
   async requestDeletion(id: string) {
