@@ -17,6 +17,12 @@ export const loginSchema = z.object({
   }),
 });
 
+export const refreshSchema = z.object({
+  body: z.object({
+    refreshToken: z.string().min(1, 'Refresh token is required'),
+  }),
+});
+
 export const userApprovalSchema = z.object({
   params: z.object({
     id: z.string().uuid('Invalid user ID'),

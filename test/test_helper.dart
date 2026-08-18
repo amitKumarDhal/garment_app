@@ -18,8 +18,8 @@ class TestHelper {
       (MethodCall methodCall) async => _tempDir!.path,
     );
 
-    // Initialize GetStorage with unique container in temp dir
-    await GetStorage.init('test_container_${DateTime.now().microsecondsSinceEpoch}');
+    // Initialize default GetStorage container in isolated temp dir
+    await GetStorage.init();
 
     // Mock ApiService to intercept all controller network calls
     ApiService.mockHandler = (String method, String endpoint, dynamic body) async {
@@ -42,6 +42,28 @@ class TestHelper {
           'success': true,
           'url': 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
         };
+      }
+      if (endpoint == '/quotations') {
+        return {
+          'success': true,
+          'data': {
+            'id': 'quote-12345',
+            'quotationNo': body?['quotationNo'] ?? 'ZBR26001',
+            'clientName': body?['clientName'] ?? 'Test Client',
+          },
+        };
+      }
+      if (endpoint == '/auth/refresh') {
+        if (body?['refreshToken'] == 'valid-refresh-token' || body?['refreshToken'] != null) {
+          return {
+            'success': true,
+            'accessToken': 'new-access-token-999',
+            'refreshToken': 'new-refresh-token-999',
+            'expiresAt': (DateTime.now().millisecondsSinceEpoch / 1000).round() + 3600,
+            'user': {'id': 'user-1', 'email': 'agent@zobbra.com', 'role': 'SALES_ASSOCIATE'},
+          };
+        }
+        throw ApiException('Invalid or expired refresh token', 401);
       }
       return {'success': true, 'data': {}};
     };

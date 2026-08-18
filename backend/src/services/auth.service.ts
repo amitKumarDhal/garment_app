@@ -78,4 +78,43 @@ export class AuthService {
       },
     };
   }
+
+  async refreshToken(token: string) {
+    if (!token) {
+      throw ApiError.badRequest('Refresh token is required');
+    }
+
+    // 1. Refresh Supabase session
+    const { data: authData, error } = await supabaseClient.auth.refreshSession({
+      refresh_token: token,
+    });
+
+    if (error || !authData.session || !authData.user) {
+      throw ApiError.unauthorized('Invalid or expired refresh token');
+    }
+
+    // 2. Fetch user profile from database
+    const profile = await this.userRepo.findById(authData.user.id);
+    if (!profile) {
+      throw ApiError.unauthorized('User profile not found');
+    }
+
+    if (profile.status !== 'APPROVED') {
+      throw ApiError.forbidden(`Your account registration is ${profile.status}. Admin approval is required.`);
+    }
+
+    return {
+      accessToken: authData.session.access_token,
+      refreshToken: authData.session.refresh_token,
+      expiresAt: authData.session.expires_at,
+      user: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role,
+        agentRank: profile.agent_rank || 'JSA',
+        status: profile.status,
+      },
+    };
+  }
 }

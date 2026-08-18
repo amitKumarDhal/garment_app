@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart'; // ✅ Required to load the logo image
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../data/models/order_model.dart';
+import '../utils/constants/branding_constants.dart';
 
 class PdfInvoiceService {
 
@@ -45,11 +46,11 @@ class PdfInvoiceService {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text("ZOBBRA", style: pw.TextStyle(font: boldFont, fontSize: 32, color: const PdfColor.fromInt(0xFF1A237E))),
+                    pw.Text(ZobbraBranding.brandName.toUpperCase(), style: pw.TextStyle(font: boldFont, fontSize: 32, color: PdfColors.black)),
                     pw.SizedBox(height: 4),
-                    pw.Text("Premium Manufacturing & Logistics", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
-                    pw.Text("Bhubaneswar, Odisha", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
-                    pw.Text("Contact: support@yoobbel.com", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
+                    pw.Text(ZobbraBranding.tagline, style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
+                    pw.Text(ZobbraBranding.fullLocation, style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
+                    pw.Text("Contact: ${ZobbraBranding.supportEmail}", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
                   ],
                 ),
                 pw.Column(
@@ -60,10 +61,10 @@ class PdfInvoiceService {
                     pw.Container(
                       padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: pw.BoxDecoration(
-                        color: const PdfColor.fromInt(0xFFE8EAF6),
+                        color: const PdfColor.fromInt(0xFFEEEEEE),
                         borderRadius: pw.BorderRadius.circular(4),
                       ),
-                      child: pw.Text("Order #: ${order.manualOrderNo ?? 'N/A'}", style: pw.TextStyle(font: boldFont, fontSize: 12, color: const PdfColor.fromInt(0xFF1A237E))),
+                      child: pw.Text("Order #: ${order.manualOrderNo ?? 'N/A'}", style: pw.TextStyle(font: boldFont, fontSize: 12, color: PdfColors.black)),
                     ),
                     pw.SizedBox(height: 4),
                     pw.Text("Date: ${DateFormat('MMM dd, yyyy').format(order.orderDate)}", style: pw.TextStyle(font: font, fontSize: 10)),
@@ -72,7 +73,7 @@ class PdfInvoiceService {
               ],
             ),
             pw.SizedBox(height: 20),
-            pw.Divider(color: PdfColors.grey300, thickness: 1.5),
+            pw.Divider(color: PdfColors.grey400, thickness: 1.5),
             pw.SizedBox(height: 20),
 
             // --- CLIENT INFO ---
@@ -106,7 +107,7 @@ class PdfInvoiceService {
                     pw.SizedBox(height: 15),
                     pw.Text("DELIVERY DEADLINE:", style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.grey600)),
                     pw.SizedBox(height: 4),
-                    pw.Text(DateFormat('MMM dd, yyyy').format(order.deliveryDate), style: pw.TextStyle(font: boldFont, fontSize: 12, color: PdfColors.red800)),
+                    pw.Text(DateFormat('MMM dd, yyyy').format(order.deliveryDate), style: pw.TextStyle(font: boldFont, fontSize: 12, color: PdfColors.black)),
                   ],
                 ),
               ],
@@ -134,9 +135,9 @@ class PdfInvoiceService {
                   currency.format(iTotal),
                 ];
               }).toList(),
-              border: pw.TableBorder.all(color: PdfColors.grey200, width: 0.5),
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
               headerStyle: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.white),
-              headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF1A237E)),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.black),
               cellStyle: pw.TextStyle(font: font, fontSize: 10),
               cellAlignments: {
                 0: pw.Alignment.centerLeft,
@@ -172,10 +173,10 @@ class PdfInvoiceService {
                           child: pw.Container(
                             padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                             decoration: pw.BoxDecoration(
-                              border: pw.Border.all(color: PdfColors.green800, width: 3),
+                              border: pw.Border.all(color: PdfColors.black, width: 3),
                               borderRadius: pw.BorderRadius.circular(8),
                             ),
-                            child: pw.Text("FULLY PAID", style: pw.TextStyle(font: boldFont, fontSize: 24, color: PdfColors.green800, letterSpacing: 4)),
+                            child: pw.Text("FULLY PAID", style: pw.TextStyle(font: boldFont, fontSize: 24, color: PdfColors.black, letterSpacing: 4)),
                           ),
                         ),
                       ]
@@ -194,7 +195,7 @@ class PdfInvoiceService {
                         _buildSummaryRow("Shipping", "+ ${currency.format(order.shippingCharge)}", font),
 
                       pw.SizedBox(height: 4),
-                      pw.Divider(color: PdfColors.grey300),
+                      pw.Divider(color: PdfColors.grey400),
                       pw.SizedBox(height: 4),
 
                       _buildSummaryRow("Grand Total", currency.format(order.totalAmount), boldFont, size: 14),
@@ -216,14 +217,14 @@ class PdfInvoiceService {
                                 : (payment['date'] is DateTime ? payment['date'] as DateTime : DateTime.now());
                             dateStr = DateFormat('dd MMM').format(dt);
                           }
-                          return _buildSummaryRow("Paid on $dateStr", "- ${currency.format(amount)}", font, color: PdfColors.red800, size: 9);
+                          return _buildSummaryRow("Paid on $dateStr", "- ${currency.format(amount)}", font, color: PdfColors.black, size: 9);
                         }),
                       ] else if (order.advanceAmount > 0) ...[
-                        _buildSummaryRow("Advance Paid", "- ${currency.format(order.advanceAmount)}", font, color: PdfColors.red800),
+                        _buildSummaryRow("Advance Paid", "- ${currency.format(order.advanceAmount)}", font, color: PdfColors.black),
                       ],
 
                       pw.SizedBox(height: 4),
-                      pw.Divider(color: PdfColors.grey800, thickness: 1.5),
+                      pw.Divider(color: PdfColors.black, thickness: 1.5),
                       pw.SizedBox(height: 4),
 
                       _buildSummaryRow(
@@ -231,7 +232,7 @@ class PdfInvoiceService {
                           currency.format(order.balanceDue),
                           boldFont,
                           size: 16,
-                          color: order.balanceDue <= 0 ? PdfColors.green800 : PdfColors.red800
+                          color: PdfColors.black
                       ),
                     ],
                   ),
@@ -240,7 +241,7 @@ class PdfInvoiceService {
             ),
 
             pw.Spacer(),
-            pw.Divider(color: PdfColors.grey300),
+            pw.Divider(color: PdfColors.grey400),
             pw.SizedBox(height: 10),
             pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -255,8 +256,8 @@ class PdfInvoiceService {
                     ],
                   ),
                   pw.Text(
-                    "Thank you for doing business with Zobbra!",
-                    style: pw.TextStyle(font: boldFont, fontSize: 10, color: const PdfColor.fromInt(0xFF1A237E), fontStyle: pw.FontStyle.italic),
+                    "Thank you for doing business with ${ZobbraBranding.brandName}!",
+                    style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.black, fontStyle: pw.FontStyle.italic),
                   ),
                 ]
             ),
@@ -272,7 +273,7 @@ class PdfInvoiceService {
   }
 
   // ===========================================================================
-  // 2. GENERATE QUOTATION (Red & White Theme with Exact Logo)
+  // 2. GENERATE QUOTATION (Strict Black & White Theme with Zobbra Branding)
   // ===========================================================================
   static Future<void> generateQuotationPdf(Map<String, dynamic> data) async {
     final pdf = pw.Document();
@@ -282,16 +283,13 @@ class PdfInvoiceService {
     final boldFont = await PdfGoogleFonts.robotoBold();
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-    // ✅ Define the Brand Red Color
-    final PdfColor brandRed = const PdfColor.fromInt(0xFFC62828);
-
-    // ✅ Load Zobbra Logo from assets
+    // Load Zobbra Logo from assets
     pw.MemoryImage? logoImage;
     try {
-      final ByteData bytes = await rootBundle.load('assets/images/zobbra.jpeg');
+      final ByteData bytes = await rootBundle.load(ZobbraBranding.logoAssetPath);
       logoImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (e) {
-      debugPrint("Warning: Could not load zobbra.jpeg from assets.");
+      debugPrint("Warning: Could not load ${ZobbraBranding.logoAssetPath} from assets.");
     }
 
     pdf.addPage(
@@ -302,12 +300,12 @@ class PdfInvoiceService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              // --- 1. HEADER ---
+              // --- 1. HEADER (Black & White) ---
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // Logo Area (Uses the image, falls back to text if missing)
+                  // Logo Area (Uses the image, falls back to clean monochrome text if missing)
                   if (logoImage != null)
                     pw.Image(logoImage, width: 140)
                   else
@@ -315,46 +313,46 @@ class PdfInvoiceService {
                       children: [
                         pw.Container(
                           width: 40, height: 40,
-                          decoration: pw.BoxDecoration(color: brandRed, borderRadius: pw.BorderRadius.circular(8)),
+                          decoration: pw.BoxDecoration(color: PdfColors.black, borderRadius: pw.BorderRadius.circular(8)),
                           alignment: pw.Alignment.center,
                           child: pw.Text("Z", style: pw.TextStyle(font: boldFont, color: PdfColors.white, fontSize: 24)),
                         ),
                         pw.SizedBox(width: 8),
-                        pw.Text("Zobbra", style: pw.TextStyle(font: boldFont, fontSize: 26, color: PdfColors.grey800, letterSpacing: -1)),
+                        pw.Text(ZobbraBranding.brandName, style: pw.TextStyle(font: boldFont, fontSize: 26, color: PdfColors.black, letterSpacing: -1)),
                       ],
                     ),
 
-                  // Company Info
+                  // Company Info (Centralized Zobbra Details)
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text("QUOTATION", style: pw.TextStyle(font: boldFont, fontSize: 24, color: brandRed, letterSpacing: 2)),
+                      pw.Text("QUOTATION", style: pw.TextStyle(font: boldFont, fontSize: 24, color: PdfColors.black, letterSpacing: 2)),
                       pw.SizedBox(height: 8),
-                      pw.Text("Yoobbel Technologies Pvt Ltd.", style: pw.TextStyle(font: boldFont, fontSize: 12, color: PdfColors.grey900)),
-                      pw.Text("2nd Floor, Plot No 204 Aditya Nagar,", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
-                      pw.Text("Sundarpada, Botanda, Odisha", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
-                      pw.Text("751002 Bhubaneswar", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
-                      pw.Text("India", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text(ZobbraBranding.legalCompanyName, style: pw.TextStyle(font: boldFont, fontSize: 12, color: PdfColors.black)),
+                      pw.Text(ZobbraBranding.addressLine1, style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey800)),
+                      pw.Text(ZobbraBranding.addressLine2, style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey800)),
+                      pw.Text("${ZobbraBranding.pinCode} ${ZobbraBranding.city}", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey800)),
+                      pw.Text(ZobbraBranding.country, style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey800)),
                     ],
                   ),
                 ],
               ),
 
               pw.SizedBox(height: 10),
-              pw.Divider(color: brandRed, thickness: 1.5), // Red Accent Line
+              pw.Divider(color: PdfColors.black, thickness: 1.5), // Black Divider
               pw.SizedBox(height: 10),
 
-              // --- 2. TAX INFO ---
+              // --- 2. TAX INFO (Black & White) ---
               pw.Align(
                 alignment: pw.Alignment.centerRight,
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Text("GSTIN : 21AABCY4324K1ZH", style: pw.TextStyle(font: boldFont, fontSize: 10)),
-                    pw.Text("IEC : AABCY4324K", style: pw.TextStyle(font: boldFont, fontSize: 10)),
-                    pw.Text("PAN : AABCY4324K", style: pw.TextStyle(font: boldFont, fontSize: 10)),
+                    pw.Text("GSTIN : ${ZobbraBranding.gstin}", style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.black)),
+                    pw.Text("IEC : ${ZobbraBranding.iec}", style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.black)),
+                    pw.Text("PAN : ${ZobbraBranding.pan}", style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.black)),
                     pw.SizedBox(height: 4),
-                    pw.Text("E-mail : admin@yoobbel.com", style: pw.TextStyle(font: boldFont, fontSize: 10, color: brandRed)),
+                    pw.Text("E-mail : ${ZobbraBranding.supportEmail}", style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.black)),
                   ],
                 ),
               ),
@@ -368,9 +366,9 @@ class PdfInvoiceService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("BILL TO", style: pw.TextStyle(font: boldFont, fontSize: 12, color: brandRed)),
+                      pw.Text("BILL TO", style: pw.TextStyle(font: boldFont, fontSize: 12, color: PdfColors.black)),
                       pw.SizedBox(height: 4),
-                      pw.Text(data['clientName'] ?? "", style: pw.TextStyle(font: boldFont, fontSize: 11)),
+                      pw.Text(data['clientName'] ?? "", style: pw.TextStyle(font: boldFont, fontSize: 11, color: PdfColors.black)),
                       if ((data['clientAddress'] ?? "").toString().isNotEmpty)
                         pw.Text(data['clientAddress'], style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey800)),
                       if ((data['clientGst'] ?? "").toString().isNotEmpty)
@@ -384,7 +382,7 @@ class PdfInvoiceService {
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text("Quotation No: ", style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey700)),
-                          pw.Text(data['quotationNo'] ?? "", style: pw.TextStyle(font: boldFont, fontSize: 11)),
+                          pw.Text(data['quotationNo'] ?? "", style: pw.TextStyle(font: boldFont, fontSize: 11, color: PdfColors.black)),
                         ],
                       ),
                       pw.SizedBox(height: 4),
@@ -392,7 +390,7 @@ class PdfInvoiceService {
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text("Issue Date: ", style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey700)),
-                          pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: pw.TextStyle(font: boldFont, fontSize: 11)),
+                          pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: pw.TextStyle(font: boldFont, fontSize: 11, color: PdfColors.black)),
                         ],
                       ),
                     ],
@@ -401,7 +399,7 @@ class PdfInvoiceService {
               ),
               pw.SizedBox(height: 20),
 
-              // --- 4. ITEM TABLE (Red Header) ---
+              // --- 4. ITEM TABLE (Black Header & Crisp Monochrome Rows) ---
               pw.TableHelper.fromTextArray(
                 headers: ['DESCRIPTION', 'QTY', 'UNIT PRICE', 'GST', 'AMOUNT'],
                 data: (data['items'] as List<dynamic>).map((item) {
@@ -423,8 +421,8 @@ class PdfInvoiceService {
                 }).toList(),
                 headerStyle: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.white),
                 cellStyle: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black),
-                headerDecoration: pw.BoxDecoration(color: brandRed), // Red Header Background
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.black), // Black Header Background
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
                 cellAlignments: {
                   0: pw.Alignment.centerLeft,
                   1: pw.Alignment.centerRight,
@@ -437,29 +435,29 @@ class PdfInvoiceService {
               ),
               pw.SizedBox(height: 20),
 
-              // --- 5. BOTTOM SECTION ---
+              // --- 5. BOTTOM SECTION (Bank Details & Totals) ---
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // Bank Details
+                  // Bank Details Box
                   pw.Expanded(
                     flex: 5,
                     child: pw.Container(
                       padding: const pw.EdgeInsets.all(10),
                       decoration: pw.BoxDecoration(
-                          border: pw.Border.all(color: PdfColors.grey300),
+                          border: pw.Border.all(color: PdfColors.grey400),
                           borderRadius: pw.BorderRadius.circular(6),
-                          color: const PdfColor.fromInt(0xFFF5F5F5)
+                          color: const PdfColor.fromInt(0xFFF9F9F9)
                       ),
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text("Bank Details:", style: pw.TextStyle(font: boldFont, fontSize: 10, color: brandRed)),
+                          pw.Text("Bank Details:", style: pw.TextStyle(font: boldFont, fontSize: 10, color: PdfColors.black)),
                           pw.SizedBox(height: 6),
-                          pw.Text("Account name- Yoobbel Technologies Private Limited", style: pw.TextStyle(font: font, fontSize: 10)),
-                          pw.Text("Bank Name- Yes Bank", style: pw.TextStyle(font: font, fontSize: 10)),
-                          pw.Text("Account no- 106663300002414", style: pw.TextStyle(font: font, fontSize: 10)),
-                          pw.Text("IFSC code- YESB0001066", style: pw.TextStyle(font: font, fontSize: 10)),
+                          pw.Text("Account name- ${ZobbraBranding.bankAccountName}", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black)),
+                          pw.Text("Bank Name- ${ZobbraBranding.bankName}", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black)),
+                          pw.Text("Account no- ${ZobbraBranding.bankAccountNumber}", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black)),
+                          pw.Text("IFSC code- ${ZobbraBranding.bankIfscCode}", style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black)),
                         ],
                       ),
                     ),
@@ -478,10 +476,10 @@ class PdfInvoiceService {
                         pw.Container(
                           padding: const pw.EdgeInsets.all(6),
                           decoration: pw.BoxDecoration(
-                            border: pw.Border.all(color: brandRed, width: 2), // Thick Red Border for Total
+                            border: pw.Border.all(color: PdfColors.black, width: 1.5), // Crisp Black Border for Total
                             borderRadius: pw.BorderRadius.circular(4),
                           ),
-                          child: _buildSummaryRow("TOTAL", currency.format(data['grandTotal'] ?? 0), boldFont, color: brandRed),
+                          child: _buildSummaryRow("TOTAL", currency.format(data['grandTotal'] ?? 0), boldFont, color: PdfColors.black),
                         ),
                       ],
                     ),
@@ -494,7 +492,7 @@ class PdfInvoiceService {
               // Signature Placeholder
               pw.Align(
                 alignment: pw.Alignment.bottomRight,
-                child: pw.Text("Authorized Signatory", style: pw.TextStyle(font: font, fontSize: 12, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                child: pw.Text("Authorized Signatory", style: pw.TextStyle(font: font, fontSize: 12, fontStyle: pw.FontStyle.italic, color: PdfColors.grey800)),
               ),
             ],
           );
@@ -504,7 +502,7 @@ class PdfInvoiceService {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: '${data['quotationNo']}.pdf',
+      name: '${data['quotationNo'] ?? 'Quotation'}.pdf',
     );
   }
 

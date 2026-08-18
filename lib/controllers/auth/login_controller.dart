@@ -56,7 +56,12 @@ class LoginController extends GetxController {
           return;
         }
 
-        ApiService.saveSession(token, user);
+        final refreshToken = (data['refreshToken'] ?? response['refreshToken']) as String?;
+        final expiresAt = (data['expiresAt'] ?? response['expiresAt']) is int
+            ? (data['expiresAt'] ?? response['expiresAt']) as int
+            : null;
+
+        ApiService.saveSession(token, user, refreshToken: refreshToken, expiresAt: expiresAt);
         await AuthenticationRepository.instance.checkAuthSession();
       } else {
         _showError(response['message']?.toString() ?? "Login failed");

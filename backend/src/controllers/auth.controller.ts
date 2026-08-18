@@ -28,6 +28,16 @@ export class AuthController {
     }
   };
 
+  refresh = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { refreshToken } = req.body;
+      const result = await this.authService.refreshToken(refreshToken);
+      return ApiResponse.success(res, result, 'Token refreshed successfully');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getMe = async (req: Request, res: Response, next: NextFunction) => {
     try {
       return ApiResponse.success(res, req.user, 'Authenticated user profile');
