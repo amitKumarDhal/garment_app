@@ -89,7 +89,7 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
               children: [
                 if (!isEditMode)
                   Obx(
-                        () => Container(
+                    () => Container(
                       margin: const EdgeInsets.only(bottom: 24),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
@@ -109,9 +109,25 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("Last Synced Serial in Database", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800)),
+                                Text(
+                                  "Last Synced Database Serial",
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800),
+                                ),
                                 const SizedBox(height: 2),
-                                Text(controller.isLoading.value ? "Fetching..." : controller.lastOrderSerial.value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87, letterSpacing: 1)),
+                                Text(
+                                  controller.isFetchingSerial.value
+                                      ? "Syncing latest ID..."
+                                      : (controller.lastOrderSerial.value.isNotEmpty ? controller.lastOrderSerial.value : "None yet"),
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87, letterSpacing: 1),
+                                ),
+                                if (controller.serialFetchError.value.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      controller.serialFetchError.value,
+                                      style: const TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -120,7 +136,9 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                               HapticFeedback.lightImpact();
                               controller.fetchLastOrderSerial();
                             },
-                            icon: controller.isLoading.value ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)) : const Icon(Icons.sync_rounded, color: Colors.blue),
+                            icon: controller.isFetchingSerial.value
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue))
+                                : const Icon(Icons.sync_rounded, color: Colors.blue),
                           ),
                         ],
                       ),
@@ -135,12 +153,14 @@ class _MarketingUploadScreenState extends State<MarketingUploadScreen> {
                 // --- SECTION 2: CLIENT INFO ---
                 _buildSectionHeader("Order & Client Details", Icons.business_center_outlined, isDark),
                 _buildFormCard(isDark, [
-                  TCustomTextField(
+                  Obx(
+                    () => TCustomTextField(
                       label: isEditMode ? "Order ID" : "New Order ID (Auto-Generated)",
                       controller: controller.orderNo,
                       prefixIcon: Icons.tag_rounded,
                       readOnly: true,
-                      hintText: isEditMode ? "" : "Syncing..."
+                      hintText: isEditMode ? "" : (controller.isFetchingSerial.value ? "Syncing..." : "Auto-Generated"),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TCustomTextField(

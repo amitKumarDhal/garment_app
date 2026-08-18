@@ -24,6 +24,19 @@ export class OrderService {
     return order;
   }
 
+  async getLastSerial() {
+    const serialInfo = await this.orderRepo.getLatestOrderSerial();
+    return {
+      lastSerial: serialInfo.lastSerial,
+      nextSerial: serialInfo.nextSerial,
+      formattedLastSerial: serialInfo.formattedLastSerial,
+      formattedNextSerial: serialInfo.formattedNextSerial,
+      serial: serialInfo.formattedNextSerial,
+      lastOrderNo: serialInfo.formattedLastSerial,
+      nextOrderNo: serialInfo.formattedNextSerial,
+    };
+  }
+
   async createOrder(data: any, user: AuthUser) {
     // 1. Calculate server-side order total & tax math
     let subTotal = 0;
@@ -52,7 +65,11 @@ export class OrderService {
     const firstProdName = data.products[0]?.productName || 'Garments';
     const rootProdName = data.products.length > 1 ? `${firstProdName} + ${data.products.length - 1} more` : firstProdName;
 
+    // 2. Authoritative serial generation from backend database state
+    const serialInfo = await this.orderRepo.getLatestOrderSerial();
+
     const orderData = {
+      manual_order_no: serialInfo.formattedNextSerial,
       client_name: data.clientName.trim(),
       client_phone: data.clientPhone?.trim() || null,
       organization: data.organization?.trim() || null,
@@ -80,7 +97,7 @@ export class OrderService {
 
     const newOrder = await this.orderRepo.createOrderWithItems(orderData, data.products);
 
-    // 2. If advance payment collected, create payment_request
+    // 3. If advance payment collected, create payment_request
     if (advance > 0) {
       await this.paymentRepo.createRequest({
         order_id: newOrder.id,
@@ -99,30 +116,20 @@ export class OrderService {
     const existing = await this.orderRepo.findById(id);
     if (!existing) throw ApiError.notFound('Order not found');
 
-    const updatePayload: Record<string, any> = {
-      last_updated_by: user.name,
-    };
-
-    if (data.clientName) updatePayload.client_name = data.clientName.trim();
-    if (data.clientPhone !== undefined) updatePayload.client_phone = data.clientPhone?.trim() || null;
-    if (data.organization !== undefined) updatePayload.organization = data.organization?.trim() || null;
-    if (data.clientAddress !== undefined) updatePayload.client_address = data.clientAddress?.trim() || null;
-    if (data.clientGstNumber !== undefined) updatePayload.client_gst_number = data.clientGstNumber?.trim() || null;
-    if (data.pincode) updatePayload.pincode = data.pincode;
-    if (data.state) updatePayload.state = data.state;
-    if (data.deliveryDate) updatePayload.delivery_date = data.deliveryDate;
-    if (data.mockupUrl !== undefined) updatePayload.mockup_url = data.mockupUrl;
-    if (data.productDetails || data.product_details) {
-      updatePayload.product_details = data.productDetails || data.product_details;
+    if (user.role === 'SALES_ASSOCIATE') {
+      if (existing.marketing_person_id !== user.id) {
+        throw ApiError.forbidden('You can only edit your own orders');
+      }
+      if (existing.status !== 'Pending') {
+        throw ApiError.forbidden('Orders can only be edited while in Pending status');
+      }
     }
-    if (data.status) updatePayload.status = data.status;
 
-    // Financial calculations
+    let subTotal = 0;
+    let totalTax = 0;
+    let totalQty = 0;
+
     if (data.products && data.products.length > 0) {
-      let subTotal = 0;
-      let totalTax = 0;
-      let totalQty = 0;
-
       data.products.forEach((prod: any) => {
         const price = Number(prod.price) || 0;
         const qty = Number(prod.qty) || 1;
@@ -135,107 +142,140 @@ export class OrderService {
         totalTax += tax;
         totalQty += qty;
       });
-
-      const shipping = data.shippingCharge !== undefined ? Number(data.shippingCharge) : Number(existing.shipping_charge || 0);
-      const advance = data.advanceAmount !== undefined ? Number(data.advanceAmount) : Number(existing.advance_amount || 0);
-      const grandTotal = subTotal + totalTax + shipping;
-      const balanceDue = grandTotal - advance;
-
-      updatePayload.quantity = totalQty;
-      updatePayload.shipping_charge = shipping;
-      updatePayload.advance_amount = advance;
-      updatePayload.total_amount = grandTotal;
-      updatePayload.balance_due = balanceDue;
-      updatePayload.effective_revenue = grandTotal;
-      updatePayload.gst_percentage = data.products[0]?.gstPercentage || existing.gst_percentage || 0;
-
-      const firstProdName = data.products[0]?.productName || existing.product_name;
-      updatePayload.product_name = data.products.length > 1 ? `${firstProdName} + ${data.products.length - 1} more` : firstProdName;
-
-      return this.orderRepo.updateOrderWithItems(id, updatePayload, data.products);
-    } else if (data.quantity !== undefined || data.total_amount !== undefined || data.totalAmount !== undefined) {
-      const newQty = Number(data.quantity) || existing.quantity;
-      const newTotal = Number(data.total_amount ?? data.totalAmount) || existing.total_amount;
-      const advance = Number(existing.advance_amount || 0);
-      const newBalance = newTotal - advance;
-
-      updatePayload.quantity = newQty;
-      updatePayload.total_amount = newTotal;
-      updatePayload.balance_due = newBalance;
-      updatePayload.effective_revenue = newTotal;
-
-      return this.orderRepo.updateOrderWithItems(id, updatePayload);
     }
 
-    return this.orderRepo.updateOrderWithItems(id, updatePayload);
+    const shipping = data.shippingCharge !== undefined ? Number(data.shippingCharge) : existing.shipping_charge;
+    const advance = data.advanceAmount !== undefined ? Number(data.advanceAmount) : existing.advance_amount;
+    const grandTotal = (data.products && data.products.length > 0) ? (subTotal + totalTax + shipping) : existing.total_amount;
+    const balanceDue = grandTotal - advance;
+
+    const firstProdName = data.products && data.products.length > 0 ? (data.products[0]?.productName || 'Garments') : existing.product_name;
+    const rootProdName = data.products && data.products.length > 1 ? `${firstProdName} + ${data.products.length - 1} more` : firstProdName;
+
+    const updatePayload: Record<string, any> = {
+      client_name: data.clientName ? data.clientName.trim() : existing.client_name,
+      client_phone: data.clientPhone !== undefined ? (data.clientPhone ? data.clientPhone.trim() : null) : existing.client_phone,
+      organization: data.organization !== undefined ? (data.organization ? data.organization.trim() : null) : existing.organization,
+      client_address: data.clientAddress !== undefined ? (data.clientAddress ? data.clientAddress.trim() : null) : existing.client_address,
+      client_gst_number: data.clientGstNumber !== undefined ? (data.clientGstNumber ? data.clientGstNumber.trim() : null) : existing.client_gst_number,
+      pincode: data.pincode !== undefined ? data.pincode : existing.pincode,
+      state: data.state !== undefined ? data.state : existing.state,
+      delivery_date: data.deliveryDate !== undefined ? data.deliveryDate : existing.delivery_date,
+      shipping_charge: shipping,
+      advance_amount: advance,
+      total_amount: grandTotal,
+      balance_due: balanceDue,
+      effective_revenue: grandTotal,
+      product_name: rootProdName,
+      product_details: rootProdName,
+      quantity: totalQty > 0 ? totalQty : existing.quantity,
+      mockup_url: data.mockupUrl !== undefined ? data.mockupUrl : existing.mockup_url,
+    };
+
+    return this.orderRepo.updateOrderWithItems(id, updatePayload, data.products);
   }
 
-  async updateOrderStatus(id: string, status: string, user: AuthUser, extraFields: Record<string, any> = {}) {
-    const order = await this.orderRepo.findById(id);
-    if (!order) throw ApiError.notFound('Order not found');
+  async updateOrderStatus(id: string, newStatus: string, user: AuthUser, extraFields: Record<string, any> = {}) {
+    const existing = await this.orderRepo.findById(id);
+    if (!existing) throw ApiError.notFound('Order not found');
 
-    return this.orderRepo.updateStatus(id, status, user.name, extraFields);
-  }
+    const updated = await this.orderRepo.updateStatus(id, newStatus, user.name, extraFields);
 
-  async approveOrder(id: string, user: AuthUser, approvalData: { effectiveRevenue?: number; marginNumber?: number }) {
-    const order = await this.orderRepo.findById(id);
-    if (!order) throw ApiError.notFound('Order not found');
-
-    const updatePayload: Record<string, any> = {};
-    if (approvalData.effectiveRevenue) {
-      updatePayload.effective_revenue = approvalData.effectiveRevenue;
-    }
-
-    const updated = await this.orderRepo.updateStatus(id, 'Approved', user.name, updatePayload);
-
-    // Notify agent
-    if (order.marketing_person_id) {
+    if (newStatus === 'Production') {
       await this.notificationRepo.createNotification({
-        target_user_id: order.marketing_person_id,
-        title: 'Order Update ✅',
-        message: `Order ${order.manual_order_no} has been approved by ${user.name}.`,
-        type: 'OrderApproved',
-        order_id: order.id,
+        target_user_id: existing.marketing_person_id,
+        order_id: id,
+        title: 'Order Moved to Production',
+        message: `Order #${existing.manual_order_no} for ${existing.client_name} has moved to Production.`,
+        type: 'production_started',
+      });
+    } else if (newStatus === 'Dispatched') {
+      await this.notificationRepo.createNotification({
+        target_user_id: existing.marketing_person_id,
+        order_id: id,
+        title: 'Order Dispatched',
+        message: `Order #${existing.manual_order_no} has been dispatched.`,
+        type: 'order_dispatched',
       });
     }
+
+    return updated;
+  }
+
+  async approveOrder(id: string, user: AuthUser, approvalData: { effectiveRevenue?: number; marginNumber?: number; approvalNotes?: string }) {
+    const existing = await this.orderRepo.findById(id);
+    if (!existing) throw ApiError.notFound('Order not found');
+    if (existing.status !== 'Pending') {
+      throw ApiError.badRequest('Only Pending orders can be approved');
+    }
+
+    const payload: Record<string, any> = {
+      status: 'Approved',
+      approved_by_id: user.id,
+      approved_by_name: user.name,
+      approved_at: new Date().toISOString(),
+      last_updated_by: user.name,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (approvalData.effectiveRevenue !== undefined) {
+      payload.effective_revenue = approvalData.effectiveRevenue;
+    }
+    if (approvalData.marginNumber !== undefined) {
+      payload.margin_number = approvalData.marginNumber;
+    }
+    if (approvalData.approvalNotes) {
+      payload.approval_notes = approvalData.approvalNotes;
+    }
+
+    const updated = await this.orderRepo.updateOrderWithItems(id, payload);
+
+    await this.notificationRepo.createNotification({
+      target_user_id: existing.marketing_person_id,
+      order_id: id,
+      title: 'Order Approved',
+      message: `Your Order #${existing.manual_order_no} (${existing.client_name}) has been Approved!`,
+      type: 'order_approved',
+    });
 
     return updated;
   }
 
   async rejectOrder(id: string, user: AuthUser) {
-    const order = await this.orderRepo.findById(id);
-    if (!order) throw ApiError.notFound('Order not found');
+    const existing = await this.orderRepo.findById(id);
+    if (!existing) throw ApiError.notFound('Order not found');
 
-    const updated = await this.orderRepo.updateStatus(id, 'Rejected', user.name);
+    const updated = await this.orderRepo.updateOrderWithItems(id, {
+      status: 'Cancelled',
+      last_updated_by: user.name,
+      updated_at: new Date().toISOString(),
+    });
 
-    if (order.marketing_person_id) {
-      await this.notificationRepo.createNotification({
-        target_user_id: order.marketing_person_id,
-        title: 'Order Rejected ❌',
-        message: `Order ${order.manual_order_no} was rejected.`,
-        type: 'OrderRejected',
-        order_id: order.id,
-      });
-    }
+    await this.notificationRepo.createNotification({
+      target_user_id: existing.marketing_person_id,
+      order_id: id,
+      title: 'Order Rejected',
+      message: `Order #${existing.manual_order_no} has been rejected/cancelled.`,
+      type: 'order_rejected',
+    });
 
     return updated;
   }
 
   async deleteOrder(id: string, user: AuthUser) {
-    const order = await this.orderRepo.findById(id);
-    if (!order) throw ApiError.notFound('Order not found');
+    const existing = await this.orderRepo.findById(id);
+    if (!existing) throw ApiError.notFound('Order not found');
+
+    if (user.role !== 'ADMIN' && user.role !== 'SALES_MANAGER') {
+      throw ApiError.forbidden('Only Admins or Sales Managers can delete orders');
+    }
 
     return this.orderRepo.deleteOrder(id, true);
   }
 
   async requestDeletion(id: string, user: AuthUser) {
-    const order = await this.orderRepo.findById(id);
-    if (!order) throw ApiError.notFound('Order not found');
-
-    const lockedStatuses = ['Shipping', 'Shipped', 'Delivered', 'Completed'];
-    if (lockedStatuses.includes(order.status)) {
-      throw ApiError.badRequest(`Cannot delete order in ${order.status} stage.`);
-    }
+    const existing = await this.orderRepo.findById(id);
+    if (!existing) throw ApiError.notFound('Order not found');
 
     return this.orderRepo.requestDeletion(id);
   }

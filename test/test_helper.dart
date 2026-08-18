@@ -23,18 +23,35 @@ class TestHelper {
 
     // Mock ApiService to intercept all controller network calls
     ApiService.mockHandler = (String method, String endpoint, dynamic body) async {
+      if (endpoint == '/orders/last-serial' || endpoint.contains('last-serial')) {
+        return {
+          'success': true,
+          'data': {
+            'lastSerial': 260018,
+            'nextSerial': 260019,
+            'formattedLastSerial': 'ZBR260018',
+            'formattedNextSerial': 'ZBR260019',
+            'serial': 'ZBR260019',
+            'lastOrderNo': 'ZBR260018',
+            'nextOrderNo': 'ZBR260019',
+          },
+        };
+      }
       if (endpoint == '/orders' || endpoint.startsWith('/orders?')) {
+        if (method == 'POST') {
+          return {
+            'success': true,
+            'data': {
+              'id': 'new-order-id-12345',
+              'manual_order_no': 'ZBR260019',
+              'client_name': body?['clientName'] ?? 'Test Client',
+            },
+          };
+        }
         return {
           'success': true,
           'orders': <Map<String, dynamic>>[],
           'data': <Map<String, dynamic>>[],
-        };
-      }
-      if (endpoint.contains('last-serial') || endpoint.contains('serial')) {
-        return {
-          'success': true,
-          'serial': 'ORD-1001',
-          'data': {'serial': 'ORD-1001'},
         };
       }
       if (endpoint.contains('/media/upload')) {

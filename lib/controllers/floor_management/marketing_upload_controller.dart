@@ -80,6 +80,12 @@ class MarketingUploadController extends GetxController {
   final grandTotal = 0.0.obs;
   final balanceDue = 0.0.obs;
 
+  // Serial auto-sync observables
+  final isFetchingSerial = false.obs;
+  final serialFetchError = ''.obs;
+  final nextOrderSerial = ''.obs;
+  final lastOrderSerial = ''.obs;
+
   RxBool get isLoading => isSubmitting;
 
   // Centralized option lists
@@ -89,7 +95,6 @@ class MarketingUploadController extends GetxController {
   List<String> get colorOptions => AppConstants.colorOptions;
   List<String> get indianStates => AppConstants.indianStates;
 
-  var lastOrderSerial = 'ZBR001'.obs;
   var selectedState = Rxn<String>('Odisha');
   var selectedDistrict = Rxn<String>();
 
@@ -225,20 +230,37 @@ class MarketingUploadController extends GetxController {
     mockupImage.value = null;
   }
 
+  // ===========================================================================
+  // ORDER SERIAL AUTO-SYNC
+  // ===========================================================================
   Future<void> fetchLastOrderSerial() async {
+    if (isEditing.value) return; // Keep existing order ID in edit mode
     try {
-      final res = await ApiService.get('/orders');
+      isFetchingSerial.value = true;
+      serialFetchError.value = '';
+
+      final res = await ApiService.get('/orders/last-serial');
       if (res['success'] == true && res['data'] != null) {
-        final list = res['data'] as List;
-        if (list.isNotEmpty) {
-          final first = list.first;
-          final serial = first['manual_order_no'] ?? first['manualOrderNo'];
-          if (serial != null && serial.toString().isNotEmpty) {
-            lastOrderSerial.value = serial.toString();
-          }
+        final data = res['data'] is Map<String, dynamic> ? res['data'] as Map<String, dynamic> : res;
+        final next = (data['formattedNextSerial'] ?? data['nextOrderNo'] ?? data['serial'] ?? '').toString();
+        final last = (data['formattedLastSerial'] ?? data['lastOrderNo'] ?? data['lastSerial'] ?? '').toString();
+
+        if (next.isNotEmpty) {
+          nextOrderSerial.value = next;
+          orderNo.text = next;
         }
+        if (last.isNotEmpty) {
+          lastOrderSerial.value = last;
+        }
+      } else {
+        serialFetchError.value = res['message']?.toString() ?? 'Failed to sync latest serial';
       }
-    } catch (_) {}
+    } catch (e) {
+      serialFetchError.value = 'Could not sync serial from server';
+      debugPrint('[MarketingUploadController] Error fetching last serial: $e');
+    } finally {
+      isFetchingSerial.value = false;
+    }
   }
 
   Future<void> chooseDate(BuildContext context) async {
@@ -257,6 +279,7 @@ class MarketingUploadController extends GetxController {
   void loadOrderData(OrderModel order) {
     isEditing.value = true;
     editingOrderId = order.id;
+    orderNo.text = order.manualOrderNo ?? '';
     clientName.text = order.clientName;
     phone.text = order.clientPhone ?? '';
     organization.text = order.organization ?? '';
@@ -314,6 +337,7 @@ class MarketingUploadController extends GetxController {
   }
 
   void clearForm() {
+    orderNo.clear();
     clientName.clear();
     phone.clear();
     organization.clear();
@@ -334,6 +358,7 @@ class MarketingUploadController extends GetxController {
     }
     items.clear();
     addDefaultProductRow();
+    fetchLastOrderSerial();
   }
 
   // ===========================================================================
@@ -408,9 +433,14 @@ class MarketingUploadController extends GetxController {
       }
 
       if (response['success'] == true) {
+        final orderData = response['data'] is Map<String, dynamic> ? response['data'] as Map<String, dynamic> : response;
+        final assignedOrderNo = (orderData['manual_order_no'] ?? orderData['manualOrderNo'] ?? '').toString();
+
         Get.snackbar(
           isEditing.value ? "Order Updated" : "Order Submitted",
-          isEditing.value ? "Order updated successfully" : "Order has been created successfully",
+          isEditing.value
+              ? "Order updated successfully"
+              : "Order $assignedOrderNo created successfully",
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );

@@ -15,6 +15,15 @@ export class OrderController {
     }
   };
 
+  getLastSerial = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const serialData = await this.orderService.getLastSerial();
+      return ApiResponse.success(res, serialData, 'Latest order serial fetched successfully');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const order = await this.orderService.getOrderById(req.params.id);

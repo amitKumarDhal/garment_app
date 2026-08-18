@@ -11,6 +11,7 @@ const controller = new OrderController();
 router.use(authenticateToken);
 
 router.get('/', controller.getAll);
+router.get('/last-serial', controller.getLastSerial);
 router.get('/:id', controller.getById);
 router.post('/', validateRequest(createOrderSchema), controller.create);
 router.put('/:id/status', validateRequest(updateOrderStatusSchema), controller.updateStatus);
